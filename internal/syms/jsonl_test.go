@@ -1,14 +1,25 @@
 package syms
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
+	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	gomacho "github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/model"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
@@ -29,6 +40,420 @@ func rawLines(t *testing.T, b []byte) [][]byte {
 		t.Fatalf("scan error: %v", err)
 	}
 	return lines
+}
+
+func TestFactsEmitterPreservesDistinctVolumeOccurrences(t *testing.T) {
+	for typ, want := range map[string]string{
+		"fs": "filesystem", "sys": "SystemOS", "app": "AppOS", "exc": "ExclaveOS",
+	} {
+		if got := factsVolumeLabel(typ); got != want {
+			t.Fatalf("facts volume label %q = %q, want %q", typ, got, want)
+		}
+	}
+
+	var buf bytes.Buffer
+	em := newJSONLEmitter(&buf)
+	source := &gomacho.File{FileTOC: gomacho.FileTOC{FileHeader: types.FileHeader{
+		CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E,
+	}}}
+	image := func(volume string) *scanImage {
+		return &scanImage{
+			Kind:        "macho",
+			VolumeLabel: volume,
+			Macho: &model.Macho{
+				UUID: "SAME-UUID",
+				Path: model.Path{Path: "/usr/lib/same.dylib"},
+			},
+		}
+	}
+
+	for _, volume := range []string{"SystemOS", "AppOS"} {
+		if err := em.facts(image(volume), source); err != nil {
+			t.Fatalf("emit %s facts: %v", volume, err)
+		}
+	}
+
+	lines := rawLines(t, buf.Bytes())
+	if len(lines) != 2 {
+		t.Fatalf("facts lines = %d, want 2: %s", len(lines), buf.String())
+	}
+	var first, second comparisonFactsLine
+	if err := json.Unmarshal(lines[0], &first); err != nil {
+		t.Fatalf("decode first facts record: %v", err)
+	}
+	if err := json.Unmarshal(lines[1], &second); err != nil {
+		t.Fatalf("decode second facts record: %v", err)
+	}
+	if first.Occurrence.Path != second.Occurrence.Path || first.Occurrence.UUID != second.Occurrence.UUID {
+		t.Fatalf("test inputs did not preserve same image identity: first=%+v second=%+v", first.Occurrence, second.Occurrence)
+	}
+	if first.Occurrence.VolumeLabel != "SystemOS" || second.Occurrence.VolumeLabel != "AppOS" {
+		t.Fatalf("volume occurrences collapsed or relabeled: first=%+v second=%+v", first.Occurrence, second.Occurrence)
+	}
+	if first.Facts.CPU.Type != uint32(types.CPUArm64) || first.Facts.CPU.Subtype != uint32(types.CPUSubtypeArm64E) {
+		t.Fatalf("numeric CPU identity missing: %+v", first.Facts.CPU)
+	}
+}
+
+type failSecondWrite struct {
+	buf   bytes.Buffer
+	calls int
+}
+
+func (w *failSecondWrite) Write(data []byte) (int, error) {
+	w.calls++
+	if w.calls == 2 {
+		return 0, errors.New("synthetic writer failure")
+	}
+	return w.buf.Write(data)
+}
+
+func TestFactsCompletionRequiresSuccessfulWriter(t *testing.T) {
+	w := &failSecondWrite{}
+	bw := bufio.NewWriterSize(w, 4096)
+	em := newJSONLEmitter(bw)
+	em.factsCount = 1
+	em.factsCounts[coverageKey{"kernel", "kernelcache"}] = 1
+	if err := em.emit(map[string]string{"type": "comparison_facts"}); err != nil {
+		t.Fatalf("emit facts record: %v", err)
+	}
+
+	err := finishFactsStream(bw, em, &factsCollection{coverage: []factsCoverage{{
+		Family: "kernel", Volume: "kernelcache", Status: "successful",
+	}}})
+	if err == nil || !strings.Contains(err.Error(), "synthetic writer failure") {
+		t.Fatalf("finish error = %v, want synthetic writer failure", err)
+	}
+	if strings.Contains(w.buf.String(), "comparison_facts_complete") {
+		t.Fatalf("failed stream contains successful completion: %s", w.buf.String())
+	}
+	if !strings.Contains(w.buf.String(), `"type":"comparison_facts"`) {
+		t.Fatalf("pre-failure facts record was not flushed: %s", w.buf.String())
+	}
+}
+
+func TestFactsCompletionRecordsSuccessfulStream(t *testing.T) {
+	var out bytes.Buffer
+	bw := bufio.NewWriter(&out)
+	em := newJSONLEmitter(bw)
+	em.factsCount = 3
+	em.factsCounts[coverageKey{"kernel", "kernelcache"}] = 3
+	if err := finishFactsStream(bw, em, &factsCollection{coverage: []factsCoverage{{
+		Family: "kernel", Volume: "kernelcache", Status: "successful",
+	}}}); err != nil {
+		t.Fatalf("finish facts stream: %v", err)
+	}
+	lines := rawLines(t, out.Bytes())
+	if len(lines) != 1 {
+		t.Fatalf("completion lines = %d, want 1", len(lines))
+	}
+	var completion comparisonFactsCompleteLine
+	if err := json.Unmarshal(lines[0], &completion); err != nil {
+		t.Fatalf("decode completion: %v", err)
+	}
+	if completion.Type != "comparison_facts_complete" || completion.Records != 3 || !completion.RequiresSuccessfulProcessExit {
+		t.Fatalf("completion = %+v", completion)
+	}
+}
+
+func TestFactsSourceIdentityUsesBytesAndDetectsChanges(t *testing.T) {
+	path := t.TempDir() + "/source.ipsw"
+	data := []byte("synthetic source bytes")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	source, snapshot, err := readFactsSource(path)
+	if err != nil {
+		t.Fatalf("read source identity: %v", err)
+	}
+	wantSHA1, wantSHA256 := sha1.Sum(data), sha256.Sum256(data)
+	if source.LegacySHA1 != fmt.Sprintf("%x", wantSHA1) || source.SHA256 != fmt.Sprintf("%x", wantSHA256) || source.Length != int64(len(data)) {
+		t.Fatalf("source identity = %+v", source)
+	}
+	if err := snapshot.validate(path); err != nil {
+		t.Fatalf("unchanged source rejected: %v", err)
+	}
+	if err := os.WriteFile(path, append(data, '!'), 0o600); err != nil {
+		t.Fatalf("change source: %v", err)
+	}
+	if err := snapshot.validate(path); err == nil {
+		t.Fatal("changed source passed consistency validation")
+	}
+}
+
+func TestFactsCollectionBindsAllSelectedIdentitiesDeterministically(t *testing.T) {
+	identity := func(board, kernel string) plist.BuildIdentity {
+		return plist.BuildIdentity{
+			ApProductType: "iPhone18,1",
+			Info:          plist.IdentityInfo{DeviceClass: board, Variant: "Customer Erase Install (IPSW)"},
+			Manifest: map[string]plist.IdentityManifest{
+				"KernelCache":       {Info: map[string]any{"Path": kernel}},
+				"OS":                {Info: map[string]any{"Path": "filesystem.dmg"}},
+				"Cryptex1,SystemOS": {Info: map[string]any{"Path": "system.dmg"}},
+			},
+		}
+	}
+	newInfo := func(identities []plist.BuildIdentity) *info.Info {
+		return &info.Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
+			SupportedProductTypes: []string{"iPhone18,1"}, BuildIdentities: identities,
+		}}}
+	}
+	cfg := &JSONLConfig{Device: "iPhone18,1", Kernel: true, FileSystem: true}
+	source := factsSourceIdentity{LegacySHA1: "sha1", SHA256: "sha256", Length: 42}
+	first, err := newFactsCollection(cfg, newInfo([]plist.BuildIdentity{
+		identity("d24ap", "kernelcache.research.d24"), identity("d23ap", "kernelcache.release.d23"),
+	}), source)
+	if err != nil {
+		t.Fatalf("first collection: %v", err)
+	}
+	second, err := newFactsCollection(cfg, newInfo([]plist.BuildIdentity{
+		identity("d23ap", "kernelcache.release.d23"), identity("d24ap", "kernelcache.research.d24"),
+	}), source)
+	if err != nil {
+		t.Fatalf("second collection: %v", err)
+	}
+	if first.start.CollectionID != second.start.CollectionID {
+		t.Fatalf("collection ID depends on identity order: %s != %s", first.start.CollectionID, second.start.CollectionID)
+	}
+	if !slices.Equal(first.start.Selection.Boards, []string{"d23ap", "d24ap"}) || len(first.start.Selection.Identities) != 2 {
+		t.Fatalf("selection lost identities: %+v", first.start.Selection)
+	}
+	wantKernels := []string{"kernelcache.release.d23", "kernelcache.research.d24"}
+	if got := componentPaths(first.start.Selection, "KernelCache"); !slices.Equal(got, wantKernels) {
+		t.Fatalf("kernel components = %v, want %v", got, wantKernels)
+	}
+}
+
+func TestFactsCollectionRejectsEmptyKernelSelection(t *testing.T) {
+	const selector = "iPhone18,1"
+	inf := testVolumeInfo(map[string]string{"OS": "filesystem.dmg"})
+	collection, err := newFactsCollection(&JSONLConfig{Device: selector, Kernel: true}, inf, factsSourceIdentity{})
+	if err == nil || !strings.Contains(err.Error(), selector) || !strings.Contains(err.Error(), "KernelCache") {
+		t.Fatalf("expected empty KernelCache selection error naming %q, got %v", selector, err)
+	}
+	if collection != nil {
+		t.Fatal("empty kernel selection returned a collection")
+	}
+}
+
+func TestFactsCollectionVersionsFilesystemContract(t *testing.T) {
+	inf := testVolumeInfo(map[string]string{"OS": "filesystem.dmg", "KernelCache": "kernelcache.release.test"})
+	source := factsSourceIdentity{LegacySHA1: "sha1", SHA256: "sha256", Length: 42}
+	kernelOnly, err := newFactsCollection(&JSONLConfig{Kernel: true}, inf, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filesystem, err := newFactsCollection(&JSONLConfig{FileSystem: true}, inf, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kernelOnly.start.CollectionSchemaVersion != factsCollectionSchemaVersionV3 {
+		t.Fatalf("kernel-only collection version = %d, want v3", kernelOnly.start.CollectionSchemaVersion)
+	}
+	if filesystem.start.CollectionSchemaVersion != factsCollectionSchemaVersionV2 {
+		t.Fatalf("filesystem collection version = %d, want v2", filesystem.start.CollectionSchemaVersion)
+	}
+	v1ID, err := factsCollectionID(factsCollectionSchemaVersionV1, source, filesystem.start.Selection, filesystem.start.Requested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1ID == filesystem.start.CollectionID {
+		t.Fatal("collection ID is not bound to the collection schema version")
+	}
+	for _, family := range []string{"standalone_entitlements", "symbol_table", "cstring_comparison", "function_start_comparison"} {
+		row := findCoverage(t, filesystem.coverage, family, "all")
+		if row.Status != "unavailable" {
+			t.Fatalf("%s coverage = %+v, want explicitly unavailable", family, row)
+		}
+	}
+	filesystem.coverage = []factsCoverage{{Family: "filesystem_macho", Volume: "filesystem", Status: "successful"}}
+	emitter := newJSONLEmitter(&bytes.Buffer{})
+	completion, err := filesystem.completion(emitter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completion.CollectionSchemaVersion != factsCollectionSchemaVersionV2 || completion.CollectionID != filesystem.start.CollectionID {
+		t.Fatalf("filesystem completion = %+v", completion)
+	}
+}
+
+func TestFactsCoverageDistinguishesAbsentAliasAndUnselected(t *testing.T) {
+	selection := factsManifestSelection{Identities: []factsManifestIdentity{{Components: []factsManifestComponent{
+		{Name: "OS", Path: "shared.dmg"},
+	}}}}
+	selected := initialFactsCoverage(&JSONLConfig{FileSystem: true}, selection)
+	if row := findCoverage(t, selected, "filesystem_macho", "filesystem"); row.Status != "unavailable" {
+		t.Fatalf("selected filesystem = %+v", row)
+	}
+	if row := findCoverage(t, selected, "filesystem_macho", "SystemOS"); row.Status != "unavailable" || row.AliasOf != "filesystem" {
+		t.Fatalf("SystemOS alias = %+v", row)
+	}
+	if row := findCoverage(t, selected, "filesystem_macho", "AppOS"); row.Status != "absent" {
+		t.Fatalf("absent AppOS = %+v", row)
+	}
+	unselected := initialFactsCoverage(&JSONLConfig{}, selection)
+	if row := findCoverage(t, unselected, "filesystem_macho", "AppOS"); row.Status != "not-selected" {
+		t.Fatalf("unselected AppOS = %+v", row)
+	}
+}
+
+func TestFactsCompletionReconcilesExactFramedRecords(t *testing.T) {
+	var body bytes.Buffer
+	em := newJSONLEmitter(&body)
+	source := &gomacho.File{FileTOC: gomacho.FileTOC{FileHeader: types.FileHeader{CPU: types.CPUArm64}}}
+	images := []*scanImage{
+		{Kind: "kernel", Macho: &model.Macho{UUID: "KERNEL"}},
+		{Kind: "kext", KernelUUID: "KERNEL", Macho: &model.Macho{UUID: "KEXT"}},
+		{Kind: "dylib", DSCUUID: "DSC", Macho: &model.Macho{UUID: "DYLIB"}},
+	}
+	for _, image := range images {
+		if err := em.facts(image, source); err != nil {
+			t.Fatalf("emit %s: %v", image.Kind, err)
+		}
+	}
+	collection := &factsCollection{start: factsCollectionStartLine{CollectionID: "bound"}, coverage: []factsCoverage{
+		{Family: "kernel", Volume: "kernelcache", Status: "successful"},
+		{Family: "kext", Volume: "kernelcache", Status: "successful"},
+		{Family: "dsc", Volume: "SystemOS", RecordVolume: "dyld_shared_cache", Status: "successful"},
+	}}
+	completion, err := collection.completion(em)
+	if err != nil {
+		t.Fatalf("complete collection: %v", err)
+	}
+	wantDigest := sha256.Sum256(body.Bytes())
+	if completion.Records != 3 || completion.RecordsSHA256 != fmt.Sprintf("%x", wantDigest) {
+		t.Fatalf("completion = %+v", completion)
+	}
+	var covered uint64
+	for _, row := range completion.Coverage {
+		covered += row.Records
+	}
+	if covered != completion.Records {
+		t.Fatalf("coverage records = %d, total = %d", covered, completion.Records)
+	}
+	collection.coverage[0].Status = "unavailable"
+	collection.coverage[0].Reason = "selected collection did not finish"
+	if _, err := collection.completion(em); err == nil {
+		t.Fatal("incomplete selected coverage produced a completion")
+	}
+}
+
+func TestFactsKernelComponentsRemainIndependent(t *testing.T) {
+	var body bytes.Buffer
+	emitter := newJSONLEmitter(&body)
+	source := &gomacho.File{FileTOC: gomacho.FileTOC{FileHeader: types.FileHeader{CPU: types.CPUArm64}}}
+	paths := []string{"kernelcache.release.iphone17", "kernelcache.research.iphone17"}
+	collection := &factsCollection{start: factsCollectionStartLine{CollectionSchemaVersion: 3},
+		coverage: []factsCoverage{
+			{Family: "kernel", Volume: "kernelcache", Status: "successful", ComponentPaths: paths},
+			{Family: "kext", Volume: "kernelcache", Status: "successful", ComponentPaths: paths},
+		}}
+	for _, component := range paths {
+		for _, kind := range []string{"kernel", "kext"} {
+			image := &scanImage{Kind: kind, ComponentPath: component, KernelUUID: "KERNEL",
+				Macho: &model.Macho{UUID: kind, Path: model.Path{Path: "same-image"}}}
+			if err := emitter.facts(image, source); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	lines := rawLines(t, body.Bytes())
+	if len(lines) != 4 {
+		t.Fatalf("shared names/UUIDs lost occurrences: %d", len(lines))
+	}
+	var release, research comparisonFactsLine
+	if err := json.Unmarshal(lines[1], &release); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(lines[3], &research); err != nil {
+		t.Fatal(err)
+	}
+	if release.Occurrence.ContainerNamespace != "kernelcache/release" || research.Occurrence.ContainerNamespace != "kernelcache/research" ||
+		release.Occurrence.ComponentPath != paths[0] || research.Occurrence.ComponentPath != paths[1] ||
+		!reflect.DeepEqual(release.Facts, research.Facts) {
+		t.Fatal("component provenance was lost or leaked into semantic facts")
+	}
+	footer, err := collection.completion(emitter)
+	if err != nil || footer.Records != 4 || len(footer.Coverage[0].ComponentRecords) != 2 {
+		t.Fatalf("component completion: %+v, %v", footer, err)
+	}
+	delete(emitter.componentCounts[coverageKey{"kernel", "kernelcache"}], paths[1])
+	if _, err := collection.completion(emitter); err == nil {
+		t.Fatal("missing research container accepted")
+	}
+	if _, err := kernelFactsNamespace("kernelcache.unknown.iphone17"); err == nil {
+		t.Fatal("unknown variant silently classified")
+	}
+}
+
+func TestFactsKernelExtractionRetainsArchivePaths(t *testing.T) {
+	paths := []string{"kernelcache.release.iphone17", "kernelcache.research.iphone17"}
+	inf := testVolumeInfo(map[string]string{"KernelCache": paths[0]}, map[string]string{"KernelCache": paths[1]})
+	collection, err := newFactsCollection(&JSONLConfig{Kernel: true}, inf, factsSourceIdentity{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	for _, component := range paths {
+		payload, err := img4.CreatePayload(&img4.CreatePayloadConfig{
+			Type: img4.IM4P_KERNELCACHE, Version: "test", Data: []byte(component), Compression: "lzss",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded, err := payload.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, err := writer.Create(component)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write(encoded); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(t.TempDir(), "test.ipsw")
+	if err := os.WriteFile(source, archive.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	extracted, err := extractScanKernels(source, "", t.TempDir(), inf, collection)
+	if err != nil || len(extracted) != 2 {
+		t.Fatalf("extract exact kernel components: %v, %v", extracted, err)
+	}
+	for file, component := range extracted {
+		data, err := os.ReadFile(file)
+		if err != nil || string(data) != component {
+			t.Fatalf("extracted payload/source mismatch: %q, %q, %v", component, data, err)
+		}
+	}
+}
+
+func findCoverage(t *testing.T, rows []factsCoverage, family, volume string) factsCoverage {
+	t.Helper()
+	for _, row := range rows {
+		if row.Family == family && row.Volume == volume {
+			return row
+		}
+	}
+	t.Fatalf("missing coverage %s/%s", family, volume)
+	return factsCoverage{}
+}
+
+func TestLegacyJSONLHeaderBytesRemainUnchanged(t *testing.T) {
+	var out bytes.Buffer
+	em := newJSONLEmitter(&out)
+	if err := em.emit(&ipswLine{Type: "ipsw", ID: "legacy-sha1", Name: "source.ipsw", Version: "26.6", Build: "23G71", Platform: "ios", Devices: []string{"iPhone18,1"}}); err != nil {
+		t.Fatalf("emit header: %v", err)
+	}
+	want := "{\"type\":\"ipsw\",\"id\":\"legacy-sha1\",\"name\":\"source.ipsw\",\"version\":\"26.6\",\"build\":\"23G71\",\"platform\":\"ios\",\"devices\":[\"iPhone18,1\"]}\n"
+	if out.String() != want {
+		t.Fatalf("legacy header changed:\n got %q\nwant %q", out.String(), want)
+	}
 }
 
 // decodeLines splits a JSONL buffer into a slice of generic maps, one per line.

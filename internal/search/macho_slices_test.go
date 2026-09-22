@@ -54,6 +54,29 @@ func TestMachoWalkersSelectSlices(t *testing.T) {
 	}
 }
 
+func TestForEachMachoSlicesRetainsFatOrderAndPropagatesErrors(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "tool")
+	testutil.WriteMacho(t, path,
+		testutil.MachoArch{CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64EX1},
+		testutil.MachoArch{CPU: types.CPUAmd64, SubCPU: types.CPUSubtypeX8664All})
+	wantErr := errors.New("stop")
+	calls := 0
+	err := search.ForEachMachoSlices(root, func(gotPath string, slices []*macho.File) error {
+		calls++
+		if gotPath != path || len(slices) != 2 {
+			t.Fatalf("got path=%q slices=%d, want path=%q slices=2", gotPath, len(slices), path)
+		}
+		if slices[0].CPU != types.CPUArm64 || slices[1].CPU != types.CPUAmd64 {
+			t.Fatalf("slice order = [%s, %s], want [arm64, amd64]", slices[0].CPU, slices[1].CPU)
+		}
+		return wantErr
+	})
+	if !errors.Is(err, wantErr) || calls != 1 {
+		t.Fatalf("error=%v calls=%d, want stop and one call", err, calls)
+	}
+}
+
 func TestMachoMultiWalkSelectsPerHandler(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range []string{"a", "b"} {

@@ -21,3 +21,13 @@ func TestSymbolsRunsWithoutJSONFlag(t *testing.T) {
 		t.Fatalf("err=%v, want missing file validation after default JSONL mode", err)
 	}
 }
+
+func TestSymbolsExposesOptInFactsFlag(t *testing.T) {
+	flag := symbolsCmd.Flags().Lookup("facts")
+	if flag == nil {
+		t.Fatal("symbols command is missing --facts")
+	}
+	if flag.DefValue != "false" {
+		t.Fatalf("--facts default = %q, want false", flag.DefValue)
+	}
+}

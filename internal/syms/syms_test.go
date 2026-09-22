@@ -1,10 +1,18 @@
 package syms
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/blacktop/go-macho"
 )
+
+func TestExtractScanKernelsRequiresIPSWMetadata(t *testing.T) {
+	_, err := extractScanKernels("missing.ipsw", "", "", nil, &factsCollection{})
+	if err == nil || !strings.Contains(err.Error(), "missing IPSW metadata") || !strings.Contains(err.Error(), "missing.ipsw") {
+		t.Fatalf("expected missing IPSW metadata error, got %v", err)
+	}
+}
 
 func seg(name string) *macho.Segment {
 	return &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: name, Addr: 0x1000, Filesz: 0x100}}

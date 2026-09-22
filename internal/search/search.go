@@ -612,6 +612,16 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error, select
 	})
 }
 
+// ForEachMachoSlices walks the folder and calls handler once with every open
+// slice of each Mach-O file. Slices remain open only for the handler call.
+func ForEachMachoSlices(folder string, handler func(string, []*macho.File) error) error {
+	return WalkFilesInRoot(folder, func(file string) error {
+		return withMachoSlices(file, func(slices []*macho.File) error {
+			return handler(file, slices)
+		})
+	})
+}
+
 // ForEachIm4pInIPSW walks the IPSW and calls the handler for each im4p
 // firmware Mach-O file found. skippedUnsupportedExclave is called for Exclave
 // app bundles that parse as a known but unsupported bundle type.

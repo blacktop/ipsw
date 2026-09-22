@@ -13,6 +13,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/db"
@@ -36,13 +37,15 @@ const (
 // scanConfig selects which sources of an IPSW a scan walks.
 type scanConfig struct {
 	Device     string
-	Info       *info.Info // pre-parsed IPSW metadata; nil parses IPSW
+	Info       *info.Info // pre-parsed IPSW metadata; nil parses IPSW for DSC/filesystem scans, exact kernel extraction requires it
 	IPSW       string
 	PemDB      string
 	SigsDir    string
 	Kernel     bool
 	DSC        bool
 	FileSystem bool
+	Facts      scanFactsVisitor
+	Collection *factsCollection
 }
 
 // scanImage is a single Mach-O image surfaced while scanning an IPSW, paired
@@ -52,21 +55,29 @@ type scanConfig struct {
 // Macho is normalized exactly as the daemon database stores it, so the symbol
 // start/end values are byte-identical whether they are persisted or streamed.
 type scanImage struct {
-	Macho             *model.Macho // nil for a "dsc" container event
-	Kind              string       // "dsc", "dylib", "kext", "kernel", or "macho"
-	CPU               string       // lowercase arch slice, e.g. "arm64e"
-	Arch              string       // lowercase arch slice, e.g. "arm64e"
-	DSCUUID           string       // parent DSC UUID ("dsc" + "dylib")
-	SharedRegionStart uint64       // parent DSC shared region start ("dsc")
-	IsFileset         bool         // kernel image is a fileset container, not a loadable kernel Mach-O
-	KernelUUID        string       // parent kernelcache UUID ("kext")
-	KernelVersion     string       // kernelcache version ("kernel")
-	KernelPath        string       // canonical path of a file-system kernel ("macho"), see fileSystemKernelPath
+	Macho             *model.Macho                   // nil for a "dsc" container event
+	Kind              string                         // "dsc", "dylib", "kext", "kernel", or "macho"
+	CPU               string                         // lowercase arch slice, e.g. "arm64e"
+	Arch              string                         // lowercase arch slice, e.g. "arm64e"
+	DSCUUID           string                         // parent DSC UUID ("dsc" + "dylib")
+	SharedRegionStart uint64                         // parent DSC shared region start ("dsc")
+	IsFileset         bool                           // kernel image is a fileset container, not a loadable kernel Mach-O
+	KernelUUID        string                         // parent kernelcache UUID ("kext")
+	KernelVersion     string                         // kernelcache version ("kernel")
+	KernelPath        string                         // canonical path of a file-system kernel ("macho"), see fileSystemKernelPath
+	ComponentPath     string                         // exact BuildManifest KernelCache path for collection v3
+	VolumeLabel       string                         // exact source volume label for file-system Mach-Os
+	SliceSelection    *comparisonFactsSliceSelection // filesystem facts occurrence selection; nil for other sources
 }
 
 // scanVisitor is invoked once per image (and once per DSC container) as an IPSW
 // is walked. Returning an error aborts the scan.
 type scanVisitor func(*scanImage) error
+
+// scanFactsVisitor observes an image while its source Mach-O is still open and
+// before the symbol stream's enrichment is assembled. Nil keeps the ordinary
+// scan path free of comparison hashing and entitlement parsing.
+type scanFactsVisitor func(*scanImage, *macho.File) error
 
 // dbAccumulator is a scanVisitor that rebuilds the nested model graph the daemon
 // database persists, preserving the exact structure the previous Scan produced.
@@ -225,7 +236,7 @@ func kextTextSegment(m *macho.File) *macho.Segment {
 // scanKernels extracts every kernelcache from the IPSW and visits the cache
 // container plus each of its KEXTs. Kernel and KEXT symbol addresses are
 // bit-63-cleared (highestBitMask) exactly as the daemon database stores them.
-func scanKernels(ipswPath, sigDir, device string, visit scanVisitor) error {
+func scanKernels(ipswPath, sigDir, device string, inf *info.Info, collection *factsCollection, visit scanVisitor, facts scanFactsVisitor) error {
 	var sigs []signature.Symbolicator
 
 	if sigDir != "" {
@@ -236,19 +247,15 @@ func scanKernels(ipswPath, sigDir, device string, visit scanVisitor) error {
 		}
 	}
 
-	out, err := extract.Kernelcache(&extract.Config{
-		IPSW:         ipswPath,
-		KernelDevice: device,
-		Output:       os.TempDir(),
-	})
+	scratch, err := os.MkdirTemp("", "ipsw_scan_kernels-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(scratch)
+	out, err := extractScanKernels(ipswPath, device, scratch, inf, collection)
 	if err != nil {
 		return fmt.Errorf("failed to extract kernelcache: %w", err)
 	}
-	defer func() {
-		for k := range out {
-			os.Remove(k)
-		}
-	}()
 	// Walk kernelcaches in path order so the first emission of a kext shared
 	// between them (e.g. release and research caches) is the same every run.
 	for _, k := range slices.Sorted(maps.Keys(out)) {
@@ -279,14 +286,21 @@ func scanKernels(ipswPath, sigDir, device string, visit scanVisitor) error {
 			container.TextEnd = (text.Addr + text.Filesz) & highestBitMask
 		}
 		if m.FileTOC.FileHeader.Type == types.MH_FILESET {
-			if err := visit(&scanImage{
+			kernelImage := &scanImage{
 				Macho:         container,
 				Kind:          "kernel",
 				CPU:           arch,
 				Arch:          arch,
 				IsFileset:     true,
 				KernelVersion: kv.String(),
-			}); err != nil {
+				ComponentPath: out[k],
+			}
+			if facts != nil {
+				if err := facts(kernelImage, m); err != nil {
+					return err
+				}
+			}
+			if err := visit(kernelImage); err != nil {
 				return err
 			}
 			for idx, fe := range m.FileSets() {
@@ -306,26 +320,40 @@ func scanKernels(ipswPath, sigDir, device string, visit scanVisitor) error {
 					kext.TextStart = text.Addr & highestBitMask
 					kext.TextEnd = (text.Addr + text.Filesz) & highestBitMask
 				}
+				kextImage := &scanImage{
+					Macho:         kext,
+					Kind:          "kext",
+					CPU:           machoArch(mfe),
+					Arch:          machoArch(mfe),
+					KernelUUID:    m.UUID().String(),
+					ComponentPath: out[k],
+				}
+				if facts != nil {
+					if err := facts(kextImage, mfe); err != nil {
+						return err
+					}
+				}
 				kext.Symbols = collectKernelMachoSymbols(mfe, smap)
-				if err := visit(&scanImage{
-					Macho:      kext,
-					Kind:       "kext",
-					CPU:        machoArch(mfe),
-					Arch:       machoArch(mfe),
-					KernelUUID: m.UUID().String(),
-				}); err != nil {
+				if err := visit(kextImage); err != nil {
 					return err
 				}
 			}
 		} else {
-			container.Symbols = collectKernelMachoSymbols(m, smap)
-			if err := visit(&scanImage{
+			kernelImage := &scanImage{
 				Macho:         container,
 				Kind:          "kernel",
 				CPU:           arch,
 				Arch:          arch,
 				KernelVersion: kv.String(),
-			}); err != nil {
+				ComponentPath: out[k],
+			}
+			if facts != nil {
+				if err := facts(kernelImage, m); err != nil {
+					return err
+				}
+			}
+			container.Symbols = collectKernelMachoSymbols(m, smap)
+			if err := visit(kernelImage); err != nil {
 				return err
 			}
 		}
@@ -334,11 +362,43 @@ func scanKernels(ipswPath, sigDir, device string, visit scanVisitor) error {
 	return nil
 }
 
+func extractScanKernels(ipswPath, device, output string, inf *info.Info, collection *factsCollection) (map[string]string, error) {
+	result := make(map[string]string)
+	if collection == nil {
+		out, err := extract.Kernelcache(&extract.Config{IPSW: ipswPath, KernelDevice: device, Output: output})
+		for file := range out {
+			result[file] = ""
+		}
+		return result, err
+	}
+	if inf == nil {
+		return nil, fmt.Errorf("missing IPSW metadata for exact kernel component extraction from %q", ipswPath)
+	}
+	// Extract one exact archive member at a time, retaining its manifest path.
+	// An extracted filename is presentation metadata, not source provenance.
+	for _, component := range componentPaths(collection.start.Selection, "KernelCache") {
+		out, err := kernelcache.ExtractWithInfo(inf, ipswPath, output, component)
+		if err != nil {
+			return nil, err
+		}
+		if len(out) != 1 {
+			return nil, fmt.Errorf("kernel component %q produced %d files", component, len(out))
+		}
+		for file := range out {
+			if _, duplicate := result[file]; duplicate {
+				return nil, fmt.Errorf("kernel components collide at extracted path %q", file)
+			}
+			result[file] = component
+		}
+	}
+	return result, nil
+}
+
 // scanDSCsInMount finds every dyld_shared_cache in an already-mounted volume and
 // visits a "dsc" container (carrying shared_region_start) followed by each of its
 // dylib images. The mount is provided by the caller so the volume is mounted once
 // and shared with the file-system Mach-O walk.
-func scanDSCsInMount(mountPoint string, visit scanVisitor) error {
+func scanDSCsInMount(mountPoint string, visit scanVisitor, facts scanFactsVisitor) error {
 	dscPaths, err := dyld.GetDscPathsInMount(mountPoint, false, true)
 	if err != nil {
 		return fmt.Errorf("failed to find DSCs in %s: %w", mountPoint, err)
@@ -356,7 +416,7 @@ func scanDSCsInMount(mountPoint string, visit scanVisitor) error {
 		if err != nil {
 			return fmt.Errorf("failed to open DSC %s: %w", dscPath, err)
 		}
-		if err := scanDSC(f, visit); err != nil {
+		if err := scanDSC(f, visit, facts); err != nil {
 			f.Close()
 			return err
 		}
@@ -365,7 +425,7 @@ func scanDSCsInMount(mountPoint string, visit scanVisitor) error {
 	return nil
 }
 
-func scanDSC(f *dyld.File, visit scanVisitor) error {
+func scanDSC(f *dyld.File, visit scanVisitor, facts scanFactsVisitor) error {
 	if err := visit(&scanImage{
 		Kind:              "dsc",
 		DSCUUID:           f.UUID.String(),
@@ -380,9 +440,12 @@ func scanDSC(f *dyld.File, visit scanVisitor) error {
 			"name":  img.Name,
 		}).Debug("Parsing DSC Image")
 		img.ParsePublicSymbols(false)
-		img.ParseLocalSymbols(false)
+		localSymbolsOK := img.ParseLocalSymbols(false) == nil
 		m, err := img.GetMacho()
 		if err != nil {
+			if facts != nil {
+				img.Free()
+			}
 			return fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
 		}
 		dylib := &model.Macho{
@@ -392,6 +455,24 @@ func scanDSC(f *dyld.File, visit scanVisitor) error {
 		if text := m.Segment("__TEXT"); text != nil {
 			dylib.TextStart = text.Addr
 			dylib.TextEnd = text.Addr + text.Filesz
+		}
+		if facts != nil {
+			// Match the reference DSC diff extractor: local cache symbols are raw
+			// input names and must be captured before output symbol enrichment.
+			if localSymbolsOK && m.Symtab != nil {
+				m.Symtab.Syms = append(m.Symtab.Syms, img.GetLocalSymbolsAsMachoSymbols()...)
+			}
+			factsImage := &scanImage{
+				Macho:   dylib,
+				Kind:    "dylib",
+				CPU:     machoArch(m),
+				Arch:    machoArch(m),
+				DSCUUID: f.UUID.String(),
+			}
+			if err := facts(factsImage, m); err != nil {
+				img.Free()
+				return err
+			}
 		}
 		for _, fn := range m.GetFunctions() {
 			var msym *model.Symbol
@@ -417,7 +498,13 @@ func scanDSC(f *dyld.File, visit scanVisitor) error {
 			Arch:    machoArch(m),
 			DSCUUID: f.UUID.String(),
 		}); err != nil {
+			if facts != nil {
+				img.Free()
+			}
 			return err
+		}
+		if facts != nil {
+			img.Free()
 		}
 	}
 	return nil
@@ -452,55 +539,143 @@ func fileSystemKernelPath(raw string, textStart uint64) string {
 	return ""
 }
 
-// scanMachosInMount walks every Mach-O in an already-mounted volume and visits
-// it as a "macho" image. The path is reported relative to the mount point so it
+// scanMachosInMount walks every Mach-O in an already-mounted volume. Facts see
+// every slice before enrichment; the ordinary visitor keeps the historical
+// last-slice selection. The path is reported relative to the mount point so it
 // matches the path the daemon database stores. Addresses are raw: file-system
 // kernels keep kernelSpaceBit here, and are flagged via KernelPath so the JSONL
 // stream can present them as kernel images.
-func scanMachosInMount(mountPoint string, visit scanVisitor) error {
-	return search.ForEachMacho(mountPoint, func(path string, m *macho.File) error {
-		if m.UUID() == nil {
-			return nil
-		}
+func scanMachosInMount(mountPoint, volumeLabel string, visit scanVisitor, facts scanFactsVisitor) error {
+	return search.ForEachMachoSlices(mountPoint, func(path string, slices []*macho.File) error {
 		if _, rest, ok := strings.Cut(path, mountPoint); ok {
 			path = rest
 		}
-		mm := &model.Macho{
-			UUID: m.UUID().String(),
-			Path: model.Path{Path: path},
-		}
-		if text := m.Segment("__TEXT"); text != nil {
-			mm.TextStart = text.Addr
-			mm.TextEnd = text.Addr + text.Filesz
-		}
-		for _, fn := range m.GetFunctions() {
-			var msym *model.Symbol
-			if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
-				for _, sym := range syms {
-					fn.Name = sym.Name
-				}
-				msym = &model.Symbol{
-					Name:  model.Name{Name: fn.Name},
-					Start: fn.StartAddr,
-					End:   fn.EndAddr,
-				}
-			} else {
-				msym = &model.Symbol{
-					Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
-					Start: fn.StartAddr,
-					End:   fn.EndAddr,
-				}
-			}
-			mm.Symbols = append(mm.Symbols, msym)
-		}
-		return visit(&scanImage{
-			Macho:      mm,
-			Kind:       "macho",
-			CPU:        machoArch(m),
-			Arch:       machoArch(m),
-			KernelPath: fileSystemKernelPath(path, mm.TextStart),
-		})
+		return scanMachoSlices(path, volumeLabel, slices, visit, facts)
 	})
+}
+
+type machoSliceIdentity struct {
+	cpu    types.CPU
+	subCPU types.CPUSubtype
+}
+
+func filesystemSliceSelections(path string, slices []*macho.File) ([]comparisonFactsSliceSelection, error) {
+	if len(slices) == 0 {
+		return nil, fmt.Errorf("filesystem Mach-O %s has no slices", path)
+	}
+	seen := make(map[machoSliceIdentity]struct{}, len(slices))
+	for idx, m := range slices {
+		if m == nil {
+			return nil, fmt.Errorf("filesystem Mach-O %s has nil slice %d", path, idx)
+		}
+		identity := machoSliceIdentity{cpu: m.CPU, subCPU: m.SubCPU}
+		if _, ok := seen[identity]; ok {
+			return nil, fmt.Errorf("filesystem Mach-O %s has duplicate CPU/subtype %#x/%#x", path, uint32(m.CPU), uint32(m.SubCPU))
+		}
+		seen[identity] = struct{}{}
+	}
+
+	machoReference := slices[len(slices)-1]
+	entitlementReference := ent.PreferredSlice(path, slices)
+	selections := make([]comparisonFactsSliceSelection, len(slices))
+	var machoMatches, entitlementMatches int
+	for idx, m := range slices {
+		selections[idx] = comparisonFactsSliceSelection{
+			Version:              factsSliceSelectionVersion,
+			MachoReference:       m == machoReference,
+			EntitlementReference: m == entitlementReference,
+		}
+		if selections[idx].MachoReference {
+			machoMatches++
+		}
+		if selections[idx].EntitlementReference {
+			entitlementMatches++
+		}
+	}
+	if machoMatches != 1 || entitlementMatches != 1 {
+		return nil, fmt.Errorf("filesystem Mach-O %s has ambiguous slice selection (macho=%d entitlement=%d)", path, machoMatches, entitlementMatches)
+	}
+	return selections, nil
+}
+
+func filesystemScanImage(path, volumeLabel string, m *macho.File) *scanImage {
+	mm := &model.Macho{Path: model.Path{Path: path}}
+	if uuid := m.UUID(); uuid != nil {
+		mm.UUID = uuid.String()
+	}
+	if text := m.Segment("__TEXT"); text != nil {
+		mm.TextStart = text.Addr
+		mm.TextEnd = text.Addr + text.Filesz
+	}
+	arch := machoArch(m)
+	return &scanImage{
+		Macho:       mm,
+		Kind:        "macho",
+		CPU:         arch,
+		Arch:        arch,
+		KernelPath:  fileSystemKernelPath(path, mm.TextStart),
+		VolumeLabel: volumeLabel,
+	}
+}
+
+func scanMachoSlices(path, volumeLabel string, slices []*macho.File, visit scanVisitor, facts scanFactsVisitor) error {
+	if facts != nil {
+		selections, err := filesystemSliceSelections(path, slices)
+		if err != nil {
+			return err
+		}
+		for idx, m := range slices {
+			image := filesystemScanImage(path, volumeLabel, m)
+			image.SliceSelection = &selections[idx]
+			if err := facts(image, m); err != nil {
+				return err
+			}
+		}
+	}
+	if len(slices) == 0 || slices[len(slices)-1] == nil {
+		return fmt.Errorf("filesystem Mach-O %s has no legacy slice", path)
+	}
+	m := slices[len(slices)-1]
+	image := filesystemScanImage(path, volumeLabel, m)
+	if image.Macho.UUID == "" {
+		return nil
+	}
+	for _, fn := range m.GetFunctions() {
+		var msym *model.Symbol
+		if syms, err := m.FindAddressSymbols(fn.StartAddr); err == nil {
+			for _, sym := range syms {
+				fn.Name = sym.Name
+			}
+			msym = &model.Symbol{
+				Name:  model.Name{Name: fn.Name},
+				Start: fn.StartAddr,
+				End:   fn.EndAddr,
+			}
+		} else {
+			msym = &model.Symbol{
+				Name:  model.Name{Name: fmt.Sprintf("func_%x", fn.StartAddr)},
+				Start: fn.StartAddr,
+				End:   fn.EndAddr,
+			}
+		}
+		image.Macho.Symbols = append(image.Macho.Symbols, msym)
+	}
+	return visit(image)
+}
+
+func factsVolumeLabel(typ string) string {
+	switch typ {
+	case "fs":
+		return "filesystem"
+	case "sys":
+		return "SystemOS"
+	case "app":
+		return "AppOS"
+	case "exc":
+		return "ExclaveOS"
+	default:
+		return typ
+	}
 }
 
 func optionalVolumePresent(inf *info.Info, typ string) (bool, error) {
@@ -546,10 +721,9 @@ func rescanTarget(existing *model.Ipsw) *model.Ipsw {
 // each. Each distinct volume is therefore extracted/decrypted/mounted a single
 // time per scan.
 func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
-	var inf *info.Info
+	inf := cfg.Info
 	if cfg.DSC || cfg.FileSystem {
 		var err error
-		inf = cfg.Info
 		if inf == nil {
 			inf, err = info.Parse(cfg.IPSW)
 			if err != nil {
@@ -563,8 +737,12 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 	}
 
 	if cfg.Kernel {
-		if err := scanKernels(cfg.IPSW, cfg.SigsDir, cfg.Device, visit); err != nil {
+		if err := scanKernels(cfg.IPSW, cfg.SigsDir, cfg.Device, inf, cfg.Collection, visit, cfg.Facts); err != nil {
 			return fmt.Errorf("failed to scan kernels: %w", err)
+		}
+		if cfg.Collection != nil {
+			cfg.Collection.markSuccessful("kernel", "kernelcache")
+			cfg.Collection.markSuccessful("kext", "kernelcache")
 		}
 	}
 	if !cfg.DSC && !cfg.FileSystem {
@@ -579,12 +757,12 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 	}()
 
 	walked := make(map[string]bool)
-	walk := func(mountPoint string) error {
-		if walked[mountPoint] {
+	walk := func(mountPoint, volumeLabel string) error {
+		if cfg.Facts == nil && walked[mountPoint] {
 			return nil // a volume aliased to one already walked (e.g. sys==fs)
 		}
 		walked[mountPoint] = true
-		return scanMachosInMount(mountPoint, visit)
+		return scanMachosInMount(mountPoint, volumeLabel, visit, cfg.Facts)
 	}
 
 	// The SystemOS volume hosts both the DSC and most framework Mach-Os; mount
@@ -594,13 +772,20 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 		return fmt.Errorf("failed to mount SystemOS: %w", err)
 	}
 	if cfg.DSC {
-		if err := scanDSCsInMount(sysMount, visit); err != nil {
+		if err := scanDSCsInMount(sysMount, visit, cfg.Facts); err != nil {
 			return fmt.Errorf("failed to scan DSCs: %w", err)
+		}
+		if cfg.Collection != nil {
+			cfg.Collection.markSuccessful("dsc", "SystemOS")
 		}
 	}
 	if cfg.FileSystem {
-		if err := walk(sysMount); err != nil {
+		if err := walk(sysMount, factsVolumeLabel("sys")); err != nil {
 			return fmt.Errorf("failed to scan SystemOS machos: %w", err)
+		}
+		if cfg.Collection != nil {
+			cfg.Collection.markSuccessful("filesystem_macho", "SystemOS")
+			cfg.Collection.markSuccessful("kernel", "SystemOS")
 		}
 		for _, typ := range []string{"fs", "app", "exc"} {
 			present, err := optionalVolumePresent(inf, typ)
@@ -615,8 +800,12 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 			if err != nil {
 				return fmt.Errorf("failed to mount %s volume: %w", typ, err)
 			}
-			if err := walk(mountPoint); err != nil {
+			if err := walk(mountPoint, factsVolumeLabel(typ)); err != nil {
 				return fmt.Errorf("failed to scan %s machos: %w", typ, err)
+			}
+			if cfg.Collection != nil {
+				cfg.Collection.markSuccessful("filesystem_macho", factsVolumeLabel(typ))
+				cfg.Collection.markSuccessful("kernel", factsVolumeLabel(typ))
 			}
 		}
 	}

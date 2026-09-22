@@ -40,6 +40,7 @@ func init() {
 	symbolsCmd.Flags().Bool("dyld", false, "Include dyld_shared_cache dylib symbols")
 	symbolsCmd.Flags().Bool("kernel", false, "Include kernelcache/KEXT symbols")
 	symbolsCmd.Flags().Bool("filesystem", false, "Include file system Mach-O symbols")
+	symbolsCmd.Flags().Bool("facts", false, "Emit versioned per-image comparison facts")
 	symbolsCmd.Flags().String("signatures", "", "Path to kernel symbolication signatures directory")
 	symbolsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolsCmd.Flags().String("device", "", "Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)")
@@ -49,6 +50,7 @@ func init() {
 	viper.BindPFlag("symbols.dyld", symbolsCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("symbols.kernel", symbolsCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("symbols.filesystem", symbolsCmd.Flags().Lookup("filesystem"))
+	viper.BindPFlag("symbols.facts", symbolsCmd.Flags().Lookup("facts"))
 	viper.BindPFlag("symbols.signatures", symbolsCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("symbols.pem-db", symbolsCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbols.device", symbolsCmd.Flags().Lookup("device"))
@@ -78,7 +80,17 @@ database stores them, so a server backed by this output returns byte-identical
 results to the daemon. Kernels found on the file system
 (/System/Library/Kernels/kernel*, /System/Library/KernelCollections/*.kc) are
 emitted the same way: kind "kernel", canonical /System/Library/... path, and
-bit-63-cleared text and symbol ranges.`,
+bit-63-cleared text and symbol ranges.
+
+With --facts, a "comparison_facts_collection_start" line follows the "ipsw" line.
+One versioned "comparison_facts" line is emitted per FAT slice, before that
+file's image/symbol lines (if it gets any), including UUID-less Mach-Os and
+deduplicated occurrences (for example a KEXT shared by release and research
+kernelcaches, or a volume mounted under two labels). Kernelcaches are selected
+from BuildManifest KernelCache components and named from the device-filtered
+metadata, so with --device a kernelcache image path can differ from the same
+scan without --facts. A final "comparison_facts_complete" line is written only
+after every requested source has been scanned successfully.`,
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	Hidden:        true,
@@ -134,6 +146,7 @@ bit-63-cleared text and symbol ranges.`,
 			Kernel:     kernel,
 			DSC:        dyld,
 			FileSystem: filesystem,
+			Facts:      viper.GetBool("symbols.facts"),
 		}, out)
 	},
 }
