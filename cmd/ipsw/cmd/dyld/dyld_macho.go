@@ -299,25 +299,7 @@ var MachoCmd = &cobra.Command{
 						fmt.Println("=====")
 					}
 					if m.HasSwift() {
-						image.ParseLocalSymbols(false) // parse local symbols for swift demangling
-						if m.Symtab != nil {
-							for idx, sym := range m.Symtab.Syms {
-								if sym.Value != 0 {
-									if sym.Name == "<redacted>" {
-										if name, ok := f.AddressToSymbol.Get(sym.Value); ok {
-											m.Symtab.Syms[idx].Name = name
-										}
-									}
-								}
-								if doDemangle {
-									if swift.IsMangled(sym.Name) {
-										m.Symtab.Syms[idx].Name, _ = swift.Demangle(sym.Name)
-									} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
-										m.Symtab.Syms[idx].Name = demangle.Do(sym.Name, false, false)
-									}
-								}
-							}
-						}
+						image.ResolveLocalSymbolNames(m, doDemangle)
 						fixedLocals = true
 						s, err := mcmd.NewSwift(m, f, &mcmd.SwiftConfig{
 							Verbose:  verbose,

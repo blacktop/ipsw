@@ -14,6 +14,17 @@ description: 🚧 Swift class-dump a dylib from a DSC or MachO
 ipsw swift-dump [<DSC> <DYLIB>|<MACHO>] [flags]
 ```
 
+### Examples
+
+```bash
+# Swift-dump a dylib from a DSC
+❯ ipsw swift-dump <DSC> <DYLIB> --demangle
+# Swift-dump a standalone MachO binary
+❯ ipsw swift-dump <MACHO> --demangle
+# Structurally diff a dylib's Swift between two DSC versions (added/removed/changed)
+❯ ipsw swift-dump <NEW_DSC> <DYLIB> --diff <OLD_DSC> --demangle
+```
+
 ### Options
 
 ```
@@ -22,6 +33,7 @@ ipsw swift-dump [<DSC> <DYLIB>|<MACHO>] [flags]
   -a, --ass string      Dump associated type (regex)
       --demangle        Demangle symbol names
       --deps            Dump imported private frameworks as well
+      --diff string     Structurally diff Swift against another DSC/MachO (same DYLIB)
   -e, --ext string      Dump extension (regex)
       --extra           Dump all other Swift sections/info
       --headers         Create separate header files for each Swift type/protocol/extension

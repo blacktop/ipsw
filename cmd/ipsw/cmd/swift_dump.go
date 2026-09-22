@@ -28,12 +28,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/pkg/swift"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -62,6 +62,11 @@ func init() {
 	swiftDumpCmd.Flags().StringP("ass", "a", "", "Dump associated type (regex)")
 	// swiftDumpCmd.Flags().Bool("re", false, "RE verbosity (with addresses)")
 	swiftDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
+	swiftDumpCmd.Flags().String("diff", "", "Structurally diff Swift against another DSC/MachO (same DYLIB)")
+	swiftDumpCmd.MarkFlagFilename("diff")
+	for _, other := range []string{"all", "deps", "extra", "interface", "output", "headers", "type", "proto", "ext", "ass"} {
+		swiftDumpCmd.MarkFlagsMutuallyExclusive("diff", other)
+	}
 
 	viper.BindPFlag("swift-dump.all", swiftDumpCmd.Flags().Lookup("all"))
 	viper.BindPFlag("swift-dump.deps", swiftDumpCmd.Flags().Lookup("deps"))
@@ -77,6 +82,87 @@ func init() {
 	viper.BindPFlag("swift-dump.ass", swiftDumpCmd.Flags().Lookup("ass"))
 	// viper.BindPFlag("swift-dump.re", swiftDumpCmd.Flags().Lookup("re"))
 	viper.BindPFlag("swift-dump.arch", swiftDumpCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("swift-dump.diff", swiftDumpCmd.Flags().Lookup("diff"))
+}
+
+// openSwiftForDiff loads the Swift metadata of a standalone MachO, or of an
+// in-cache dylib when path is a DSC. The returned func releases the backing file.
+func openSwiftForDiff(path, dylib, arch string, conf *mcmd.SwiftConfig) (*mcmd.Swift, func(), error) {
+	path = filepath.Clean(path)
+	if ok, _ := magic.IsMachO(path); ok {
+		mr, err := mcmd.OpenMachO(path, arch)
+		if err != nil {
+			return nil, nil, err
+		}
+		s, err := mcmd.NewSwift(mr.File, nil, conf)
+		if err != nil {
+			mr.Close()
+			return nil, nil, err
+		}
+		return s, func() { mr.Close() }, nil
+	}
+	if dylib == "" {
+		return nil, nil, fmt.Errorf("must provide an in-cache DYLIB to diff")
+	}
+	f, err := dyld.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	img, err := f.Image(dylib)
+	if err != nil {
+		f.Close()
+		return nil, nil, fmt.Errorf("failed to find dylib '%s' in DSC '%s': %v", dylib, filepath.Base(path), err)
+	}
+	m, err := img.GetMacho()
+	if err != nil {
+		f.Close()
+		return nil, nil, fmt.Errorf("failed to parse MachO from dylib '%s': %v", filepath.Base(img.Name), err)
+	}
+	img.ResolveLocalSymbolNames(m, conf.Demangle)
+	s, err := mcmd.NewSwift(m, f, conf)
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	return s, func() { f.Close() }, nil
+}
+
+// runSwiftDumpDiff compares the Swift of args[0] (the newer build) against
+// oldPath, using the same DYLIB (args[1]) for both when the inputs are DSCs.
+func runSwiftDumpDiff(args []string, oldPath string, conf *mcmd.SwiftConfig) error {
+	dylib := ""
+	if len(args) > 1 {
+		dylib = args[1]
+	}
+	arch := viper.GetString("swift-dump.arch")
+
+	if dylib != "" {
+		conf.Name = filepath.Base(dylib)
+	} else {
+		conf.Name = filepath.Base(args[0])
+	}
+
+	newSwift, closeNew, err := openSwiftForDiff(args[0], dylib, arch, conf)
+	if err != nil {
+		return fmt.Errorf("failed to load new target '%s': %w", filepath.Base(args[0]), err)
+	}
+	defer closeNew()
+
+	oldSwift, closeOld, err := openSwiftForDiff(oldPath, dylib, arch, conf)
+	if err != nil {
+		return fmt.Errorf("failed to load --diff target '%s': %w", filepath.Base(oldPath), err)
+	}
+	defer closeOld()
+
+	out, err := newSwift.Diff(oldSwift)
+	if err != nil {
+		return err
+	}
+	if conf.Color {
+		return quick.Highlight(os.Stdout, out, "diff", "terminal256", conf.Theme)
+	}
+	fmt.Print(out)
+	return nil
 }
 
 // swiftDumpCmd represents the swiftDump command
@@ -84,7 +170,14 @@ var swiftDumpCmd = &cobra.Command{
 	Use:     "swift-dump [<DSC> <DYLIB>|<MACHO>]",
 	Aliases: []string{"sd"},
 	Short:   "🚧 Swift class-dump a dylib from a DSC or MachO",
-	Args:    cobra.MinimumNArgs(1),
+	Example: heredoc.Doc(`
+		# Swift-dump a dylib from a DSC
+		❯ ipsw swift-dump <DSC> <DYLIB> --demangle
+		# Swift-dump a standalone MachO binary
+		❯ ipsw swift-dump <MACHO> --demangle
+		# Structurally diff a dylib's Swift between two DSC versions (added/removed/changed)
+		❯ ipsw swift-dump <NEW_DSC> <DYLIB> --diff <OLD_DSC> --demangle`),
+	Args: cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
 			return getImages(args[0]), cobra.ShellCompDirectiveNoFileComp
@@ -141,6 +234,10 @@ var swiftDumpCmd = &cobra.Command{
 			Theme:       viper.GetString("swift-dump.theme"),
 			Output:      viper.GetString("swift-dump.output"),
 			Headers:     viper.GetBool("swift-dump.headers"),
+		}
+
+		if oldPath := viper.GetString("swift-dump.diff"); oldPath != "" {
+			return runSwiftDumpDiff(args, oldPath, &conf)
 		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
@@ -226,25 +323,7 @@ var swiftDumpCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse MachO from dylib '%s': %v", filepath.Base(image.Name), err)
 				}
 
-				image.ParseLocalSymbols(false) // parse local symbols for swift demangling
-				if m.Symtab != nil {
-					for idx, sym := range m.Symtab.Syms {
-						if sym.Value != 0 {
-							if sym.Name == "<redacted>" {
-								if name, ok := f.AddressToSymbol.Get(sym.Value); ok {
-									m.Symtab.Syms[idx].Name = name
-								}
-							}
-						}
-						if doDemangle {
-							if swift.IsMangled(sym.Name) {
-								m.Symtab.Syms[idx].Name, _ = swift.Demangle(sym.Name)
-							} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
-								m.Symtab.Syms[idx].Name = demangle.Do(sym.Name, false, false)
-							}
-						}
-					}
-				}
+				image.ResolveLocalSymbolNames(m, doDemangle)
 
 				conf.Name = filepath.Base(image.Name)
 

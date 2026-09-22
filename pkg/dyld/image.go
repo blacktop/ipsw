@@ -14,8 +14,10 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/symbols"
@@ -1044,6 +1046,31 @@ func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no local symbol at %#x", addr)
+}
+
+// ResolveLocalSymbolNames parses the image's local symbols and rewrites the
+// "<redacted>" entries in m's symbol table with their real names, optionally
+// demangling every Swift and C++ name, so Swift metadata dumps can label
+// methods and witnesses.
+func (i *CacheImage) ResolveLocalSymbolNames(m *macho.File, demangleNames bool) {
+	i.ParseLocalSymbols(false)
+	if m.Symtab == nil {
+		return
+	}
+	for idx, sym := range m.Symtab.Syms {
+		if sym.Value != 0 && sym.Name == "<redacted>" {
+			if name, ok := i.cache.AddressToSymbol.Get(sym.Value); ok {
+				m.Symtab.Syms[idx].Name = name
+			}
+		}
+		if demangleNames {
+			if swift.IsMangled(sym.Name) {
+				m.Symtab.Syms[idx].Name, _ = swift.Demangle(sym.Name)
+			} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
+				m.Symtab.Syms[idx].Name = demangle.Do(sym.Name, false, false)
+			}
+		}
+	}
 }
 
 // ParseLocalSymbols parses and caches, with the option to dump, all the local/private symbols for an image
