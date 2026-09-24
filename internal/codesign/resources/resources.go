@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-macho"
+	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-plist"
 	pl "github.com/blacktop/ipsw/pkg/plist"
 )
@@ -35,6 +36,17 @@ type CodeResources struct {
 	Files2 map[string]hash2  `plist:"files2,omitempty" xml:"files2,omitempty"`
 	Rules  map[string]any    `plist:"rules,omitempty" xml:"rules,omitempty"`
 	Rules2 map[string]any    `plist:"rules2,omitempty" xml:"rules2,omitempty"`
+}
+
+// designatedRequirement returns the text of the designated requirement, or ""
+// if the signature has none. Other requirement types can come before it.
+func designatedRequirement(reqs []cstypes.Requirement) string {
+	for _, req := range reqs {
+		if req.Type == cstypes.DesignatedRequirementType {
+			return req.Detail
+		}
+	}
+	return ""
 }
 
 func CreateCodeResources(dir string) error {
@@ -207,10 +219,7 @@ func CreateCodeResources(dir string) error {
 		if err != nil {
 			return err
 		}
-		var requirement string
-		if len(cs.Requirements) > 0 {
-			requirement = cs.Requirements[0].Detail
-		}
+		requirement := designatedRequirement(cs.Requirements)
 		relPath, err = filepath.Rel(filepath.Join(dir, "Contents"), fwpath)
 		if err != nil {
 			return err
