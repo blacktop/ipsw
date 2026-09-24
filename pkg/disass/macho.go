@@ -182,8 +182,8 @@ func (d *MachoDisass) Triage() error {
 // FindSwiftStrings walks a function extracts Swift StringObjects/String Structs/Compiler optimized strings
 // ref - test/SILOptimizer/character_literals.swift
 // ref - stdlib/public/core/StringObject.swift
+// Trailing bytes after the last complete instruction word are ignored.
 func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
-	var instrValue uint32
 	var prevInstr disassemble.Inst
 	var hasPrev bool
 
@@ -192,7 +192,7 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 		Locations: make(map[uint64][]uint64),
 	}
 	startAddr := d.StartAddr()
-	r := bytes.NewReader(d.Data())
+	data := d.Data()
 
 	out = make(map[uint64]string)
 
@@ -206,12 +206,8 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 	nextVal := uint64(0)
 
 	// extract all Swift strings
-	for {
-		err := binary.Read(r, binary.LittleEndian, &instrValue)
-
-		if err == io.EOF {
-			break
-		}
+	for i := 0; i+4 <= len(data); i += 4 {
+		instrValue := binary.LittleEndian.Uint32(data[i:])
 
 		var instruction disassemble.Inst
 		if err := d.decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
