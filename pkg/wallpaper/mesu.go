@@ -4,15 +4,19 @@ package wallpaper
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"image/jpeg"
 	"image/png"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download"
@@ -23,6 +27,9 @@ const (
 	updateURL       = "https://mesu.apple.com/assets/com_apple_MobileAsset_Wallpaper/com_apple_MobileAsset_Wallpaper.xml"
 	macOsUpdateURL  = "https://mesu.apple.com/assets/macos/com_apple_MobileAsset_DesktopPicture/com_apple_MobileAsset_DesktopPicture.xml"
 	macOsAerialsURL = "https://configuration.apple.com/configurations/internetservices/aerials/resources-config-15-0.plist"
+
+	sipsPath    = "/usr/bin/sips"
+	sipsTimeout = 30 * time.Second
 )
 
 type WallpaperAsset struct {
@@ -86,7 +93,7 @@ func resizePNGThumbnail(imgBytes []byte) ([]byte, error) {
 }
 
 // convertWithSips uses macOS ImageIO via sips for HEIC-family wallpaper previews.
-func convertWithSips(imgBytes []byte, sourceExt string) ([]byte, error) {
+func convertWithSips(ctx context.Context, imgBytes []byte, sourceExt string) ([]byte, error) {
 	tempDir, err := os.MkdirTemp("", "ipsw-wallpaper-*")
 	if err != nil {
 		return nil, fmt.Errorf("unable to create temporary directory for %s preview: %w", sourceExt, err)
@@ -99,12 +106,24 @@ func convertWithSips(imgBytes []byte, sourceExt string) ([]byte, error) {
 	}
 
 	outputPath := filepath.Join(tempDir, "thumbnail.png")
-	cmd := exec.Command("sips", "--resampleHeight", "700", "-s", "format", "png", sourcePath, "--out", outputPath)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("sips failed to convert %s preview: %w (%s)", sourceExt, err, strings.TrimSpace(string(output)))
+	cmd := exec.CommandContext(ctx, sipsPath,
+		"--resampleHeight", "700", "-s", "format", "png", sourcePath, "--out", outputPath)
+	// Stop waiting on output pipes that a child of a killed sips may still hold open.
+	cmd.WaitDelay = time.Second
+	output, err := cmd.CombinedOutput()
+	sipsOutput := strings.TrimSpace(string(output))
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("sips did not finish converting %s preview: %w", sourceExt, ctxErr)
+		}
+		return nil, fmt.Errorf("sips failed to convert %s preview: %w (%s)", sourceExt, err, sipsOutput)
 	}
 
 	converted, err := os.ReadFile(outputPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		// sips exits 0 without writing output when it skips an input it cannot read.
+		return nil, fmt.Errorf("sips produced no %s preview (%s)", sourceExt, sipsOutput)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("unable to read converted %s preview: %w", sourceExt, err)
 	}
@@ -112,7 +131,9 @@ func convertWithSips(imgBytes []byte, sourceExt string) ([]byte, error) {
 	return converted, nil
 }
 
-func extractThumbnailPreview(imgBytes []byte, thumbnailFile string) ([]byte, error) {
+func extractThumbnailPreview(
+	ctx context.Context, imgBytes []byte, thumbnailFile string,
+) ([]byte, error) {
 	thumbnailExt := strings.ToLower(filepath.Ext(thumbnailFile))
 	if bytes.HasPrefix(imgBytes, []byte("\x89PNG")) {
 		thumbnailExt = ".png"
@@ -120,7 +141,9 @@ func extractThumbnailPreview(imgBytes []byte, thumbnailFile string) ([]byte, err
 
 	switch thumbnailExt {
 	case ".avif", ".heic", ".heif":
-		converted, err := convertWithSips(imgBytes, thumbnailExt)
+		ctx, cancel := context.WithTimeout(ctx, sipsTimeout)
+		defer cancel()
+		converted, err := convertWithSips(ctx, imgBytes, thumbnailExt)
 		if err != nil {
 			return nil, fmt.Errorf("unable to decode %s preview: %w", thumbnailExt, err)
 		}
@@ -154,7 +177,8 @@ func FetchWallpaperPlist() (*MESUAssets, error) {
 
 // ExtractThumbnailBytes downloads a wallpaper zip from the given URL and extracts the thumbnail image to a byte slice,
 // resizing it to a fixed height while preserving aspect ratio.
-func ExtractThumbnailBytes(url, proxy string, insecure bool) ([]byte, error) {
+// Canceling ctx kills any running HEIC conversion.
+func ExtractThumbnailBytes(ctx context.Context, url, proxy string, insecure bool) ([]byte, error) {
 	zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
 		Proxy:    proxy,
 		Insecure: insecure,
@@ -205,7 +229,7 @@ func ExtractThumbnailBytes(url, proxy string, insecure bool) ([]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("unable to read thumbnail image %s: %v", thumbnailFile, err)
 			}
-			return extractThumbnailPreview(imgBytes, thumbnailFile)
+			return extractThumbnailPreview(ctx, imgBytes, thumbnailFile)
 		}
 	}
 

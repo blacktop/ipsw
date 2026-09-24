@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/list"
@@ -125,7 +127,18 @@ type model struct {
 	termHeight     int
 	lastImageID    string
 	imageError     error
+
+	// ctx is canceled by Close; previews run under it so quitting kills their sips children.
+	ctx      context.Context
+	cancel   context.CancelFunc
+	mu       sync.Mutex
+	closed   bool
+	previews sync.WaitGroup
 }
+
+// previewShutdownGrace bounds how long Close waits for previews to exit, since
+// the zip download they may be blocked on does not observe ctx.
+const previewShutdownGrace = 2 * time.Second
 
 func NewWallpaperTUI(ctx context.Context) (*model, error) {
 	// Fetch wallpapers first
@@ -160,7 +173,10 @@ func NewWallpaperTUI(ctx context.Context) (*model, error) {
 	delegate.Styles.NormalDesc = itemStyle.Foreground(mutedColor)
 	l.SetDelegate(delegate)
 
+	ctx, cancel := context.WithCancel(ctx)
 	m := &model{
+		ctx:         ctx,
+		cancel:      cancel,
 		list:        l,
 		help:        help.New(),
 		spinner:     spinner.New(),
@@ -174,6 +190,37 @@ func NewWallpaperTUI(ctx context.Context) (*model, error) {
 	m.spinner.Spinner = spinner.Dot
 
 	return m, nil
+}
+
+// Close cancels in-flight previews and waits up to previewShutdownGrace for
+// them to exit, so no sips process outlives the TUI. Call it after Run returns.
+func (m *model) Close() {
+	m.mu.Lock()
+	m.closed = true
+	m.mu.Unlock()
+	m.cancel()
+
+	done := make(chan struct{})
+	go func() {
+		m.previews.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(previewShutdownGrace):
+		log.Warn("wallpaper preview did not stop before exit")
+	}
+}
+
+// beginPreview registers a running preview unless Close has already started.
+func (m *model) beginPreview() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return false
+	}
+	m.previews.Add(1)
+	return true
 }
 
 func (m *model) Init() tea.Cmd {
@@ -228,7 +275,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// For non-cached images, start loading but keep current image visible
 						m.loadingPreview = true
 						m.status = "Loading preview for " + item.asset.WallpaperName + "..."
-						return m, previewWallpaperCmd(item.asset, item.index)
+						return m, m.previewWallpaperCmd(item.asset, item.index)
 					}
 				}
 			}
@@ -516,13 +563,18 @@ type previewResultMsg struct {
 	err      error
 }
 
-func previewWallpaperCmd(asset wallpaper.WallpaperAsset, row int) tea.Cmd {
+func (m *model) previewWallpaperCmd(asset wallpaper.WallpaperAsset, row int) tea.Cmd {
 	return func() tea.Msg {
+		if !m.beginPreview() {
+			return nil
+		}
+		defer m.previews.Done()
+
 		log.Debugf("Previewing wallpaper: %s", asset.WallpaperName)
 		url := asset.BaseURL + asset.RelativePath
 
 		// Download and extract thumbnail
-		imgBytes, err := wallpaper.ExtractThumbnailBytes(url, "", false)
+		imgBytes, err := wallpaper.ExtractThumbnailBytes(m.ctx, url, "", false)
 		if err != nil {
 			return previewResultMsg{row: row, asset: asset, err: fmt.Errorf("failed to extract thumbnail: %w", err)}
 		}

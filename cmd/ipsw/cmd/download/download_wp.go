@@ -51,6 +51,7 @@ var downloadWpCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		defer m.Close()
 		if _, err := tea.NewProgram(m).Run(); err != nil {
 			return fmt.Errorf("TUI error: %w", err)
 		}
