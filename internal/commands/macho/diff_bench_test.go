@@ -383,3 +383,18 @@ func TestGenerateDiffInfoBlockListExcludesSegmentLayout(t *testing.T) {
 		t.Fatal("blocked section/layout drift made GenerateDiffInfo unequal")
 	}
 }
+
+func BenchmarkNormalizeSymbolForDiff(b *testing.B) {
+	for _, bc := range []struct{ name, in string }{
+		{"no-counter", "-[NSObject(NSKeyValueCoding) valueForKeyPath:]"},
+		{"digit-no-counter", "_OBJC_CLASS_$_NSURLSessionTask2"},
+		{"counter", "___block_invoke.870.cold.1"},
+	} {
+		b.Run(bc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				normalizeSymbolForDiff(bc.in)
+			}
+		})
+	}
+}

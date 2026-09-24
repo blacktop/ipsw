@@ -169,7 +169,22 @@ var generatedSymbolCounterRE = regexp.MustCompile(`(\.cold|\.[0-9]+)+$`)
 // symbols cancel in the diff instead of flooding it with renumber noise.
 func normalizeSymbolForDiff(value string) string {
 	value = normalizeBuildPathForDiff(value)
+	if !mayEndInGeneratedCounter(value) {
+		return value
+	}
 	return generatedSymbolCounterRE.ReplaceAllString(value, "")
+}
+
+// mayEndInGeneratedCounter reports whether value can match
+// generatedSymbolCounterRE: every match ends in ".cold" or an ASCII digit.
+// Most symbols end in neither, and the regexp allocates even when it does not
+// match.
+func mayEndInGeneratedCounter(value string) bool {
+	if value == "" {
+		return false
+	}
+	last := value[len(value)-1]
+	return ('0' <= last && last <= '9') || strings.HasSuffix(value, ".cold")
 }
 
 func normalizeSymbolsForDiff(values []string) []string {

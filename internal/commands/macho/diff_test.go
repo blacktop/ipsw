@@ -169,3 +169,58 @@ func TestLoadCommandsDigestThreadCommandBoundaries(t *testing.T) {
 		}
 	})
 }
+
+// symbolNormalizationCases pairs names with what the diff normalizer must
+// produce. The expected values are those of the unguarded pipeline.
+var symbolNormalizationCases = []struct{ in, want string }{
+	{"", ""},
+	{"_objc_msgSend", "_objc_msgSend"},
+	{"-[NSObject description]", "-[NSObject description]"},
+	{"___foo_block_invoke.323", "___foo_block_invoke"},
+	{"___foo_block_invoke.870.cold.1", "___foo_block_invoke"},
+	{"_bar.cold", "_bar"},
+	{"_bar.cold.cold.2", "_bar"},
+	{"_bar.cold2", "_bar.cold2"},
+	{"_bar.COLD", "_bar.COLD"},
+	{"_name2", "_name2"},
+	{"_v1.2.3", "_v1"},
+	{"OSLog.12.x", "OSLog.12.x"},
+	{".1", ""},
+	{"..1", "."},
+	{"a.", "a."},
+	{"ünïcødé.12", "ünïcødé"},
+	{"日本.cold", "日本"},
+	{"foo.١٢", "foo.١٢"}, // non-ASCII digits
+	{"foo.cold\n", "foo.cold\n"},
+	{"foo.12\n", "foo.12\n"},
+	{"foo.1\x00", "foo.1\x00"},
+	{"foo.\xff1", "foo.\xff1"},
+	{"/AppleInternal/Library/BuildRoots/0123abc/Sources/x.o.7", "/AppleInternal/Library/BuildRoots/<BUILDROOT>/Sources/x.o"},
+}
+
+// unguardedNormalizeSymbolForDiff is the normalizer without the suffix guard.
+func unguardedNormalizeSymbolForDiff(value string) string {
+	return generatedSymbolCounterRE.ReplaceAllString(normalizeBuildPathForDiff(value), "")
+}
+
+func TestNormalizeSymbolForDiffMatchesUnguardedPipeline(t *testing.T) {
+	for _, tc := range symbolNormalizationCases {
+		if ref := unguardedNormalizeSymbolForDiff(tc.in); ref != tc.want {
+			t.Fatalf("case %q expects %q, but the unguarded pipeline gives %q", tc.in, tc.want, ref)
+		}
+		if got := normalizeSymbolForDiff(tc.in); got != tc.want {
+			t.Errorf("normalizeSymbolForDiff(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func FuzzNormalizeSymbolForDiffMatchesUnguardedPipeline(f *testing.F) {
+	for _, tc := range symbolNormalizationCases {
+		f.Add(tc.in)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		if got, want := normalizeSymbolForDiff(value), unguardedNormalizeSymbolForDiff(value); got != want {
+			t.Fatalf("normalizeSymbolForDiff(%q) = %q, want %q", value, got, want)
+		}
+	})
+}
