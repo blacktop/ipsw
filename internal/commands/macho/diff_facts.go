@@ -186,7 +186,7 @@ func ComparisonFactsFromDiffInfo(info *DiffInfo, cpu ComparisonFactsCPU, contain
 			SectionBlocklist:      cloneStrings(conf.BlockList),
 		},
 		Provenance: ComparisonFactsProvenance{
-			ReferenceSource:      "ipsw@d36b6418f383470775f763487059dc28e44456be",
+			ReferenceSource:      "ipsw@88dec284d70abb0a9d56fb438b5a3dc4c7ac1801",
 			DiffInfoGenerator:    "internal/commands/macho." + generator,
 			NameNormalization:    "internal/commands/macho.normalizeSymbolForDiff",
 			EntitlementSelection: "xml_preferred_internal/codesign/entitlements.DerDecode_fallback",
