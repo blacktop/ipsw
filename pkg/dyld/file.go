@@ -118,6 +118,10 @@ type File struct {
 	strtabMu sync.Mutex
 	strtabs  map[mtypes.UUID]cachedStrtab
 
+	// dylibsTrieData is the raw dylibs trie, kept once a read of it succeeds
+	dylibsTrieMu   sync.Mutex
+	dylibsTrieData []byte
+
 	// sortedImages is Images sorted by LoadAddress for O(log N) binary search
 	sortedImages []*CacheImage
 }
@@ -271,8 +275,9 @@ func (f *File) openCacheMember(name string, want mtypes.UUID) (int64, error) {
 }
 
 // Close releases the address-to-symbol table, the string table copies held for
-// cache files that aren't mmap'd, and every mapping Open created. A File built
-// with NewFile owns no mappings, so Close releases only the first two.
+// cache files that aren't mmap'd, the cached dylibs trie, and every mapping
+// Open created. A File built with NewFile owns no mappings, so Close releases
+// only the first three.
 func (f *File) Close() error {
 	var errs []error
 	if f.AddressToSymbol != nil {
@@ -283,6 +288,9 @@ func (f *File) Close() error {
 	f.strtabMu.Lock()
 	f.strtabs = nil
 	f.strtabMu.Unlock()
+	f.dylibsTrieMu.Lock()
+	f.dylibsTrieData = nil
+	f.dylibsTrieMu.Unlock()
 	for uuid, closer := range f.closers {
 		delete(f.closers, uuid)
 		delete(f.r, uuid) // a lookup after Close fails as a nil reader, not a fault
@@ -2030,13 +2038,9 @@ func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
 func (f *File) HasImagePath(path string) (int, error) {
 	var imageIndex uint64
 	if f.Headers[f.UUID].MappingOffset >= 0x118 {
-		uuid, off, err := f.GetOffset(f.Headers[f.UUID].DylibsTrieAddr)
+		dylibTrie, err := f.dylibsTrie()
 		if err != nil {
-			return -1, fmt.Errorf("failed to get dylibs trie offset: %v", err)
-		}
-		dylibTrie, err := f.ReadBytesForUUID(uuid, int64(off), f.Headers[f.UUID].DylibsTrieSize)
-		if err != nil {
-			return -1, fmt.Errorf("failed to read dylibs trie: %v", err)
+			return -1, fmt.Errorf("failed to read dylibs trie: %w", err)
 		}
 		imageNode, err := trie.WalkTrie(bytes.NewReader(dylibTrie), path)
 		if err != nil {

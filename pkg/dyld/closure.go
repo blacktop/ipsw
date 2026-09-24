@@ -986,48 +986,17 @@ func (f *File) GetDylibsImageArray() error {
 }
 
 func (f *File) GetDylibsImageArrayIDs() ([]trie.Node, error) {
-
-	dylibsTrieAddr, dylibsTrieSize, err := f.dylibsTrieInfo()
+	dylibTrie, err := f.dylibsTrie()
 	if err != nil {
 		return nil, err
 	}
-
-	uuid, off, err := f.GetOffset(dylibsTrieAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-
-	sr.Seek(int64(off), io.SeekStart)
-
-	dylibTrie := make([]byte, dylibsTrieSize)
-	if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
-		return nil, err
-	}
-
 	return trie.ParseTrie(bytes.NewReader(dylibTrie))
 }
 
 // GetDylibIndex returns the index of a given dylib
 func (f *File) GetDylibIndex(path string) (uint64, error) {
-
-	dylibsTrieAddr, dylibsTrieSize, err := f.dylibsTrieInfo()
+	dylibTrie, err := f.dylibsTrie()
 	if err != nil {
-		return 0, err
-	}
-
-	uuid, off, err := f.GetOffset(dylibsTrieAddr)
-	if err != nil {
-		return 0, err
-	}
-
-	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-
-	sr.Seek(int64(off), io.SeekStart)
-
-	dylibTrie := make([]byte, dylibsTrieSize)
-	if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
 		return 0, err
 	}
 
@@ -1042,6 +1011,39 @@ func (f *File) GetDylibIndex(path string) (uint64, error) {
 	}
 
 	return imageIndex, nil
+}
+
+// dylibsTrie returns the raw bytes of the cache's dylibs trie. They are read
+// once per File and shared by every lookup, each of which walks them with its
+// own reader and must not modify them. Only a complete read is kept, so a
+// failed read is retried.
+func (f *File) dylibsTrie() ([]byte, error) {
+	f.dylibsTrieMu.Lock()
+	defer f.dylibsTrieMu.Unlock()
+	if f.dylibsTrieData != nil {
+		return f.dylibsTrieData, nil
+	}
+	addr, size, err := f.dylibsTrieInfo()
+	if err != nil {
+		return nil, err
+	}
+	uuid, off, err := f.GetOffset(addr)
+	if err != nil {
+		return nil, err
+	}
+	r, ok := f.r[uuid]
+	if !ok {
+		return nil, fmt.Errorf("no cache file with UUID %s holds the dylibs trie", uuid)
+	}
+	data := make([]byte, size)
+	if n, err := r.ReadAt(data, int64(off)); n != len(data) {
+		if err == nil {
+			err = io.ErrUnexpectedEOF
+		}
+		return nil, fmt.Errorf("failed to read dylibs trie (%d of %d bytes at %#x): %w", n, size, off, err)
+	}
+	f.dylibsTrieData = data
+	return data, nil
 }
 
 func (f *File) dylibsTrieInfo() (uint64, uint64, error) {

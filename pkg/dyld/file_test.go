@@ -209,22 +209,22 @@ func strtabFile() []byte {
 }
 
 // countingReaderAt is a cache file that is not mmap'd. It counts the reads
-// that touch the string pool at [poolOff, poolEnd).
+// that touch [watchOff, watchEnd).
 type countingReaderAt struct {
-	data             []byte
-	poolOff, poolEnd int64
-	poolReads        int
+	data               []byte
+	watchOff, watchEnd int64
+	reads              int
 }
 
 func (c *countingReaderAt) ReadAt(p []byte, off int64) (int, error) {
-	if off < c.poolEnd && off+int64(len(p)) > c.poolOff {
-		c.poolReads++
+	if off < c.watchEnd && off+int64(len(p)) > c.watchOff {
+		c.reads++
 	}
 	return bytes.NewReader(c.data).ReadAt(p, off)
 }
 
 func strtabReader() *countingReaderAt {
-	return &countingReaderAt{data: strtabFile(), poolOff: strtabOff, poolEnd: strtabOff + int64(len(strtabPool))}
+	return &countingReaderAt{data: strtabFile(), watchOff: strtabOff, watchEnd: strtabOff + int64(len(strtabPool))}
 }
 
 // strtabTestFile builds a File whose single cache file is r.
@@ -262,13 +262,13 @@ func TestStringTableLookupCopyPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkStrtabNames(t, nameAt)
-	if r.poolReads == 0 {
+	if r.reads == 0 {
 		t.Fatal("first lookup did not read the pool")
 	}
 
 	// A second dylib pointing at the same pool, and one whose table is a
 	// sub-range of it, are both served from the cached copy.
-	reads := r.poolReads
+	reads := r.reads
 	if _, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool))); err != nil {
 		t.Fatal(err)
 	}
@@ -279,8 +279,8 @@ func TestStringTableLookupCopyPath(t *testing.T) {
 	if got := sub(0); got != "_fo" {
 		t.Errorf("sub-range name at 0 = %q, want %q (bounded by the sub-range)", got, "_fo")
 	}
-	if r.poolReads != reads {
-		t.Fatalf("cached lookups read the pool %d more times, want 0", r.poolReads-reads)
+	if r.reads != reads {
+		t.Fatalf("cached lookups read the pool %d more times, want 0", r.reads-reads)
 	}
 
 	// A table that starts before the cached range is read as the union, and
@@ -292,7 +292,7 @@ func TestStringTableLookupCopyPath(t *testing.T) {
 	if got := wider(8 + 1); got != "_main" {
 		t.Errorf("wider-range name at 9 = %q, want %q", got, "_main")
 	}
-	if r.poolReads == reads {
+	if r.reads == reads {
 		t.Fatal("widening did not read the pool")
 	}
 	if len(f.strtabs) != 1 {
@@ -301,12 +301,12 @@ func TestStringTableLookupCopyPath(t *testing.T) {
 	if c := f.strtabs[uuid]; c.off != strtabOff-8 || len(c.buf) != len(strtabPool)+8 {
 		t.Fatalf("pinned range is %#x+%d, want %#x+%d", c.off, len(c.buf), strtabOff-8, len(strtabPool)+8)
 	}
-	reads = r.poolReads
+	reads = r.reads
 	if _, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool))); err != nil {
 		t.Fatal(err)
 	}
-	if r.poolReads != reads {
-		t.Fatalf("lookup inside the widened range read the pool %d more times, want 0", r.poolReads-reads)
+	if r.reads != reads {
+		t.Fatalf("lookup inside the widened range read the pool %d more times, want 0", r.reads-reads)
 	}
 }
 
@@ -413,5 +413,44 @@ func TestCloseDropsStringTableCopies(t *testing.T) {
 	}
 	if len(f.strtabs) != 0 {
 		t.Fatalf("Close kept %d string table copies", len(f.strtabs))
+	}
+}
+
+// TestHasImagePathFallsBackToImageNames covers headers that predate the dylibs
+// trie fields: HasImagePath matches image names and never reads a trie.
+func TestHasImagePathFallsBackToImageNames(t *testing.T) {
+	f, r := trieTestFile(t, testDylibPaths)
+	h := f.Headers[f.UUID]
+	h.MappingOffset = dylibsTrieFieldEnd() - 1
+	f.Headers[f.UUID] = h
+	f.Images = cacheImages{
+		{Name: "/usr/lib/libA.dylib", Index: 0},
+		{Name: "/usr/lib/libB.dylib", Index: 1},
+	}
+
+	if idx, err := f.HasImagePath("/usr/lib/libB.dylib"); err != nil || idx != 1 {
+		t.Fatalf("HasImagePath(libB) = %d, %v; want 1", idx, err)
+	}
+	if _, err := f.HasImagePath("/usr/lib/libAlias.dylib"); err == nil {
+		t.Error("an alias resolved without a dylibs trie")
+	}
+	if r.reads != 0 {
+		t.Fatalf("legacy header read the trie %d times, want 0", r.reads)
+	}
+}
+
+func TestCloseDropsDylibsTrie(t *testing.T) {
+	f, _ := trieTestFile(t, testDylibPaths)
+	if _, err := f.GetDylibIndex("/usr/lib/libA.dylib"); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.dylibsTrieData) == 0 {
+		t.Fatal("lookup did not keep the dylibs trie")
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if f.dylibsTrieData != nil {
+		t.Fatal("Close kept the dylibs trie")
 	}
 }

@@ -240,7 +240,7 @@ func sharedPoolCache(t *testing.T, want [2][]string) (*countingReaderAt, [2]*Cac
 	copy(data[poolOff:], pool)
 
 	uuid := mtypes.UUID{1}
-	r := &countingReaderAt{data: data, poolOff: poolOff, poolEnd: poolOff + int64(len(pool))}
+	r := &countingReaderAt{data: data, watchOff: poolOff, watchEnd: poolOff + int64(len(pool))}
 	f := &File{
 		UUID:      uuid,
 		ByteOrder: binary.LittleEndian,
@@ -320,14 +320,14 @@ func TestGetMachoSharesStringPool(t *testing.T) {
 	if got := names(images[0]); !slices.Equal(got, want[0]) {
 		t.Fatalf("first image symbols = %q, want %q", got, want[0])
 	}
-	if r.poolReads == 0 {
+	if r.reads == 0 {
 		t.Fatal("first image did not read the string pool")
 	}
-	reads := r.poolReads
+	reads := r.reads
 	if got := names(images[1]); !slices.Equal(got, want[1]) {
 		t.Fatalf("second image symbols = %q, want %q", got, want[1])
 	}
-	if r.poolReads != reads {
-		t.Fatalf("second image read the shared string pool %d more times, want 0", r.poolReads-reads)
+	if r.reads != reads {
+		t.Fatalf("second image read the shared string pool %d more times, want 0", r.reads-reads)
 	}
 }
