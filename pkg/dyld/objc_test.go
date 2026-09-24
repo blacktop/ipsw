@@ -182,3 +182,36 @@ func TestLibObjCImagePrefersCanonicalPath(t *testing.T) {
 		t.Fatalf("libObjCImage() = %v, %v; want /usr/lib/libobjc.A.dylib", image, err)
 	}
 }
+
+// TestOffsetsToMapReadsEachNameAtItsOffset reads names out of order, so a
+// reader that kept bytes buffered from the previous name would return them.
+func TestOffsetsToMapReadsEachNameAtItsOffset(t *testing.T) {
+	const base, hashOff, namesOff = 0x180000000, 0xf0, 0x100
+	data := make([]byte, 0x200)
+	copy(data[namesOff:], "alpha\x00beta\x00gamma\x00")
+	uuid := types.UUID{1}
+	f := &File{
+		UUID: uuid,
+		MappingsWithSlideInfo: map[types.UUID]cacheMappingsWithSlideInfo{uuid: {
+			&CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: base, Size: uint64(len(data))}},
+		}},
+		AddressToSymbol: NewA2STable(0),
+		r:               map[types.UUID]io.ReaderAt{uuid: bytes.NewReader(data)},
+	}
+	rel := func(off int) int32 { return int32(namesOff + off - hashOff) }
+	shash := &StringHash{FileOffset: hashOff, Offsets: []int32{rel(11), 0, rel(0), rel(6)}}
+
+	want := map[uint64]string{base + namesOff: "alpha", base + namesOff + 6: "beta", base + namesOff + 11: "gamma"}
+	got := f.offsetsToMap(shash, uuid)
+	if len(got) != len(want) {
+		t.Fatalf("offsetsToMap returned %d names, want %d: %v", len(got), len(want), got)
+	}
+	for addr, name := range want {
+		if got[addr].Name != name {
+			t.Errorf("name at %#x = %q, want %q", addr, got[addr].Name, name)
+		}
+		if sym, _ := f.AddressToSymbol.Get(addr); sym != name {
+			t.Errorf("AddressToSymbol at %#x = %q, want %q", addr, sym, name)
+		}
+	}
+}

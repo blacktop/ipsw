@@ -718,11 +718,13 @@ func (f *File) offsetsToMap(shash *StringHash, uuid types.UUID) map[uint64]objHa
 
 	objcMap := make(map[uint64]objHashMap)
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	br := bufio.NewReader(sr)
 
 	for idx, ptr := range shash.Offsets {
 		if ptr != 0 {
 			sr.Seek(int64(int32(shash.FileOffset)+ptr), io.SeekStart)
-			s, err := bufio.NewReader(sr).ReadString('\x00')
+			br.Reset(sr) // drop bytes buffered from the previous name
+			s, err := br.ReadString('\x00')
 			if err != nil {
 				log.Errorf("failed to read objc name at %#x: %v", int32(shash.FileOffset)+ptr, err)
 			}
