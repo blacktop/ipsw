@@ -20,7 +20,7 @@ const (
 	ComparisonFactsSchemaVersion uint32 = 1
 	// ReferenceComparisonPolicyVersion identifies the fixed ipsw diff policy
 	// used to produce comparison facts.
-	ReferenceComparisonPolicyVersion uint32 = 1
+	ReferenceComparisonPolicyVersion uint32 = 2
 )
 
 // ComparisonFactsPolicy describes every reference comparison option applied to
@@ -42,8 +42,8 @@ type ComparisonFactsPolicy struct {
 // and normalized the comparison values. Consumers pin these identifiers as a
 // policy contract, so they change only when the policy they name changes.
 type ComparisonFactsProvenance struct {
-	// ReferenceSource names the ipsw commit whose diff semantics
-	// ReferenceComparisonPolicyVersion 1 freezes. The darwin-db reader compares
+	// ReferenceSource names the ipsw commit whose diff semantics the current
+	// ReferenceComparisonPolicyVersion freezes. The darwin-db reader compares
 	// it byte-for-byte, so change it only together with that version and reader.
 	ReferenceSource      string `json:"reference_source"`
 	DiffInfoGenerator    string `json:"diff_info_generator"`
@@ -186,7 +186,7 @@ func ComparisonFactsFromDiffInfo(info *DiffInfo, cpu ComparisonFactsCPU, contain
 			SectionBlocklist:      cloneStrings(conf.BlockList),
 		},
 		Provenance: ComparisonFactsProvenance{
-			ReferenceSource:      "ipsw@169cdda50867b01c94af79011a29e13534ab8d15",
+			ReferenceSource:      "ipsw@d36b6418f383470775f763487059dc28e44456be",
 			DiffInfoGenerator:    "internal/commands/macho." + generator,
 			NameNormalization:    "internal/commands/macho.normalizeSymbolForDiff",
 			EntitlementSelection: "xml_preferred_internal/codesign/entitlements.DerDecode_fallback",
