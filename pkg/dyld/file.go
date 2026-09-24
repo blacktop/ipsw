@@ -270,9 +270,9 @@ func (f *File) openCacheMember(name string, want mtypes.UUID) (int64, error) {
 	return size, nil
 }
 
-// Close releases every mapping Open created and every string table copy held
-// for a cache file that isn't mmap'd. A File built with NewFile owns no
-// mappings, so Close only drops its string table copies.
+// Close releases the address-to-symbol table, the string table copies held for
+// cache files that aren't mmap'd, and every mapping Open created. A File built
+// with NewFile owns no mappings, so Close releases only the first two.
 func (f *File) Close() error {
 	var errs []error
 	if f.AddressToSymbol != nil {
