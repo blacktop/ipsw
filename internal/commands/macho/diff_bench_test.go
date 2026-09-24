@@ -164,7 +164,7 @@ func TestLoadCommandsDigestIgnoresBuildMetadata(t *testing.T) {
 	off := hdrSize
 	touchedVolatile := false
 	for _, l := range m.Loads {
-		sz := int(l.LoadSize())
+		sz := len(l.Raw())
 		if sz <= 0 || off+sz > len(meta) {
 			break
 		}

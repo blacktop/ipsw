@@ -236,7 +236,7 @@ func machoDiffHasContent(d *mcmd.MachoDiff) bool {
 // written by a prior ipsw build. A change to the SHARED rendered-body semantics
 // belongs on the marker string in hashMachoDiffConfig instead, which orphans
 // stale rows for every task that folds it.
-const machosCacheVersion = 1
+const machosCacheVersion = 2
 
 // Version reports the cache payload / output-semantics version. See
 // machosCacheVersion.

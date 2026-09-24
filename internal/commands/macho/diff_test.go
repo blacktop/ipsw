@@ -3,6 +3,7 @@ package macho
 import (
 	"bytes"
 	"encoding/binary"
+	"slices"
 	"testing"
 
 	"github.com/blacktop/go-macho"
@@ -119,6 +120,52 @@ func TestLoadCommandsHashUsesTheImagesOwnHeader(t *testing.T) {
 		}
 		if got := loadCommandsHash(m, &DiffConfig{}); got != want {
 			t.Fatalf("hash = %q, want the standalone hash %q", got, want)
+		}
+	})
+}
+
+// TestLoadCommandsDigestThreadCommandBoundaries walks past an LC_UNIXTHREAD,
+// whose go-macho LoadSize (8) is shorter than the command: fields after it must
+// still be normalized, and its thread state must still be hashed.
+func TestLoadCommandsDigestThreadCommandBoundaries(t *testing.T) {
+	const headerSize, segmentSize, uuidSize, threadSize = 32, 72, 24, 288
+	hash := func(data []byte, conf *DiffConfig) string {
+		t.Helper()
+		m, err := macho.NewFile(bytes.NewReader(data))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := loadCommandsHash(m, conf)
+		if got == "" {
+			t.Fatal("empty load-command hash")
+		}
+		return got
+	}
+	original := syntheticMachO(t, types.MH_EXECUTE, 1)
+	// Move the thread command ahead of the LC_UUID.
+	uuidCmd := original[headerSize+segmentSize : headerSize+segmentSize+uuidSize]
+	threadFirst := slices.Concat(original[:headerSize+segmentSize], original[headerSize+segmentSize+uuidSize:], uuidCmd)
+
+	t.Run("UUID after the thread command stays volatile", func(t *testing.T) {
+		changed := bytes.Clone(threadFirst)
+		changed[headerSize+segmentSize+threadSize+8] ^= 1
+		if hash(changed, &DiffConfig{}) != hash(threadFirst, &DiffConfig{}) {
+			t.Fatal("a UUID-only change altered the digest")
+		}
+	})
+	t.Run("thread state before the UUID stays structural", func(t *testing.T) {
+		changed := bytes.Clone(threadFirst)
+		changed[headerSize+segmentSize+16] ^= 1
+		if hash(changed, &DiffConfig{}) == hash(threadFirst, &DiffConfig{}) {
+			t.Fatal("a thread-state change disappeared from the digest")
+		}
+	})
+	t.Run("filtered digest keeps the thread state", func(t *testing.T) {
+		changed := bytes.Clone(original)
+		changed[headerSize+segmentSize+uuidSize+16] ^= 1
+		conf := &DiffConfig{BlockList: []string{"__LLVM"}}
+		if hash(changed, conf) == hash(original, conf) {
+			t.Fatal("a thread-state change disappeared from the filtered digest")
 		}
 	})
 }

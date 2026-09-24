@@ -666,10 +666,12 @@ func loadCommandsRegion(m *macho.File) ([]byte, int) {
 // loadCommandsDigest hashes the header + load-command region with volatile
 // fields zeroed. With an allow- or block-list, raw segment commands are replaced
 // by a policy-aware representation produced by writeFilteredSegmentDigest.
+// Commands are walked by the length of their raw bytes, the boundaries
+// loadCommandsRegion checks against cmdsize, not by Load.LoadSize.
 func loadCommandsDigest(buf []byte, hdrSize int, loads []macho.Load, sections []*types.Section, conf *DiffConfig) string {
 	off := hdrSize
 	for _, l := range loads {
-		sz := int(l.LoadSize())
+		sz := len(l.Raw())
 		if sz <= 0 || off+sz > len(buf) {
 			break
 		}
@@ -701,7 +703,7 @@ func loadCommandsDigest(buf []byte, hdrSize int, loads []macho.Load, sections []
 	_, _ = h.Write(buf[:hdrSize])
 	off = hdrSize
 	for _, l := range loads {
-		sz := int(l.LoadSize())
+		sz := len(l.Raw())
 		if sz <= 0 || off+sz > len(buf) {
 			break
 		}
