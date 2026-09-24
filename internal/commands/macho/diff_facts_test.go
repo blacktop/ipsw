@@ -38,7 +38,7 @@ func TestComparisonFactsFromDiffInfoPreservesReferenceSemantics(t *testing.T) {
 	if facts.SchemaVersion != ComparisonFactsSchemaVersion || facts.Policy.Version != ReferenceComparisonPolicyVersion {
 		t.Fatalf("unexpected schema/policy: %+v", facts)
 	}
-	if facts.Provenance.ReferenceSource != "ipsw@88dec284d70abb0a9d56fb438b5a3dc4c7ac1801" ||
+	if facts.Provenance.ReferenceSource != "ipsw@c5dbde9659a1beb88ca29ca1dbb4978c9d519217" ||
 		facts.Provenance.DiffInfoGenerator != "internal/commands/macho.GenerateContainerDiffInfo" {
 		t.Fatalf("unexpected reference provenance: %+v", facts.Provenance)
 	}
