@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/blacktop/go-macho"
@@ -214,5 +216,118 @@ func TestSegmentRebases(t *testing.T) {
 				t.Fatalf("SegmentRebases(filesz %#x) = %d rebases, %v; want %d", tt.filesz, len(rebases), err, tt.want)
 			}
 		})
+	}
+}
+
+// sharedPoolCache builds a one-file cache holding two dylibs whose LC_SYMTABs
+// point at one string pool in a shared __LINKEDIT, as every dylib in a real
+// cache does. Image k's symtab holds the names in want[k].
+func sharedPoolCache(t *testing.T, want [2][]string) (*countingReaderAt, [2]*CacheImage) {
+	t.Helper()
+	const (
+		base     = 0x180000000
+		linkedit = 0x3000
+		poolOff  = linkedit + 0x100
+		fileSize = 0x4000
+	)
+	pool := "\x00"
+	for _, names := range want {
+		for _, name := range names {
+			pool += name + "\x00"
+		}
+	}
+	data := make([]byte, fileSize)
+	copy(data[poolOff:], pool)
+
+	uuid := mtypes.UUID{1}
+	r := &countingReaderAt{data: data, poolOff: poolOff, poolEnd: poolOff + int64(len(pool))}
+	f := &File{
+		UUID:      uuid,
+		ByteOrder: binary.LittleEndian,
+		Mappings: map[mtypes.UUID]cacheMappings{uuid: {
+			{CacheMappingInfo: CacheMappingInfo{Address: base, Size: fileSize}},
+		}},
+		r: map[mtypes.UUID]io.ReaderAt{uuid: r},
+	}
+
+	var images [2]*CacheImage
+	for k, names := range want {
+		hdrOff := uint64(0x1000 * (k + 1))
+		symOff := uint32(linkedit + 0x20*k)
+		segment := func(name string, off uint64) mtypes.Segment64 {
+			seg := mtypes.Segment64{LoadCmd: mtypes.LC_SEGMENT_64, Len: 72, Addr: base + off, Memsz: 0x1000, Offset: off, Filesz: 0x1000}
+			copy(seg.Name[:], name)
+			return seg
+		}
+		var buf bytes.Buffer
+		for _, v := range []any{
+			mtypes.FileHeader{Magic: mtypes.Magic64, CPU: mtypes.CPUArm64, Type: mtypes.MH_DYLIB, NCommands: 3, SizeCommands: 72*2 + 24},
+			segment("__TEXT", hdrOff),
+			segment("__LINKEDIT", linkedit),
+			mtypes.SymtabCmd{LoadCmd: mtypes.LC_SYMTAB, Len: 24, Symoff: symOff, Nsyms: 2, Stroff: poolOff, Strsize: uint32(len(pool))},
+		} {
+			if err := binary.Write(&buf, binary.LittleEndian, v); err != nil {
+				t.Fatal(err)
+			}
+		}
+		copy(data[hdrOff:], buf.Bytes())
+
+		buf.Reset()
+		for n, name := range names {
+			sym := mtypes.Nlist64{
+				Nlist: mtypes.Nlist{Name: uint32(strings.Index(pool, "\x00"+name+"\x00") + 1), Type: mtypes.N_SECT | mtypes.N_EXT, Sect: 1},
+				Value: base + hdrOff + uint64(0x10*n),
+			}
+			if err := binary.Write(&buf, binary.LittleEndian, sym); err != nil {
+				t.Fatal(err)
+			}
+		}
+		copy(data[symOff:], buf.Bytes())
+
+		images[k] = &CacheImage{
+			Name:               fmt.Sprintf("/usr/lib/libSynthetic%d.dylib", k),
+			CacheImageTextInfo: CacheImageTextInfo{LoadAddress: base + hdrOff, TextSegmentSize: 0x1000},
+			cache:              f,
+			cuuid:              uuid,
+		}
+		f.Images = append(f.Images, images[k])
+	}
+	return r, images
+}
+
+// TestGetMachoSharesStringPool checks that GetMacho serves symbol names out
+// of the cache's shared string pool: a second dylib pointing at the same
+// pool gets its names without reading the pool again.
+func TestGetMachoSharesStringPool(t *testing.T) {
+	want := [2][]string{{"_a_one", "_a_two"}, {"_b_one", "_b_two"}}
+	r, images := sharedPoolCache(t, want)
+	names := func(img *CacheImage) []string {
+		t.Helper()
+		m, err := img.GetMacho()
+		if err != nil {
+			t.Fatalf("%s: %v", img.Name, err)
+		}
+		if m.Symtab == nil {
+			t.Fatalf("%s: no symtab", img.Name)
+		}
+		var got []string
+		for _, sym := range m.Symtab.Syms {
+			got = append(got, sym.Name)
+		}
+		return got
+	}
+
+	if got := names(images[0]); !slices.Equal(got, want[0]) {
+		t.Fatalf("first image symbols = %q, want %q", got, want[0])
+	}
+	if r.poolReads == 0 {
+		t.Fatal("first image did not read the string pool")
+	}
+	reads := r.poolReads
+	if got := names(images[1]); !slices.Equal(got, want[1]) {
+		t.Fatalf("second image symbols = %q, want %q", got, want[1])
+	}
+	if r.poolReads != reads {
+		t.Fatalf("second image read the shared string pool %d more times, want 0", r.poolReads-reads)
 	}
 }

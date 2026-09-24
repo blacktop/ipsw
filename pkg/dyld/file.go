@@ -270,8 +270,9 @@ func (f *File) openCacheMember(name string, want mtypes.UUID) (int64, error) {
 	return size, nil
 }
 
-// Close releases every mapping Open created. A File built with NewFile owns
-// no mappings, so Close is a no-op for it.
+// Close releases every mapping Open created and every string table copy held
+// for a cache file that isn't mmap'd. A File built with NewFile owns no
+// mappings, so Close only drops its string table copies.
 func (f *File) Close() error {
 	var errs []error
 	if f.AddressToSymbol != nil {
@@ -2091,7 +2092,7 @@ func (f *File) stringTableLookup(uuid mtypes.UUID, off int64, size uint64) (func
 // LC_SYMTAB string table of an image whose __LINKEDIT lives there. Every dylib
 // in a cache points its symtab at the same shared pool, so rather than copying
 // it per image, the pool is sliced out of the mmap'd cache file or, where the
-// file isn't mmap'd, read from disk once per File.
+// file isn't mmap'd, read from disk once per cache file.
 func (f *File) sharedStringTable(uuid mtypes.UUID, off int64, size uint64) ([]byte, error) {
 	if size == 0 {
 		return []byte{}, nil
@@ -2102,7 +2103,7 @@ func (f *File) sharedStringTable(uuid mtypes.UUID, off int64, size uint64) ([]by
 	}
 	end := off + int64(size)
 	if off < 0 {
-		return nil, fmt.Errorf("string table %#x-%#x extends past the end of the cache file", off, end)
+		return nil, fmt.Errorf("string table offset %#x is negative", off)
 	}
 
 	// mmap'd cache file: hand back the mapping itself. Nothing is copied onto
@@ -2138,7 +2139,10 @@ func (f *File) sharedStringTable(uuid mtypes.UUID, off int64, size uint64) ([]by
 	// This bounds against the reader itself, so it holds for any File, not
 	// just one built by Open.
 	var last [1]byte
-	if n, _ := r.ReadAt(last[:], readEnd-1); n != 1 {
+	if n, err := r.ReadAt(last[:], readEnd-1); n != 1 {
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, fmt.Errorf("failed to read string table end at %#x: %w", readEnd-1, err)
+		}
 		return nil, fmt.Errorf("string table %#x-%#x extends past the end of the cache file", off, end)
 	}
 	buf := make([]byte, readEnd-readOff)

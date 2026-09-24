@@ -3,7 +3,13 @@ package dyld
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"io"
+	"runtime"
+	"strings"
 	"testing"
+
+	mtypes "github.com/blacktop/go-macho/types"
 )
 
 func TestSlidePagesForRangeHelper(t *testing.T) {
@@ -183,5 +189,229 @@ func TestSlideV5PointerTargets(t *testing.T) {
 				t.Errorf("SlidePointer() = %#x, want %#x", got, tt.want)
 			}
 		})
+	}
+}
+
+// strtabPool is a synthetic LC_SYMTAB string table: NUL at offset 0,
+// NUL-terminated names, and a final name that runs to the end of the table
+// with no terminator.
+const strtabPool = "\x00_main\x00_foo\x00tail"
+
+const strtabOff = 16
+
+// strtabFile lays strtabPool at strtabOff inside a larger cache file, with
+// bytes after the table so that a name running to the table's end must stop
+// there rather than at the next NUL in the file.
+func strtabFile() []byte {
+	file := make([]byte, strtabOff)
+	file = append(file, strtabPool...)
+	return append(file, "ZZZZ\x00"...)
+}
+
+// countingReaderAt is a cache file that is not mmap'd. It counts the reads
+// that touch the string pool at [poolOff, poolEnd).
+type countingReaderAt struct {
+	data             []byte
+	poolOff, poolEnd int64
+	poolReads        int
+}
+
+func (c *countingReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if off < c.poolEnd && off+int64(len(p)) > c.poolOff {
+		c.poolReads++
+	}
+	return bytes.NewReader(c.data).ReadAt(p, off)
+}
+
+func strtabReader() *countingReaderAt {
+	return &countingReaderAt{data: strtabFile(), poolOff: strtabOff, poolEnd: strtabOff + int64(len(strtabPool))}
+}
+
+// strtabTestFile builds a File whose single cache file is r.
+func strtabTestFile(r io.ReaderAt) (*File, mtypes.UUID) {
+	uuid := mtypes.UUID{7}
+	return &File{r: map[mtypes.UUID]io.ReaderAt{uuid: r}}, uuid
+}
+
+func checkStrtabNames(t *testing.T, nameAt func(uint64) string) {
+	t.Helper()
+	for _, tc := range []struct {
+		off  uint64
+		want string
+	}{
+		{0, ""},
+		{1, "_main"},
+		{3, "ain"},
+		{7, "_foo"},
+		{12, "tail"}, // stops at the table's end, not at the file's next NUL
+		{uint64(len(strtabPool)), ""},
+		{1 << 40, ""},
+	} {
+		if got := nameAt(tc.off); got != tc.want {
+			t.Errorf("name at %#x = %q, want %q", tc.off, got, tc.want)
+		}
+	}
+}
+
+func TestStringTableLookupCopyPath(t *testing.T) {
+	r := strtabReader()
+	f, uuid := strtabTestFile(r)
+
+	nameAt, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkStrtabNames(t, nameAt)
+	if r.poolReads == 0 {
+		t.Fatal("first lookup did not read the pool")
+	}
+
+	// A second dylib pointing at the same pool, and one whose table is a
+	// sub-range of it, are both served from the cached copy.
+	reads := r.poolReads
+	if _, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool))); err != nil {
+		t.Fatal(err)
+	}
+	sub, err := f.stringTableLookup(uuid, strtabOff+7, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := sub(0); got != "_fo" {
+		t.Errorf("sub-range name at 0 = %q, want %q (bounded by the sub-range)", got, "_fo")
+	}
+	if r.poolReads != reads {
+		t.Fatalf("cached lookups read the pool %d more times, want 0", r.poolReads-reads)
+	}
+
+	// A table that starts before the cached range is read as the union, and
+	// still leaves exactly one buffer pinned for this cache file.
+	wider, err := f.stringTableLookup(uuid, strtabOff-8, uint64(len(strtabPool))+8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := wider(8 + 1); got != "_main" {
+		t.Errorf("wider-range name at 9 = %q, want %q", got, "_main")
+	}
+	if r.poolReads == reads {
+		t.Fatal("widening did not read the pool")
+	}
+	if len(f.strtabs) != 1 {
+		t.Fatalf("%d buffers pinned, want 1", len(f.strtabs))
+	}
+	if c := f.strtabs[uuid]; c.off != strtabOff-8 || len(c.buf) != len(strtabPool)+8 {
+		t.Fatalf("pinned range is %#x+%d, want %#x+%d", c.off, len(c.buf), strtabOff-8, len(strtabPool)+8)
+	}
+	reads = r.poolReads
+	if _, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool))); err != nil {
+		t.Fatal(err)
+	}
+	if r.poolReads != reads {
+		t.Fatalf("lookup inside the widened range read the pool %d more times, want 0", r.poolReads-reads)
+	}
+}
+
+func TestSharedStringTableBounds(t *testing.T) {
+	f, uuid := strtabTestFile(strtabReader())
+
+	if _, err := f.sharedStringTable(uuid, strtabOff, uint64(len(strtabFile()))); err == nil {
+		t.Error("table past the end of the cache file was accepted")
+	} else if !strings.Contains(err.Error(), "extends past the end") {
+		t.Errorf("unexpected error for oversized table: %v", err)
+	}
+	if len(f.strtabs) != 0 {
+		t.Errorf("rejected table pinned %d buffers", len(f.strtabs))
+	}
+
+	empty, err := f.stringTableLookup(uuid, strtabOff, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := empty(0); got != "" {
+		t.Errorf("empty table yielded %q", got)
+	}
+
+	if _, err := f.sharedStringTable(mtypes.UUID{9}, strtabOff, 1); err == nil {
+		t.Error("unknown cache UUID was accepted")
+	}
+}
+
+// TestSharedStringTableRejectsOversizedWithoutAllocating advertises a table far
+// larger than the cache file; rejecting it must not allocate the advertised
+// size first. TotalAlloc is process-wide, so the threshold is a tolerance.
+func TestSharedStringTableRejectsOversizedWithoutAllocating(t *testing.T) {
+	const advertised = 16 << 20
+	f, uuid := strtabTestFile(strtabReader())
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	_, err := f.sharedStringTable(uuid, strtabOff, advertised)
+	runtime.ReadMemStats(&after)
+	if err == nil {
+		t.Fatal("oversized table accepted")
+	}
+	if got := after.TotalAlloc - before.TotalAlloc; got > advertised/16 {
+		t.Fatalf("rejecting a %d-byte table allocated %d bytes", advertised, got)
+	}
+}
+
+// failingReaderAt serves its first ok reads from data and fails every later
+// read with err.
+type failingReaderAt struct {
+	data []byte
+	ok   int
+	err  error
+}
+
+func (r *failingReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if r.ok == 0 {
+		return 0, r.err
+	}
+	r.ok--
+	return bytes.NewReader(r.data).ReadAt(p, off)
+}
+
+func TestSharedStringTableReportsReadErrors(t *testing.T) {
+	errDisk := errors.New("synthetic I/O error")
+	for _, tc := range []struct {
+		name string
+		ok   int
+	}{
+		{"bounds probe fails", 0},
+		{"table read fails", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, uuid := strtabTestFile(&failingReaderAt{data: strtabFile(), ok: tc.ok, err: errDisk})
+			if _, err := f.sharedStringTable(uuid, strtabOff, uint64(len(strtabPool))); !errors.Is(err, errDisk) {
+				t.Fatalf("error = %v, want it to wrap the reader's error", err)
+			}
+			if len(f.strtabs) != 0 {
+				t.Fatalf("failed read pinned %d buffers", len(f.strtabs))
+			}
+		})
+	}
+}
+
+func TestCloseDropsStringTableCopies(t *testing.T) {
+	data := syntheticPrimaryBytes(t, layoutSelfContained)
+	poolOff := int64(len(data))
+	data = append(data, strtabPool...)
+	f, err := NewFile(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nameAt, err := f.stringTableLookup(f.UUID, poolOff, uint64(len(strtabPool)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := nameAt(1); got != "_main" {
+		t.Fatalf("name at 1 = %q, want %q", got, "_main")
+	}
+	if c := f.strtabs[f.UUID]; len(c.buf) == 0 {
+		t.Fatal("lookup did not keep a copy of the string table")
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.strtabs) != 0 {
+		t.Fatalf("Close kept %d string table copies", len(f.strtabs))
 	}
 }

@@ -26,7 +26,7 @@ func TestStringTableLookupMmapPath(t *testing.T) {
 	}
 
 	// The names come straight out of the mapping: a change to the mapped
-	// bytes shows up in the next lookup, proving nothing was copied.
+	// bytes shows up in the next lookup, proving the table was not copied.
 	copy(data[strtabOff+1:], "_MAIN")
 	if got := nameAt(1); got != "_MAIN" {
 		t.Errorf("name at 1 after patching the mapping = %q, want %q", got, "_MAIN")
