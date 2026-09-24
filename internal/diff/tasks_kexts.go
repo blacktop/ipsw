@@ -68,7 +68,7 @@ func (t *kextsTask) Parse(_ context.Context, d *Diff) error {
 // kernelcache parse/diff pipeline, the OptionsHash composition, or the rendered
 // Kexts/Kernel section semantics change in a way that invalidates rows written
 // by a prior ipsw build.
-const kextsCacheVersion = 1
+const kextsCacheVersion = 2
 
 // Version reports the cache payload / output-semantics version. See
 // kextsCacheVersion.

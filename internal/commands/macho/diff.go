@@ -591,7 +591,7 @@ func generateDiffInfo(m *macho.File, conf *DiffConfig, containerImage bool, smap
 	}
 	var loadCmdHash string
 	if !conf.IgnoreLoadCommands {
-		loadCmdHash, _ = loadCommandsHash(m, conf)
+		loadCmdHash = loadCommandsHash(m, conf)
 	}
 	return &DiffInfo{
 		Version:     sourceVersion,
@@ -613,26 +613,54 @@ func generateDiffInfo(m *macho.File, conf *DiffConfig, containerImage bool, smap
 // are active, segment commands are represented canonically so excluded sections
 // and address/offset shifts cannot bypass the filter.
 //
-// Returns ("", err) on read failure; callers should treat an empty hash as
-// "not available" and skip the LoadCmdHash leg of the comparison.
-func loadCommandsHash(m *macho.File, conf *DiffConfig) (string, error) {
-	if m == nil {
-		return "", nil
+// Returns "" when the load commands can't be rebuilt; callers should treat an
+// empty hash as "not available" and skip the LoadCmdHash leg of the comparison.
+func loadCommandsHash(m *macho.File, conf *DiffConfig) string {
+	if m == nil || m.SizeCommands == 0 {
+		return ""
 	}
+	buf, hdrSize := loadCommandsRegion(m)
+	if buf == nil {
+		return ""
+	}
+	return loadCommandsDigest(buf, hdrSize, m.Loads, m.Sections, conf)
+}
+
+// loadCommandsRegion rebuilds the Mach header and load commands as they appear
+// on disk from the parsed header and each command's raw bytes. Reading them
+// back with m.ReadAt(buf, 0) would go through the reader of an enclosing
+// fileset or dyld_shared_cache, whose offset 0 is not this image's header. Each
+// command is sized by its own cmdsize field rather than Load.LoadSize, which
+// go-macho reports as 8 for LC_THREAD/LC_UNIXTHREAD. It returns nil when the
+// parsed commands don't cover SizeCommands.
+func loadCommandsRegion(m *macho.File) ([]byte, int) {
 	hdrSize := 28
 	if m.Magic == types.Magic64 {
 		hdrSize = 32
 	}
-	region := hdrSize + int(m.SizeCommands)
-	if region <= hdrSize {
-		return "", nil
+	buf := make([]byte, hdrSize, hdrSize+int(m.SizeCommands))
+	bo := m.ByteOrder
+	bo.PutUint32(buf[0:], uint32(m.Magic))
+	bo.PutUint32(buf[4:], uint32(m.CPU))
+	bo.PutUint32(buf[8:], uint32(m.SubCPU))
+	bo.PutUint32(buf[12:], uint32(m.Type))
+	bo.PutUint32(buf[16:], m.NCommands)
+	bo.PutUint32(buf[20:], m.SizeCommands)
+	bo.PutUint32(buf[24:], uint32(m.Flags))
+	if hdrSize == 32 {
+		bo.PutUint32(buf[28:], m.Reserved)
 	}
-	buf := make([]byte, region)
-	n, err := m.ReadAt(buf, 0)
-	if err != nil || n != region {
-		return "", err
+	for _, l := range m.Loads {
+		raw := l.Raw()
+		if len(raw) < 8 || int(bo.Uint32(raw[4:8])) != len(raw) {
+			return nil, 0
+		}
+		buf = append(buf, raw...)
 	}
-	return loadCommandsDigest(buf, hdrSize, m.Loads, m.Sections, conf), nil
+	if len(buf) != hdrSize+int(m.SizeCommands) {
+		return nil, 0
+	}
+	return buf, hdrSize
 }
 
 // loadCommandsDigest hashes the header + load-command region with volatile
