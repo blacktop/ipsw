@@ -369,19 +369,23 @@ func (i *CacheImage) Seek(offset int64, whence int) (int64, error) {
 	return offset - i.base, nil
 }
 
-func (i *CacheImage) ReadAt(p []byte, off int64) (n int, err error) {
-	if i.pm == nil {
-		i.pm, err = i.GetPartialMacho()
-		if err != nil {
-			return -1, err
-		}
-	}
-	if i.pm.Segment("__LINKEDIT") != nil {
-		i.ruuid, _, err = i.cache.GetOffset(i.pm.Segment("__LINKEDIT").Addr)
-	} else {
-		return -1, fmt.Errorf("failed to get __LINKEDIT segment")
-	}
+// linkeditUUID returns the UUID of the cache file holding this image's
+// __LINKEDIT segment, which is the file its LC_SYMTAB offsets are relative to.
+func (i *CacheImage) linkeditUUID() (types.UUID, error) {
+	pm, err := i.GetPartialMacho()
 	if err != nil {
+		return types.UUID{}, err
+	}
+	le := pm.Segment("__LINKEDIT")
+	if le == nil {
+		return types.UUID{}, fmt.Errorf("failed to get __LINKEDIT segment")
+	}
+	uuid, _, err := i.cache.GetOffset(le.Addr)
+	return uuid, err
+}
+
+func (i *CacheImage) ReadAt(p []byte, off int64) (n int, err error) {
+	if i.ruuid, err = i.linkeditUUID(); err != nil {
 		return -1, err
 	}
 	if off < 0 || off >= i.limit-i.base {
@@ -525,6 +529,13 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 		CacheReader:          i,
 		VMAddrConverter:      vma,
 		RelativeSelectorBase: rsBase,
+		StringTableLookup: func(off int64, size uint64) (func(uint64) string, error) {
+			uuid, err := i.linkeditUUID()
+			if err != nil {
+				return nil, err
+			}
+			return i.cache.stringTableLookup(uuid, off, size)
+		},
 	})
 	if err != nil {
 		return nil, err
