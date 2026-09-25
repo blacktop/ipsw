@@ -318,6 +318,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			pset.MustBeMissingPaths = append(pset.MustBeMissingPaths, strings.TrimSuffix(s, "\x00"))
 		}
 	}
+	if pset.ObjcSelectorHashTableOffset > 0 && len(pset.Loaders) == 0 {
+		return nil, fmt.Errorf("prebuilt objc selector table requires at least one loader (LoadersArrayCount=%d)", pset.LoadersArrayCount)
+	}
 	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
 	if pset.ObjcSelectorHashTableOffset > 0 && !pset.Loaders[0].Loader.HasUUIDLoadCommand() {
 		sr.Seek(int64(pset.ObjcSelectorHashTableOffset), io.SeekStart)
@@ -704,6 +707,9 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		}
 	}
 	if pbl.Header.IndexOfTwin != NoUnzipperedTwin {
+		if int(pbl.Header.IndexOfTwin) >= len(f.Images) {
+			return nil, fmt.Errorf("prebuilt loader IndexOfTwin %d out of range for %d images", pbl.Header.IndexOfTwin, len(f.Images))
+		}
 		pbl.Twin = f.Images[pbl.Header.IndexOfTwin].Name
 	}
 	if pbl.Header.PatchTableOffset > 0 {

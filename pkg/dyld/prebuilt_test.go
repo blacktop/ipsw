@@ -3,6 +3,7 @@ package dyld
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -247,5 +248,66 @@ func TestPrebuiltNestedArrayBeyondSetLength(t *testing.T) {
 	}
 	if len(got.Loaders) != 1 || len(got.Loaders[0].BindTargets) != 1 {
 		t.Fatalf("nested bind targets not parsed: %+v", got.Loaders)
+	}
+}
+
+func TestPrebuiltSelectorTableRequiresLoader(t *testing.T) {
+	f, r, h := prebuiltTestFile(t, 0, 0)
+	h.ObjcSelectorHashTableOffset = h.LoadersArrayOffset
+	var encoded bytes.Buffer
+	if err := binary.Write(&encoded, binary.LittleEndian, h); err != nil {
+		t.Fatal(err)
+	}
+	copy(r.data[0x400:], encoded.Bytes())
+	_, err := f.parsePrebuiltLoaderSet(io.NewSectionReader(r, 0x400, 1<<63-1))
+	if err == nil || !strings.Contains(err.Error(), "objc selector table requires at least one loader") {
+		t.Fatalf("want missing loader error, got %v", err)
+	}
+}
+
+func TestPrebuiltTwinIndex(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		index uint16
+		count int
+		want  string
+	}{
+		{"first", 0, 2, "first"},
+		{"last", 1, 2, "last"},
+		{"at end", 2, 2, ""},
+		{"large index", NoUnzipperedTwin - 1, 2, ""},
+		{"empty images", 0, 0, ""},
+		{"no twin", NoUnzipperedTwin, 0, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, r, h := prebuiltTestFile(t, 1, 0)
+			f.Images = cacheImages{&CacheImage{Name: "first"}, &CacheImage{Name: "last"}}[:tc.count]
+			loaderOffset := binary.LittleEndian.Uint32(r.data[0x400+h.LoadersArrayOffset:])
+			bodyOffset := int(0x400+loaderOffset) + binary.Size(Loader{})
+			var body prebuiltLoaderHeader
+			if err := binary.Read(bytes.NewReader(r.data[bodyOffset:]), binary.LittleEndian, &body); err != nil {
+				t.Fatal(err)
+			}
+			body.IndexOfTwin = tc.index
+			var encoded bytes.Buffer
+			if err := binary.Write(&encoded, binary.LittleEndian, body); err != nil {
+				t.Fatal(err)
+			}
+			copy(r.data[bodyOffset:], encoded.Bytes())
+			got, err := f.GetDylibPrebuiltLoader("/lib/test")
+			if tc.index != NoUnzipperedTwin && int(tc.index) >= tc.count {
+				want := fmt.Sprintf("prebuilt loader IndexOfTwin %d out of range for %d images", tc.index, tc.count)
+				if err == nil || !strings.Contains(err.Error(), want) {
+					t.Fatalf("want %q, got %v", want, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Twin != tc.want {
+				t.Fatalf("twin = %q, want %q", got.Twin, tc.want)
+			}
+		})
 	}
 }
