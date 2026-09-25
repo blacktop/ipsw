@@ -79,6 +79,9 @@ type File struct {
 
 	Images cacheImages
 
+	slideInfoMu sync.Mutex
+	slideInfos  map[slideInfoKey]*cachedSlideInfo
+
 	SlideInfo        slideInfo
 	PatchInfoVersion uint32
 	LocalSymInfo     localSymbolInfo
@@ -973,36 +976,155 @@ func (f *File) GetRebaseInfoForPages(uuid mtypes.UUID, mapping *CacheMappingWith
 	return f.parseSlideInfo(uuid, mapping, false, true, start, end)
 }
 
+// Headers and tables belong to a File, while pointer bytes and symbols are read
+// afresh for each walk. Mapping values also let equivalent mapping copies share
+// the same metadata without conflating offsets in different subcaches.
+type slideInfoKey struct {
+	uuid    mtypes.UUID
+	mapping CacheMappingAndSlideInfo
+}
+
+type cachedSlideInfo struct {
+	header         slideInfo
+	headerErr      error
+	tablesOnce     sync.Once
+	tablesErr      error
+	starts, extras []uint16
+	entries        []CacheSlideInfoEntry
+}
+
+func (f *File) loadSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideInfo, pages bool) (*cachedSlideInfo, error) {
+	f.slideInfoMu.Lock()
+	key := slideInfoKey{uuid, mapping.CacheMappingAndSlideInfo}
+	cached := f.slideInfos[key]
+	if cached == nil {
+		cached = &cachedSlideInfo{}
+		sr := io.NewSectionReader(f.r[uuid], int64(mapping.SlideInfoOffset), 1<<63-1-int64(mapping.SlideInfoOffset))
+		var version [4]byte
+		if _, err := sr.ReadAt(version[:], 0); err != nil {
+			cached.headerErr = err
+		} else {
+			switch binary.LittleEndian.Uint32(version[:]) {
+			case 1:
+				var h CacheSlideInfo
+				cached.headerErr = binary.Read(sr, f.ByteOrder, &h)
+				cached.header = h
+			case 2:
+				var h CacheSlideInfo2
+				cached.headerErr = binary.Read(sr, f.ByteOrder, &h)
+				cached.header = h
+			case 3:
+				var h CacheSlideInfo3
+				cached.headerErr = binary.Read(sr, binary.LittleEndian, &h)
+				cached.header = h
+			case 4:
+				var h CacheSlideInfo4
+				cached.headerErr = binary.Read(sr, f.ByteOrder, &h)
+				cached.header = h
+			case 5:
+				var h CacheSlideInfo5
+				cached.headerErr = binary.Read(sr, binary.LittleEndian, &h)
+				cached.header = h
+			default:
+				log.Errorf("got unexpected dyld slide info version: %d", binary.LittleEndian.Uint32(version[:]))
+			}
+		}
+		if f.slideInfos == nil {
+			f.slideInfos = make(map[slideInfoKey]*cachedSlideInfo)
+		}
+		f.slideInfos[key] = cached
+	}
+	err := cached.headerErr
+	if err == nil && cached.header != nil {
+		// Version 5 historically accepts a preceding different version.
+		if cached.header.GetVersion() != 5 && f.SlideInfo != nil && f.SlideInfo.GetVersion() != cached.header.GetVersion() {
+			err = fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), cached.header.GetVersion())
+		} else if f.SlideInfo != cached.header {
+			f.SlideInfo = cached.header
+		}
+	}
+	f.slideInfoMu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	if pages && cached.header != nil {
+		cached.tablesOnce.Do(func() { cached.tablesErr = cached.readTables(f.r[uuid], mapping) })
+		if cached.tablesErr != nil {
+			return nil, cached.tablesErr
+		}
+	}
+	return cached, nil
+}
+
+func (c *cachedSlideInfo) readTables(reader io.ReaderAt, mapping *CacheMappingWithSlideInfo) error {
+	sr := io.NewSectionReader(reader, int64(mapping.SlideInfoOffset), 1<<63-1-int64(mapping.SlideInfoOffset))
+	readStarts := func(offset, count uint32) ([]uint16, error) {
+		if mapping.SlideInfoSize != 0 && (uint64(offset) > mapping.SlideInfoSize || uint64(count)*2 > mapping.SlideInfoSize-uint64(offset)) {
+			return nil, io.ErrUnexpectedEOF
+		}
+		if _, err := sr.Seek(int64(offset), io.SeekStart); err != nil {
+			return nil, err
+		}
+		values := make([]uint16, count)
+		if err := binary.Read(sr, binary.LittleEndian, values); err != nil {
+			return nil, err
+		}
+		return values, nil
+	}
+	var startsOffset, startsCount, extrasOffset, extrasCount uint32
+	switch h := c.header.(type) {
+	case CacheSlideInfo:
+		if mapping.SlideInfoSize != 0 && (uint64(h.EntriesOffset) > mapping.SlideInfoSize || uint64(h.EntriesCount)*128 > mapping.SlideInfoSize-uint64(h.EntriesOffset)) {
+			return io.ErrUnexpectedEOF
+		}
+		if _, err := sr.Seek(int64(h.EntriesOffset), io.SeekStart); err != nil {
+			return err
+		}
+		c.entries = make([]CacheSlideInfoEntry, h.EntriesCount)
+		for i := range c.entries {
+			if _, err := io.ReadFull(sr, c.entries[i].bits[:]); err != nil {
+				return err
+			}
+		}
+		startsOffset, startsCount = h.TocOffset, h.TocCount
+	case CacheSlideInfo2:
+		startsOffset, startsCount = h.PageStartsOffset, h.PageStartsCount
+		extrasOffset, extrasCount = h.PageExtrasOffset, h.PageExtrasCount
+	case CacheSlideInfo3:
+		startsOffset, startsCount = uint32(binary.Size(h)), h.PageStartsCount
+	case CacheSlideInfo4:
+		startsOffset, startsCount = h.PageStartsOffset, h.PageStartsCount
+		extrasOffset, extrasCount = h.PageExtrasOffset, h.PageExtrasCount
+	case CacheSlideInfo5:
+		startsOffset, startsCount = uint32(binary.Size(h)), h.PageStartsCount
+	}
+	var err error
+	c.starts, err = readStarts(startsOffset, startsCount)
+	if err != nil {
+		return err
+	}
+	if extrasCount != 0 {
+		c.extras, err = readStarts(extrasOffset, extrasCount)
+	}
+	return err
+}
+
 func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideInfo, dump bool, parsePages bool, startPage, endPage uint64) ([]Rebase, error) {
 	var symName string
 	var rebases []Rebase
 
-	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	cached, err := f.loadSlideInfo(uuid, mapping, parsePages)
+	if err != nil {
+		return nil, err
+	}
+	if cached.header == nil {
+		return nil, nil
+	}
+	var pointerBytes [8]byte
+	reader := f.r[uuid]
 
-	sr.Seek(int64(mapping.SlideInfoOffset), io.SeekStart)
-
-	// get version
-	slideInfoVersionData := make([]byte, 4)
-	sr.Read(slideInfoVersionData)
-	slideInfoVersion := binary.LittleEndian.Uint32(slideInfoVersionData)
-
-	sr.Seek(int64(mapping.SlideInfoOffset), io.SeekStart)
-
-	switch slideInfoVersion {
-	case 1:
-		slideInfo := CacheSlideInfo{}
-		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
-			return nil, err
-		}
-
-		if f.SlideInfo != nil {
-			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
-				return nil, fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
-			}
-		}
-
-		f.SlideInfo = slideInfo
-
+	switch slideInfo := cached.header.(type) {
+	case CacheSlideInfo:
 		if !parsePages {
 			return nil, nil
 		}
@@ -1011,17 +1133,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 		output(dump, "toc_count          = %d\n", slideInfo.TocCount)
 		output(dump, "data page count    = %d\n", mapping.Size/4096)
 
-		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.EntriesOffset)), io.SeekStart)
-		entries := make([]CacheSlideInfoEntry, int(slideInfo.EntriesCount))
-		if err := binary.Read(sr, binary.LittleEndian, &entries); err != nil {
-			return nil, err
-		}
-
-		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.TocOffset)), io.SeekStart)
-		tocs := make([]uint16, int(slideInfo.TocCount))
-		if err := binary.Read(sr, binary.LittleEndian, &tocs); err != nil {
-			return nil, err
-		}
+		entries, tocs := cached.entries, cached.starts
 		// FIXME: what should I do for version 1 rebases ?
 		for i, toc := range tocs {
 			output(dump, "%#08x: [% 5d,% 5d] ", int(mapping.Address)+i*4096, i, tocs[i])
@@ -1030,20 +1142,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			}
 			output(dump, "\n")
 		}
-	case 2:
-		slideInfo := CacheSlideInfo2{}
-		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
-			return nil, err
-		}
-
-		if f.SlideInfo != nil {
-			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
-				return nil, fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
-			}
-		}
-
-		f.SlideInfo = slideInfo
-
+	case CacheSlideInfo2:
 		if !parsePages {
 			return nil, nil
 		}
@@ -1058,22 +1157,14 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 		var targetValue uint64
 		var pointer CacheSlidePointer2
 
-		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageStartsOffset)), io.SeekStart)
-		starts := make([]uint16, slideInfo.PageStartsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &starts); err != nil {
-			return nil, err
-		}
+		starts := cached.starts
 
 		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
 			return nil, err
 		}
 
-		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), io.SeekStart)
-		extras := make([]uint16, int(slideInfo.PageExtrasCount))
-		if err := binary.Read(sr, binary.LittleEndian, &extras); err != nil {
-			return nil, err
-		}
+		extras := cached.extras
 
 		for i, start := range starts[startPage:endPage] {
 			i += int(startPage)
@@ -1083,10 +1174,10 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				deltaShift := uint64(bits.TrailingZeros64(slideInfo.DeltaMask) - 2)
 				delta := uint32(1)
 				for delta != 0 {
-					sr.Seek(int64(pageContent+uint64(startOffset)), io.SeekStart)
-					if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
+					if _, err := reader.ReadAt(pointerBytes[:8], int64(pageContent+uint64(startOffset))); err != nil {
 						return err
 					}
+					pointer = CacheSlidePointer2(f.ByteOrder.Uint64(pointerBytes[:8]))
 
 					delta = uint32(uint64(pointer) & slideInfo.DeltaMask >> deltaShift)
 					targetValue = slideInfo.SlidePointer(uint64(pointer))
@@ -1139,20 +1230,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				rebaseChain(pageOffset, uint32(start*4))
 			}
 		}
-	case 3:
-		slideInfo := CacheSlideInfo3{}
-		if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
-			return nil, err
-		}
-
-		if f.SlideInfo != nil {
-			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
-				return nil, fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
-			}
-		}
-
-		f.SlideInfo = slideInfo
-
+	case CacheSlideInfo3:
 		if !parsePages {
 			return nil, nil
 		}
@@ -1165,10 +1243,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 		var targetValue uint64
 		var pointer CacheSlidePointer3
 
-		starts := make([]uint16, slideInfo.PageStartsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &starts); err != nil {
-			return nil, err
-		}
+		starts := cached.starts
 
 		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
@@ -1195,11 +1270,10 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			for {
 				rebaseLocation += delta
 				rebaseAddr += delta
-
-				sr.Seek(int64(rebaseLocation), io.SeekStart)
-				if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
+				if _, err := reader.ReadAt(pointerBytes[:8], int64(rebaseLocation)); err != nil {
 					return nil, err
 				}
+				pointer = CacheSlidePointer3(f.ByteOrder.Uint64(pointerBytes[:8]))
 
 				if pointer.Authenticated() {
 					targetValue = slideInfo.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
@@ -1238,20 +1312,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				delta = pointer.OffsetToNextPointer() * 8
 			}
 		}
-	case 4:
-		slideInfo := CacheSlideInfo4{}
-		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
-			return nil, err
-		}
-
-		if f.SlideInfo != nil {
-			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
-				return nil, fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
-			}
-		}
-
-		f.SlideInfo = slideInfo
-
+	case CacheSlideInfo4:
 		if !parsePages {
 			return nil, nil
 		}
@@ -1266,22 +1327,14 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 		var targetValue uint64
 		var pointer CacheSlidePointer4 // uint32
 
-		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageStartsOffset)), io.SeekStart)
-		starts := make([]uint16, slideInfo.PageStartsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &starts); err != nil {
-			return nil, err
-		}
+		starts := cached.starts
 
 		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
 			return nil, err
 		}
 
-		sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), io.SeekStart)
-		extras := make([]uint16, int(slideInfo.PageExtrasCount))
-		if err := binary.Read(sr, binary.LittleEndian, &extras); err != nil {
-			return nil, err
-		}
+		extras := cached.extras
 
 		for i, start := range starts[startPage:endPage] {
 			i += int(startPage)
@@ -1292,10 +1345,10 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				pageOffset := uint32(startOffset)
 				delta := uint32(1)
 				for delta != 0 {
-					sr.Seek(int64(pageContent+uint64(pageOffset)), io.SeekStart)
-					if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
+					if _, err := reader.ReadAt(pointerBytes[:4], int64(pageContent+uint64(pageOffset))); err != nil {
 						return err
 					}
+					pointer = CacheSlidePointer4(f.ByteOrder.Uint32(pointerBytes[:4]))
 
 					delta = uint32(uint64(pointer) & slideInfo.DeltaMask >> deltaShift)
 					targetValue = slideInfo.SlidePointer(uint64(pointer))
@@ -1348,14 +1401,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				rebaseChainV4(pageOffset, start*4)
 			}
 		}
-	case 5:
-		slideInfo := CacheSlideInfo5{}
-		if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
-			return nil, err
-		}
-
-		f.SlideInfo = slideInfo
-
+	case CacheSlideInfo5:
 		if !parsePages {
 			return nil, nil
 		}
@@ -1368,10 +1414,7 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 		var targetValue uint64
 		var pointer CacheSlidePointer5
 
-		starts := make([]uint16, slideInfo.PageStartsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &starts); err != nil {
-			return nil, err
-		}
+		starts := cached.starts
 
 		startPage, endPage, err := clampSlidePages(startPage, endPage, len(starts))
 		if err != nil {
@@ -1398,11 +1441,10 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			for {
 				rebaseLocation += delta
 				rebaseAddr += delta
-
-				sr.Seek(int64(rebaseLocation), io.SeekStart)
-				if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
+				if _, err := reader.ReadAt(pointerBytes[:8], int64(rebaseLocation)); err != nil {
 					return nil, err
 				}
+				pointer = CacheSlidePointer5(f.ByteOrder.Uint64(pointerBytes[:8]))
 
 				if pointer.Authenticated() {
 					targetValue = slideInfo.ValueAdd + pointer.Value()
@@ -1441,8 +1483,6 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 				delta = pointer.OffsetToNextPointer() * 8
 			}
 		}
-	default:
-		log.Errorf("got unexpected dyld slide info version: %d", slideInfoVersion)
 	}
 
 	return rebases, nil

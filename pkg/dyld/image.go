@@ -783,7 +783,17 @@ func (i *CacheImage) SegmentRebases(seg *macho.Segment) ([]Rebase, error) {
 		return nil, fmt.Errorf("segment %s: file size %#x exceeds the %#x bytes left in its mapping",
 			seg.Name, seg.Filesz, mapping.Size-offset)
 	}
-	pageSize := uint64(i.cache.SlideInfo.GetPageSize())
+	cached, err := i.cache.loadSlideInfo(uuid, mapping, false)
+	if err != nil {
+		return nil, err
+	}
+	if cached.header == nil {
+		return nil, fmt.Errorf("mapping %s has no supported slide info", mapping.Name)
+	}
+	pageSize := uint64(cached.header.GetPageSize())
+	if pageSize == 0 {
+		return nil, fmt.Errorf("mapping %s has zero slide page size", mapping.Name)
+	}
 	start, end := slidePagesForRange(offset, seg.Filesz, pageSize)
 	rebases, err := i.cache.GetRebaseInfoForPages(uuid, mapping, start, end)
 	if err != nil {
