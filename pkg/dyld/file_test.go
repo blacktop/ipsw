@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -452,5 +454,49 @@ func TestCloseDropsDylibsTrie(t *testing.T) {
 	}
 	if f.dylibsTrieData != nil {
 		t.Fatal("Close kept the dylibs trie")
+	}
+}
+
+func TestNewFileStartsWithAnEmptyBuildTable(t *testing.T) {
+	f, err := NewFile(bytes.NewReader(syntheticPrimaryBytes(t, layoutSelfContained)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := f.AddressToSymbol.Len(); n != 0 {
+		t.Fatalf("new address-to-symbol table holds %d entries, want 0", n)
+	}
+
+	path := filepath.Join(t.TempDir(), "empty.a2s")
+	out, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.AddressToSymbol.Save(out); err != nil {
+		t.Fatalf("saving the empty table: %v", err)
+	}
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+	in, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+	fi, err := in.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded := NewA2STable(0)
+	if err := loaded.Load(in, fi.Size()); err != nil {
+		t.Fatalf("loading the saved empty table: %v", err)
+	}
+	defer loaded.Close()
+	if n := loaded.Len(); n != 0 {
+		t.Fatalf("reloaded empty table holds %d entries", n)
+	}
+
+	f.AddressToSymbol.Set(0x180001000, "_first")
+	if name, ok := f.AddressToSymbol.Get(0x180001000); !ok || name != "_first" {
+		t.Fatalf("first entry = %q, %v; want _first", name, ok)
 	}
 }

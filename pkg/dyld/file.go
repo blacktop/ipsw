@@ -334,7 +334,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.CodeSignatures = make(map[mtypes.UUID]codesignature)
 	f.r = make(map[mtypes.UUID]io.ReaderAt)
 	f.closers = make(map[mtypes.UUID]io.Closer)
-	f.AddressToSymbol = NewA2STable(7000000)
+	f.AddressToSymbol = NewA2STable(0)
 	f.ImageArray = make(map[uint32]*CImage)
 	f.islandStubs = make(map[uint64]uint64)
 
