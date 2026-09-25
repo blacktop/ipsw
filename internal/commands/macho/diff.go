@@ -198,19 +198,35 @@ func normalizeSymbolsForDiff(values []string) []string {
 	return normalized
 }
 
-// diffNormalizedSymbols returns the added and removed symbols after normalizing
-// both sides (build-root paths + generated counters). utils.Difference is
-// set-based, so renumbered duplicates collapse and cancel; a genuinely new or
-// removed symbol family still surfaces.
+// diffNormalizedSymbols returns sorted, deduplicated additions and removals
+// after collapsing build-root paths and generated counters.
 func diffNormalizedSymbols(oldValues, newValues []string) ([]string, []string) {
-	normalizedOld := normalizeSymbolsForDiff(oldValues)
-	normalizedNew := normalizeSymbolsForDiff(newValues)
+	return diffNormalizedSets(oldValues, newValues, normalizeSymbolForDiff)
+}
 
-	added := utils.Difference(normalizedNew, normalizedOld)
+// diffNormalizedSets records membership in both sides without materializing
+// normalized slices. Keeping shared entries prevents duplicates from becoming
+// false additions or removals after normalization.
+func diffNormalizedSets(oldValues, newValues []string, normalize func(string) string) (added, removed []string) {
+	const oldSide, newSide uint8 = 1, 2
+	membership := make(map[string]uint8, len(oldValues)+len(newValues))
+	for _, value := range oldValues {
+		membership[normalize(value)] = oldSide
+	}
+	for _, value := range newValues {
+		key := normalize(value)
+		membership[key] |= newSide
+	}
+	for value, sides := range membership {
+		switch sides {
+		case oldSide:
+			removed = append(removed, value)
+		case newSide:
+			added = append(added, value)
+		}
+	}
 	sort.Strings(added)
-	removed := utils.Difference(normalizedOld, normalizedNew)
 	sort.Strings(removed)
-
 	return added, removed
 }
 
@@ -228,15 +244,7 @@ func normalizeCStringsForDiff(values []string, ignoreBuildTimestamps bool) []str
 }
 
 func diffNormalizedCStrings(oldValues, newValues []string, ignoreBuildTimestamps bool) ([]string, []string) {
-	normalizedOldValues := normalizeCStringsForDiff(oldValues, ignoreBuildTimestamps)
-	normalizedNewValues := normalizeCStringsForDiff(newValues, ignoreBuildTimestamps)
-
-	added := utils.Difference(normalizedNewValues, normalizedOldValues)
-	sort.Strings(added)
-	removed := utils.Difference(normalizedOldValues, normalizedNewValues)
-	sort.Strings(removed)
-
-	return added, removed
+	return diffNormalizedSets(oldValues, newValues, cstringNormalizer(ignoreBuildTimestamps))
 }
 
 type cachedDiffInfo struct {

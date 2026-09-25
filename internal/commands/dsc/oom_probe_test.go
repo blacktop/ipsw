@@ -1,6 +1,7 @@
 package dsc
 
 import (
+	"encoding/json"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -87,6 +88,16 @@ func TestOOMProbe(t *testing.T) {
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatalf("diff: %v", err)
+	}
+
+	if path := os.Getenv("RESULT_OUT"); path != "" {
+		data, err := json.Marshal(out)
+		if err != nil {
+			t.Fatalf("marshal diff result: %v", err)
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatalf("write diff result: %v", err)
+		}
 	}
 
 	var updatedKeys, updatedBytes int

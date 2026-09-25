@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/blacktop/go-macho"
@@ -396,5 +397,23 @@ func BenchmarkNormalizeSymbolForDiff(b *testing.B) {
 				normalizeSymbolForDiff(bc.in)
 			}
 		})
+	}
+}
+
+// BenchmarkDiffNormalizedSymbols models a large image with a small symbol delta.
+func BenchmarkDiffNormalizedSymbols(b *testing.B) {
+	const count = 20000
+	oldValues := make([]string, count)
+	newValues := make([]string, count)
+	for i := range count {
+		oldValues[i] = "_symbol_" + strconv.Itoa(i) + "_name"
+		newValues[i] = oldValues[i]
+	}
+	for i := range 20 {
+		newValues[i] = "_added_" + strconv.Itoa(i) + "_name"
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		diffNormalizedSymbols(oldValues, newValues)
 	}
 }

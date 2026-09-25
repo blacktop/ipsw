@@ -8,6 +8,7 @@ import (
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // syntheticMachO returns a 64-bit arm64 Mach-O of type typ whose load commands
@@ -223,4 +224,50 @@ func FuzzNormalizeSymbolForDiffMatchesUnguardedPipeline(f *testing.F) {
 			t.Fatalf("normalizeSymbolForDiff(%q) = %q, want %q", value, got, want)
 		}
 	})
+}
+
+func TestNormalizedSetDifferences(t *testing.T) {
+	cases := []struct {
+		name     string
+		old, new []string
+	}{
+		{"empty", nil, nil},
+		{"added", nil, []string{"z", "a", "a", ""}},
+		{"removed", []string{"z", "a", "a", ""}, nil},
+		{"overlap", []string{"z", "shared", "shared", "", "a"}, []string{"shared", "b", "b", "", "y"}},
+		{"duplicates", []string{"a", "a", "b"}, []string{"b", "a", "b"}},
+		{"counters", []string{"block.1", "block.2", "gone.1", "gone.2"}, []string{"block.3", "block.4", "new.1", "new.2"}},
+		{"paths", []string{"/AppleInternal/Library/BuildRoots/old/src", "/AppleInternal/Library/BuildRoots/old/src"}, []string{"/AppleInternal/Library/BuildRoots/new/src"}},
+		{"timestamps", []string{"12:34:56", "12:34:56", "Jan  1 2025"}, []string{"23:45:01", "Feb  2 2026", "23:45:01"}},
+	}
+	for _, mode := range []struct {
+		name      string
+		normalize func([]string) []string
+		diff      func([]string, []string) ([]string, []string)
+	}{
+		{"symbols", normalizeSymbolsForDiff, diffNormalizedSymbols},
+		{"cstrings", func(v []string) []string { return normalizeCStringsForDiff(v, false) }, func(a, b []string) ([]string, []string) { return diffNormalizedCStrings(a, b, false) }},
+		{"cstrings-ignore-timestamps", func(v []string) []string { return normalizeCStringsForDiff(v, true) }, func(a, b []string) ([]string, []string) { return diffNormalizedCStrings(a, b, true) }},
+	} {
+		for _, tc := range cases {
+			t.Run(mode.name+"/"+tc.name, func(t *testing.T) {
+				oldCopy, newCopy := slices.Clone(tc.old), slices.Clone(tc.new)
+				oldNorm, newNorm := mode.normalize(tc.old), mode.normalize(tc.new)
+				wantAdded := utils.Difference(newNorm, oldNorm)
+				wantRemoved := utils.Difference(oldNorm, newNorm)
+				slices.Sort(wantAdded)
+				slices.Sort(wantRemoved)
+				added, removed := mode.diff(tc.old, tc.new)
+				if !slices.Equal(added, wantAdded) || !slices.Equal(removed, wantRemoved) {
+					t.Fatalf("got added=%q removed=%q; want added=%q removed=%q", added, removed, wantAdded, wantRemoved)
+				}
+				if (added == nil) != (wantAdded == nil) || (removed == nil) != (wantRemoved == nil) {
+					t.Fatal("empty result nilness changed")
+				}
+				if !slices.Equal(tc.old, oldCopy) || !slices.Equal(tc.new, newCopy) {
+					t.Fatal("input slices changed")
+				}
+			})
+		}
+	}
 }
