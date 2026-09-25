@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"slices"
+	"sync"
 
 	"github.com/blacktop/go-macho/types"
 )
@@ -38,6 +39,13 @@ type A2STable struct {
 
 	// build mode; cache construction mutates this on one goroutine before Save/Load.
 	m map[uint64]string
+
+	changes uint64
+	// Named stub maps belong to one File and one table revision. The mutex
+	// serializes cache-building readers; table mutation still requires exclusive
+	// access, just as it does for Get and Range.
+	stubMu    sync.Mutex
+	stubNames *namedStubCache
 }
 
 // NewA2STable creates a new table in build mode with the given capacity hint.
@@ -106,7 +114,17 @@ func (t *A2STable) Set(addr uint64, name string) {
 	if t.m == nil {
 		t.m = make(map[uint64]string)
 	}
+	if old, ok := t.m[addr]; ok && old == name {
+		return
+	}
 	t.m[addr] = name
+	t.changed()
+}
+
+func (t *A2STable) changed() {
+	t.changes++
+	// Drop the cache as well as advancing the revision, including on wraparound.
+	t.stubNames = nil
 }
 
 // Has returns true if addr exists in the table.
@@ -151,6 +169,7 @@ func (t *A2STable) Range(fn func(uint64, string) bool) {
 
 // Close releases mmap'd resources.
 func (t *A2STable) Close() error {
+	t.changed()
 	t.m = nil
 	if t.data != nil {
 		err := a2sMunmap(t.data)
@@ -269,6 +288,7 @@ func (t *A2STable) Load(f *os.File, size int64) error {
 	t.strTabSize = int(strTabSize)
 	t.m = nil
 
+	t.changed()
 	return nil
 }
 

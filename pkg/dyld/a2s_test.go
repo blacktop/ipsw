@@ -1,6 +1,7 @@
 package dyld
 
 import (
+	"bytes"
 	"encoding/binary"
 	"maps"
 	"math"
@@ -10,6 +11,55 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestA2SChangeCounter(t *testing.T) {
+	table := NewA2STable(0)
+	table.Set(1, "first")
+	version := table.changes
+	table.Set(1, "first")
+	if table.changes != version {
+		t.Fatal("same-name Set advanced the counter")
+	}
+	table.Set(1, "replacement")
+	if table.Len() != 1 || table.changes != version+1 {
+		t.Fatal("replacement must advance the counter without changing Len")
+	}
+	version = table.changes
+	table.Set(2, "")
+	if table.changes != version+1 {
+		t.Fatal("adding an empty name must advance the counter")
+	}
+	version = table.changes
+	var out bytes.Buffer
+	if err := table.Save(&out); err != nil {
+		t.Fatal(err)
+	}
+	if table.changes != version {
+		t.Fatal("Save mutated the counter")
+	}
+	path := filepath.Join(t.TempDir(), "cache.a2s")
+	if err := os.WriteFile(path, out.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	in, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+	if err := table.Load(in, int64(out.Len())); err != nil {
+		t.Fatal(err)
+	}
+	if table.changes != version+1 {
+		t.Fatal("Load did not advance the counter")
+	}
+	version = table.changes
+	if err := table.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if table.changes != version+1 {
+		t.Fatal("Close did not advance the counter")
+	}
+}
 
 // saveAndLoad writes table to a file and loads it back in mmap mode.
 func saveAndLoad(t *testing.T, table *A2STable) (*A2STable, []byte) {

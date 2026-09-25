@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -491,19 +492,33 @@ func (f *File) DumpPrewarmData() error {
 	return nil
 }
 
+type namedStubCache struct {
+	owner   *File
+	changes uint64
+	count   int
+	names   map[uint64]string
+}
+
 func (f *File) GetStubIslands() (map[uint64]string, error) {
-	stubs := make(map[uint64]string)
+	table := f.AddressToSymbol
+	table.stubMu.Lock()
+	defer table.stubMu.Unlock()
 	if len(f.islandStubs) == 0 {
 		if err := f.ParseStubIslands(); err != nil {
 			return nil, fmt.Errorf("failed to parse stub islands: %v", err)
 		}
 	}
+	if cached := table.stubNames; cached != nil && cached.owner == f && cached.changes == table.changes && cached.count == len(f.islandStubs) {
+		return maps.Clone(cached.names), nil
+	}
+	stubs := make(map[uint64]string)
 	for stub, target := range f.islandStubs {
 		if symName, ok := f.AddressToSymbol.Get(target); ok {
 			stubs[stub] = symName
 		}
 	}
-	return stubs, nil
+	table.stubNames = &namedStubCache{owner: f, changes: table.changes, count: len(f.islandStubs), names: stubs}
+	return maps.Clone(stubs), nil
 }
 
 // GetStubIslandTargets returns target function addresses keyed by stub-island
