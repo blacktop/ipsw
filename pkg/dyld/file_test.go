@@ -314,6 +314,96 @@ func TestStringTableLookupCopyPath(t *testing.T) {
 	}
 }
 
+// strtabEOFReader also reports EOF for a complete read ending at the file boundary.
+type strtabEOFReader struct{ *countingReaderAt }
+
+func (r strtabEOFReader) ReadAt(p []byte, off int64) (int, error) {
+	n, err := r.countingReaderAt.ReadAt(p, off)
+	if off+int64(n) == int64(len(r.data)) {
+		err = io.EOF
+	}
+	return n, err
+}
+
+func TestStringTableLookupCopyPathEOF(t *testing.T) {
+	r := strtabReader()
+	r.data = r.data[:strtabOff+len(strtabPool)]
+	f, uuid := strtabTestFile(strtabEOFReader{r})
+
+	nameAt, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkStrtabNames(t, nameAt)
+	// Both the one-byte probe and the full pool read end exactly at EOF.
+	if r.reads != 2 || r.bytesRead != int64(1+len(strtabPool)) {
+		t.Fatalf("pool reads = %d (%d bytes), want 2 (%d bytes)", r.reads, r.bytesRead, 1+len(strtabPool))
+	}
+	if c := f.strtabs[uuid]; len(f.strtabs) != 1 || c.off != strtabOff || string(c.buf) != strtabPool {
+		t.Fatalf("complete EOF read did not cache the pool: %+v", f.strtabs)
+	}
+	cached, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkStrtabNames(t, cached)
+	if r.reads != 2 {
+		t.Fatalf("cached lookup made %d additional reads, want 0", r.reads-2)
+	}
+
+	// The same reader returns a short read with EOF for a pool one byte longer.
+	if _, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool)+1)); err == nil || !strings.Contains(err.Error(), "extends past the end") {
+		t.Fatalf("oversized pool error = %v, want extends past the end", err)
+	}
+}
+
+func TestStringTableLookupPartiallyOverlappingRanges(t *testing.T) {
+	r := strtabReader()
+	r.watchEnd = int64(len(r.data))
+	f, uuid := strtabTestFile(r)
+	first, err := f.stringTableLookup(uuid, strtabOff, uint64(len(strtabPool)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkStrtabNames(t, first)
+	reads := r.reads
+
+	// [A+7, B+4) overlaps the first pool and extends its unterminated tail.
+	overlap, err := f.stringTableLookup(uuid, strtabOff+7, uint64(len(strtabPool)-7+4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := overlap(0); got != "_foo" {
+		t.Errorf("overlapping name = %q, want _foo", got)
+	}
+	if got := overlap(5); got != "tailZZZZ" {
+		t.Errorf("extended name = %q, want tailZZZZ", got)
+	}
+	if r.reads != reads+2 {
+		t.Fatalf("union made %d reads, want probe and full read", r.reads-reads)
+	}
+	if c := f.strtabs[uuid]; len(f.strtabs) != 1 || c.off != strtabOff || string(c.buf) != strtabPool+"ZZZZ" {
+		t.Fatalf("cached union = %+v, want one pool at %d containing %q", f.strtabs, strtabOff, strtabPool+"ZZZZ")
+	}
+	reads = r.reads
+	// This range includes bytes before the second range, so it needs the union.
+	inside, err := f.stringTableLookup(uuid, strtabOff+1, uint64(len(strtabPool)+2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := inside(0); got != "_main" {
+		t.Errorf("contained name = %q, want _main", got)
+	}
+	if got := inside(11); got != "tailZZZ" {
+		t.Errorf("contained tail = %q, want tailZZZ", got)
+	}
+	if r.reads != reads {
+		t.Fatalf("contained lookup made %d additional reads, want 0", r.reads-reads)
+	}
+	// The original closure still owns its original extent after replacement.
+	checkStrtabNames(t, first)
+}
+
 func TestSharedStringTableBounds(t *testing.T) {
 	f, uuid := strtabTestFile(strtabReader())
 
