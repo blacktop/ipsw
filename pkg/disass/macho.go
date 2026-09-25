@@ -184,6 +184,14 @@ func (d *MachoDisass) Triage() error {
 // ref - stdlib/public/core/StringObject.swift
 // Trailing bytes after the last complete instruction word are ignored.
 func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
+	return d.findSwiftStrings(swiftStringsBatchSize)
+}
+
+// swiftStringsBatchSize is how many instructions FindSwiftStrings decodes per
+// cgo call.
+const swiftStringsBatchSize = 64
+
+func (d *MachoDisass) findSwiftStrings(batchSize int) (out map[uint64]string, err error) {
 	var prevInstr disassemble.Inst
 	var hasPrev bool
 
@@ -205,19 +213,38 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 	next := disassemble.REG_NONE
 	nextVal := uint64(0)
 
-	// extract all Swift strings
-	for i := 0; i+4 <= len(data); i += 4 {
-		instrValue := binary.LittleEndian.Uint32(data[i:])
+	// extract all Swift strings, decoding a bounded batch of complete
+	// instruction words per cgo call
+	count := len(data) / 4
+	size := min(count, batchSize)
+	addrs := make([]uint64, size)
+	words := make([]uint32, size)
+	insts := make([]disassemble.Inst, size)
+	status := make([]disassemble.DecodeStatus, size)
+	for i := range count {
+		k := i % size
+		if k == 0 {
+			n := min(size, count-i)
+			for j := range n {
+				words[j] = binary.LittleEndian.Uint32(data[(i+j)*4:])
+				addrs[j] = startAddr + uint64(j)*4
+			}
+			if _, err := d.decoder.DecomposeBatchStatus(addrs[:n], words[:n], insts[:n], status[:n]); err != nil {
+				return nil, fmt.Errorf("failed to decode instructions at %#x: %w", addrs[0], err)
+			}
+		}
 
-		var instruction disassemble.Inst
-		if err := d.decoder.DecomposeInto(startAddr, instrValue, &instruction); err != nil {
+		// A word that fails to decode only advances the address; the string
+		// state and prevInstr stay as they were.
+		if !status[k].OK() {
 			startAddr += uint64(binary.Size(uint32(0)))
 			continue
 		}
+		instruction := &insts[k]
 
 		if instruction.Operation == disassemble.ARM64_MOV {
-			if dstRegister, ok := operandRegister(&instruction, 0); ok {
-				if imm, ok := operandImmediate(&instruction, 1); ok {
+			if dstRegister, ok := operandRegister(instruction, 0); ok {
+				if imm, ok := operandImmediate(instruction, 1); ok {
 					if reg == disassemble.REG_NONE {
 						strAddr = instruction.Address
 						reg = dstRegister
@@ -237,9 +264,9 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 		} else if hasPrev &&
 			((prevInstr.Operation == disassemble.ARM64_MOV && instruction.Operation == disassemble.ARM64_MOVK) ||
 				(prevInstr.Operation == disassemble.ARM64_MOVK && instruction.Operation == disassemble.ARM64_MOVK)) {
-			if dstRegister, ok := operandRegister(&instruction, 0); ok {
-				if imm, ok := operandImmediate(&instruction, 1); ok {
-					if shift, ok := operandShiftValue(&instruction, 1); ok {
+			if dstRegister, ok := operandRegister(instruction, 0); ok {
+				if imm, ok := operandImmediate(instruction, 1); ok {
+					if shift, ok := operandShiftValue(instruction, 1); ok {
 						if reg == dstRegister {
 							regVal += imm << shift
 						} else if next == dstRegister {
@@ -276,7 +303,7 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 			nextVal = uint64(0)
 		}
 
-		prevInstr = instruction
+		prevInstr = *instruction
 		hasPrev = true
 		startAddr += uint64(binary.Size(uint32(0)))
 	}

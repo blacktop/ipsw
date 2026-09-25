@@ -68,3 +68,59 @@ func TestFindSwiftStringsIgnoresTrailingBytes(t *testing.T) {
 		t.Errorf("code shorter than one instruction yielded %v", got)
 	}
 }
+
+// Words that fail to decode with three of the decoder's failure statuses:
+// undefined, unallocated and bad operands.
+const (
+	wordUndefined   = 0x0c858ca9
+	wordUnallocated = 0xffffffff
+	wordBadOperands = 0x1918f46c
+)
+
+func encodeWords(words ...uint32) []byte {
+	var code []byte
+	for _, w := range words {
+		code = binary.LittleEndian.AppendUint32(code, w)
+	}
+	return code
+}
+
+// TestFindSwiftStringsAcrossBatches runs each sequence at every batch size,
+// so batch boundaries and final partial batches fall at every position.
+// Words that fail to decode must only advance the address.
+func TestFindSwiftStringsAcrossBatches(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code []byte
+		want map[uint64]string
+	}{
+		{"failures inside a sequence", encodeWords(
+			wordUndefined,
+			movz(0, 0, 0x6568), movk(0, 1, 0x6c6c), wordUnallocated,
+			movk(0, 2, 0x006f), wordBadOperands,
+			movz(1, 0, 0), movk(1, 3, 0xe500), nop,
+		), map[uint64]string{0x1004: "hello"}},
+		{"failed batch between fragments", encodeWords(
+			movz(0, 0, 0x6568), movk(0, 1, 0x6c6c), movk(0, 2, 0x006f),
+			wordUndefined, wordUnallocated, wordBadOperands,
+			movz(1, 0, 0), movk(1, 3, 0xe500), nop,
+		), map[uint64]string{0x1000: "hello"}},
+		{"strings crossing boundaries", append(smallStringCode(), encodeWords(
+			movz(2, 0, 0x6968), movz(3, 0, 0), movk(3, 3, 0xe200), nop,
+		)...), map[uint64]string{0x1000: "hello", 0x1018: "hi"}},
+		{"pending string before trailing bytes", append(smallStringCode()[:5*4], 0, 0, 0), map[uint64]string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for size := 1; size <= len(tc.code)/4+1; size++ {
+				d := NewMachoDisass(nil, &Config{Data: tc.code, StartAddress: 0x1000})
+				got, err := d.findSwiftStrings(size)
+				if err != nil {
+					t.Fatalf("batch size %d: %v", size, err)
+				}
+				if !maps.Equal(got, tc.want) {
+					t.Errorf("batch size %d: FindSwiftStrings = %v, want %v", size, got, tc.want)
+				}
+			}
+		})
+	}
+}
