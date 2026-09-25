@@ -84,3 +84,11 @@ func TestWebKitIPCHandlerInfoDetectsWorkQueue(t *testing.T) {
 		t.Fatalf("ok=%v workQueue=%v", ok, workQueue)
 	}
 }
+
+func TestCacheImageByNameRejectsMalformedTrieIndex(t *testing.T) {
+	f, _ := trieTestFile(t, map[string]uint64{"/lib/test": 1})
+	f.Images = cacheImages{{Name: "/lib/test"}}
+	if _, err := cacheImageByName(f, "/lib/test"); err == nil {
+		t.Fatal("out-of-range trie index accepted")
+	}
+}

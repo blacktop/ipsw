@@ -370,6 +370,9 @@ func trimStrings(values []string) []string {
 
 func cacheImageByName(f *File, name string) (*CacheImage, error) {
 	if idx, err := f.GetDylibIndex(name); err == nil {
+		if idx >= uint64(len(f.Images)) {
+			return nil, fmt.Errorf("dylibs trie index %d for %q exceeds image count %d", idx, name, len(f.Images))
+		}
 		return f.Images[idx], nil
 	}
 

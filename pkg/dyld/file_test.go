@@ -216,11 +216,13 @@ type countingReaderAt struct {
 	data               []byte
 	watchOff, watchEnd int64
 	reads              int
+	bytesRead          int64
 }
 
 func (c *countingReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	if off < c.watchEnd && off+int64(len(p)) > c.watchOff {
 		c.reads++
+		c.bytesRead += min(off+int64(len(p)), c.watchEnd) - max(off, c.watchOff)
 	}
 	return bytes.NewReader(c.data).ReadAt(p, off)
 }
@@ -498,5 +500,29 @@ func TestNewFileStartsWithAnEmptyBuildTable(t *testing.T) {
 	f.AddressToSymbol.Set(0x180001000, "_first")
 	if name, ok := f.AddressToSymbol.Get(0x180001000); !ok || name != "_first" {
 		t.Fatalf("first entry = %q, %v; want _first", name, ok)
+	}
+}
+
+func TestImageRejectsMalformedTrieIndex(t *testing.T) {
+	for _, index := range []uint64{1, 1 << 63, ^uint64(0)} {
+		f, _ := trieTestFile(t, map[string]uint64{"/lib/alias": index})
+		f.Images = cacheImages{{Name: "/lib/real"}}
+		if _, err := f.Image("/lib/alias"); err == nil {
+			t.Fatalf("index %d accepted", index)
+		}
+	}
+	f, _ := trieTestFile(t, map[string]uint64{"/lib/alias": 0})
+	f.Images = cacheImages{{Name: "/lib/real"}}
+	if got, err := f.Image("/lib/alias"); err != nil || got != f.Images[0] {
+		t.Fatalf("valid alias: %v", err)
+	}
+}
+
+func TestHasImagePathRejectsIndexOverflow(t *testing.T) {
+	for _, index := range []uint64{uint64(^uint(0)>>1) + 1, ^uint64(0)} {
+		f, _ := trieTestFile(t, map[string]uint64{"/lib/test": index})
+		if got, err := f.HasImagePath("/lib/test"); err == nil || got != -1 {
+			t.Fatalf("index %d: got %d err=%v", index, got, err)
+		}
 	}
 }

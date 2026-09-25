@@ -1,6 +1,7 @@
 package dyld
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 	"slices"
@@ -90,7 +91,7 @@ var testDylibPaths = map[string]uint64{
 
 // dylibsTrieBytes encodes paths as a dylibs trie: a root node with one edge per
 // path, each leading to a terminal node holding the image index.
-func dylibsTrieBytes(t *testing.T, paths map[string]uint64) []byte {
+func dylibsTrieBytes(t testing.TB, paths map[string]uint64) []byte {
 	t.Helper()
 	names := slices.Sorted(func(yield func(string) bool) {
 		for name := range paths {
@@ -104,23 +105,27 @@ func dylibsTrieBytes(t *testing.T, paths map[string]uint64) []byte {
 		rootSize += len(name) + 2 // NUL + one-byte child offset
 	}
 	trie := []byte{0, byte(len(names))}
-	for i, name := range names {
-		child := rootSize + 3*i
-		if child > 0x7f || paths[name] > 0x7f {
+	child := rootSize
+	for _, name := range names {
+		if child > 0x7f {
 			t.Fatal("synthetic trie needs multi-byte ULEBs")
 		}
 		trie = append(trie, name...)
 		trie = append(trie, 0, byte(child))
+		child += len(binary.AppendUvarint(nil, paths[name])) + 2
 	}
 	for _, name := range names {
-		trie = append(trie, 1, byte(paths[name]), 0) // terminal size, index, no children
+		index := binary.AppendUvarint(nil, paths[name])
+		trie = append(trie, byte(len(index)))
+		trie = append(trie, index...)
+		trie = append(trie, 0) // no children
 	}
 	return trie
 }
 
 // trieTestFile builds a one-file cache whose dylibs trie encodes paths. Its
 // reader counts the reads that touch the trie.
-func trieTestFile(t *testing.T, paths map[string]uint64) (*File, *countingReaderAt) {
+func trieTestFile(t testing.TB, paths map[string]uint64) (*File, *countingReaderAt) {
 	t.Helper()
 	const base, trieOff = 0x180000000, 0x100
 	trie := dylibsTrieBytes(t, paths)

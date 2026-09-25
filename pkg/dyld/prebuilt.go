@@ -155,62 +155,80 @@ func (f *File) SupportsDylibPrebuiltLoader() bool {
 	return true
 }
 
-// GetLaunchLoader returns the PrebuiltLoader for the given executable in-cache dylib path.
+// GetDylibPrebuiltLoader returns the PrebuiltLoader for the given in-cache dylib path.
 func (f *File) GetDylibPrebuiltLoader(executablePath string) (*PrebuiltLoader, error) {
-
 	if !f.SupportsDylibPrebuiltLoader() {
 		return nil, ErrPrebuiltLoaderSetNotSupported
 	}
-
 	uuid, off, err := f.GetOffset(f.Headers[f.UUID].DylibsPblSetAddr)
 	if err != nil {
 		return nil, err
 	}
-	// if sc := f.GetSubCacheInfo(uuid); sc != nil {
-	// 	log.Debug(sc.Extention)
-	// }
-
-	sr := io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1)
-
-	var pset PrebuiltLoaderSet
-	if err := binary.Read(sr, binary.LittleEndian, &pset.prebuiltLoaderSetHeader); err != nil {
+	r, ok := f.r[uuid]
+	if !ok || off > 1<<63-1 {
+		return nil, fmt.Errorf("invalid prebuilt loader set location in cache %s at %#x", uuid, off)
+	}
+	sr := io.NewSectionReader(r, int64(off), 1<<63-1)
+	pset, err := readPrebuiltLoaderSetHeader(sr)
+	if err != nil {
 		return nil, err
 	}
-
-	if pset.Magic != PrebuiltLoaderSetMagic {
-		return nil, fmt.Errorf("invalid magic for PrebuiltLoaderSet: expected %x got %x", PrebuiltLoaderSetMagic, pset.Magic)
-	}
-
-	sr.Seek(int64(pset.LoadersArrayOffset), io.SeekStart)
-
-	loaderOffsets := make([]uint32, pset.LoadersArrayCount)
-	if err := binary.Read(sr, binary.LittleEndian, &loaderOffsets); err != nil {
-		return nil, err
-	}
-
 	imgIdx, err := f.HasImagePath(executablePath)
 	if err != nil {
 		return nil, err
-	} else if imgIdx < 0 {
-		return nil, fmt.Errorf("image not found")
+	}
+	if imgIdx < 0 || uint64(imgIdx) >= uint64(pset.LoadersArrayCount) {
+		return nil, fmt.Errorf("dylibs trie index %d for %q exceeds loader count %d", imgIdx, executablePath, pset.LoadersArrayCount)
 	}
 
-	sr.Seek(int64(loaderOffsets[imgIdx]), io.SeekStart)
+	// Only the selected offset is needed; never allocate the cache-wide array.
+	var entry [4]byte
+	if n, err := sr.ReadAt(entry[:], int64(pset.LoadersArrayOffset)+int64(imgIdx)*4); n != len(entry) {
+		if err == nil {
+			err = io.ErrUnexpectedEOF
+		}
+		return nil, fmt.Errorf("failed to read prebuilt loader offset: %w", err)
+	}
+	loaderOffset := binary.LittleEndian.Uint32(entry[:])
+	if loaderOffset >= pset.Length {
+		return nil, fmt.Errorf("prebuilt loader offset %#x exceeds set size %#x", loaderOffset, pset.Length)
+	}
+	return f.parsePrebuiltLoader(io.NewSectionReader(sr, int64(loaderOffset), 1<<63-1))
+}
 
-	// fmt.Println(executablePath)
-
-	return f.parsePrebuiltLoader(io.NewSectionReader(f.r[uuid], int64(off)+int64(loaderOffsets[imgIdx]), 1<<63-1))
+// readPrebuiltLoaderSetHeader bounds the offset array before callers allocate
+// or index it. Probe the declared end because section readers may be unbounded.
+func readPrebuiltLoaderSetHeader(sr *io.SectionReader) (prebuiltLoaderSetHeader, error) {
+	var header prebuiltLoaderSetHeader
+	if err := binary.Read(sr, binary.LittleEndian, &header); err != nil {
+		return header, err
+	}
+	if header.Magic != PrebuiltLoaderSetMagic {
+		return header, fmt.Errorf("invalid magic for PrebuiltLoaderSet: expected %x got %x", PrebuiltLoaderSetMagic, header.Magic)
+	}
+	if header.Length < uint32(binary.Size(header)) || int64(header.Length) > sr.Size() {
+		return header, fmt.Errorf("invalid prebuilt loader set size %#x", header.Length)
+	}
+	arrayBytes := uint64(header.LoadersArrayCount) * 4
+	if header.LoadersArrayOffset > header.Length || arrayBytes > uint64(header.Length-header.LoadersArrayOffset) || arrayBytes > uint64(^uint(0)>>1) {
+		return header, fmt.Errorf("prebuilt loader array offset %#x count %d exceeds set size %#x", header.LoadersArrayOffset, header.LoadersArrayCount, header.Length)
+	}
+	var last [1]byte
+	if n, err := sr.ReadAt(last[:], int64(header.Length)-1); n != len(last) {
+		if err == nil {
+			err = io.ErrUnexpectedEOF
+		}
+		return header, fmt.Errorf("failed to read prebuilt loader set end: %w", err)
+	}
+	return header, nil
 }
 
 func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet, error) {
-	var pset PrebuiltLoaderSet
-	if err := binary.Read(sr, binary.LittleEndian, &pset.prebuiltLoaderSetHeader); err != nil {
+	header, err := readPrebuiltLoaderSetHeader(sr)
+	if err != nil {
 		return nil, err
 	}
-
-	if pset.Magic != PrebuiltLoaderSetMagic {
-		return nil, fmt.Errorf("invalid magic for PrebuiltLoaderSet: expected %x got %x", PrebuiltLoaderSetMagic, pset.Magic)
-	}
+	pset := PrebuiltLoaderSet{prebuiltLoaderSetHeader: header}
 
 	sr.Seek(int64(pset.LoadersArrayOffset), io.SeekStart)
 
@@ -220,6 +238,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 	}
 
 	for _, loaderOffset := range loaderOffsets {
+		if loaderOffset >= pset.Length {
+			return nil, fmt.Errorf("prebuilt loader offset %#x exceeds set size %#x", loaderOffset, pset.Length)
+		}
 		pbl, err := f.parsePrebuiltLoader(io.NewSectionReader(sr, int64(loaderOffset), 1<<63-1))
 		if err != nil {
 			return nil, err

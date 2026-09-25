@@ -1928,6 +1928,9 @@ func (f *File) parsePatchInfoV4() error {
 func (f *File) Image(name string) (*CacheImage, error) {
 	// fast path
 	if idx, err := f.GetDylibIndex(name); err == nil {
+		if idx >= uint64(len(f.Images)) {
+			return nil, fmt.Errorf("dylibs trie index %d for %q exceeds image count %d", idx, name, len(f.Images))
+		}
 		return f.Images[idx], nil
 	}
 	// slow path
@@ -2058,6 +2061,9 @@ func (f *File) HasImagePath(path string) (int, error) {
 		imageIndex = uint64(img.Index)
 	}
 
+	if imageIndex > uint64(^uint(0)>>1) {
+		return -1, fmt.Errorf("dylibs trie index %d for %q overflows int", imageIndex, path)
+	}
 	return int(imageIndex), nil
 }
 
