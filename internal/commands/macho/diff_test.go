@@ -3,6 +3,8 @@ package macho
 import (
 	"bytes"
 	"encoding/binary"
+	"math/rand/v2"
+	"regexp"
 	"slices"
 	"testing"
 
@@ -175,6 +177,13 @@ func TestLoadCommandsDigestThreadCommandBoundaries(t *testing.T) {
 // produce. The expected values are those of the unguarded pipeline.
 var symbolNormalizationCases = []struct{ in, want string }{
 	{"", ""},
+	{".", "."},
+	{".5", ""},
+	{"a..1", "a."},
+	{"x.cold.cold", "x"},
+	{"a.12cold", "a.12cold"},
+	{"f.cold1", "f.cold1"},
+	{"g.1.cold.2", "g"},
 	{"_objc_msgSend", "_objc_msgSend"},
 	{"-[NSObject description]", "-[NSObject description]"},
 	{"___foo_block_invoke.323", "___foo_block_invoke"},
@@ -199,7 +208,10 @@ var symbolNormalizationCases = []struct{ in, want string }{
 	{"/AppleInternal/Library/BuildRoots/0123abc/Sources/x.o.7", "/AppleInternal/Library/BuildRoots/<BUILDROOT>/Sources/x.o"},
 }
 
-// unguardedNormalizeSymbolForDiff is the normalizer without the suffix guard.
+// Retain the original regexp only as a differential test oracle.
+var generatedSymbolCounterRE = regexp.MustCompile(`(\.cold|\.[0-9]+)+$`)
+
+// unguardedNormalizeSymbolForDiff is the original regexp-based pipeline.
 func unguardedNormalizeSymbolForDiff(value string) string {
 	return generatedSymbolCounterRE.ReplaceAllString(normalizeBuildPathForDiff(value), "")
 }
@@ -224,6 +236,25 @@ func FuzzNormalizeSymbolForDiffMatchesUnguardedPipeline(f *testing.F) {
 			t.Fatalf("normalizeSymbolForDiff(%q) = %q, want %q", value, got, want)
 		}
 	})
+}
+
+func TestNormalizeSymbolForDiffGeneratedInputs(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._$"
+	tails := []string{"", ".cold", ".0", ".123", ".", "cold", ".cold1", ".12cold"}
+	for range 100000 {
+		value := make([]byte, rng.IntN(128))
+		for i := range value {
+			value[i] = alphabet[rng.IntN(len(alphabet))]
+		}
+		for n := rng.IntN(8); n > 0; n-- {
+			value = append(value, tails[rng.IntN(len(tails))]...)
+		}
+		input := string(value)
+		if got, want := normalizeSymbolForDiff(input), generatedSymbolCounterRE.ReplaceAllString(input, ""); got != want {
+			t.Fatalf("normalizeSymbolForDiff(%q) = %q, want %q", input, got, want)
+		}
+	}
 }
 
 func TestNormalizedSetDifferences(t *testing.T) {

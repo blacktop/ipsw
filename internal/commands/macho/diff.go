@@ -157,13 +157,6 @@ func cstringNormalizer(ignoreBuildTimestamps bool) func(string) string {
 	return normalizeCStringForDiff
 }
 
-// generatedSymbolCounterRE matches the trailing compiler-assigned disambiguator
-// on local symbols — e.g. ..._block_invoke.323, ..._block_invoke.870.cold.1,
-// ___block_literal_global.686 — which the linker renumbers every build. Only
-// the trailing dotted counter/.cold run is stripped, so distinct blocks keep
-// their base name (..._block_invoke vs ..._block_invoke_2).
-var generatedSymbolCounterRE = regexp.MustCompile(`(\.cold|\.[0-9]+)+$`)
-
 // normalizeSymbolForDiff collapses build-root path churn and strips the
 // trailing generated disambiguator counter so recompiled-but-unchanged local
 // symbols cancel in the diff instead of flooding it with renumber noise.
@@ -172,7 +165,20 @@ func normalizeSymbolForDiff(value string) string {
 	if !mayEndInGeneratedCounter(value) {
 		return value
 	}
-	return generatedSymbolCounterRE.ReplaceAllString(value, "")
+	for {
+		if strings.HasSuffix(value, ".cold") {
+			value = value[:len(value)-len(".cold")]
+			continue
+		}
+		i := len(value)
+		for i > 0 && value[i-1] >= '0' && value[i-1] <= '9' {
+			i--
+		}
+		if i == len(value) || i == 0 || value[i-1] != '.' {
+			return value
+		}
+		value = value[:i-1]
+	}
 }
 
 // mayEndInGeneratedCounter reports whether value can match

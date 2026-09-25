@@ -386,6 +386,25 @@ func TestGenerateDiffInfoBlockListExcludesSegmentLayout(t *testing.T) {
 }
 
 func BenchmarkNormalizeSymbolForDiff(b *testing.B) {
+	b.Run("mixed", func(b *testing.B) {
+		symbols := []string{
+			"-[NSObject(NSKeyValueCoding) valueForKeyPath:]",
+			"_OBJC_CLASS_$_NSURLSessionTask2",
+			"___block_invoke.870.cold.1",
+			"___block_literal_global.686",
+			"_objc_msgSend",
+			"_helper.cold.cold.2",
+		}
+		b.ReportAllocs()
+		i := 0
+		for b.Loop() {
+			normalizeSymbolForDiff(symbols[i])
+			i++
+			if i == len(symbols) {
+				i = 0
+			}
+		}
+	})
 	for _, bc := range []struct{ name, in string }{
 		{"no-counter", "-[NSObject(NSKeyValueCoding) valueForKeyPath:]"},
 		{"digit-no-counter", "_OBJC_CLASS_$_NSURLSessionTask2"},
