@@ -298,8 +298,10 @@ type CacheImage struct {
 
 	// Mappings are immutable after registration; misses still consult the cache
 	// so mappings registered later remain visible. Concurrent readers may share
-	// this image, so publishing the most recent hit must be atomic.
-	lastMapping atomic.Pointer[CacheMappingWithSlideInfo]
+	// this image, so hints and their advisory replacement order must be atomic.
+	lastMapping     atomic.Pointer[CacheMappingWithSlideInfo]
+	previousMapping atomic.Pointer[CacheMappingWithSlideInfo]
+	previousUseful  atomic.Bool
 }
 
 // NewCacheReader returns a CacheReader that reads from r
@@ -448,15 +450,36 @@ func (i *CacheImage) GetVMAddress(offset uint64) (uint64, error) {
 }
 
 func (i *CacheImage) SlidePointer(addr uint64) uint64 {
+	return i.slidePointer(addr, i.cache.mappingForVMAddress)
+}
+
+// slidePointer accepts the fallback lookup so tests can count registry scans.
+func (i *CacheImage) slidePointer(addr uint64, lookup func(uint64) (types.UUID, *CacheMappingWithSlideInfo)) uint64 {
 	if addr == 0 {
 		return addr
 	}
 	// check if addr is in the cache (not slid)
-	if mapping := i.lastMapping.Load(); mapping != nil && mapping.Address <= addr && addr < mapping.Address+mapping.Size {
+	last := i.lastMapping.Load()
+	if last != nil && last.Address <= addr && addr < last.Address+last.Size {
+		if i.previousUseful.Load() {
+			i.previousUseful.Store(false)
+		}
 		return addr
 	}
-	if _, mapping := i.cache.mappingForVMAddress(addr); mapping != nil {
+	if previous := i.previousMapping.Load(); previous != nil && previous.Address <= addr && addr < previous.Address+previous.Size {
+		if !i.previousUseful.Load() {
+			i.previousUseful.Store(true)
+		}
+		return addr
+	}
+	if _, mapping := lookup(addr); mapping != nil {
+		// Keep the most recently useful hint when installing a new mapping.
+		// Concurrent calls can lose locality, but every hit checks its range.
+		if !i.previousUseful.Load() {
+			i.previousMapping.Store(last)
+		}
 		i.lastMapping.Store(mapping)
+		i.previousUseful.Store(false)
 		return addr
 	}
 	// try and slide the encoded pointer

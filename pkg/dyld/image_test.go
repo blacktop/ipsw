@@ -464,3 +464,68 @@ func BenchmarkSlidePointerUnslidHint(b *testing.B) {
 		n ^= 1
 	}
 }
+
+// BenchmarkSlidePointerUnslidAlternating models the isa/data lookups within
+// each CFString: one image alternates between two distant cache mappings.
+func BenchmarkSlidePointerUnslidAlternating(b *testing.B) {
+	f := &File{MappingsWithSlideInfo: make(map[mtypes.UUID]cacheMappingsWithSlideInfo)}
+	for i := range 80 {
+		f.MappingsWithSlideInfo[mtypes.UUID{byte(i + 1)}] = cacheMappingsWithSlideInfo{{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x180000000 + uint64(i)*0x10000, Size: 0x10000}}}
+	}
+	image := &CacheImage{cache: f}
+	addresses := [2]uint64{0x180000008, 0x1804f0008}
+	n := 0
+	b.ReportAllocs()
+	for b.Loop() {
+		if got := image.SlidePointer(addresses[n]); got != addresses[n] {
+			b.Fatalf("SlidePointer() = %#x, want %#x", got, addresses[n])
+		}
+		n ^= 1
+	}
+}
+
+func TestSlidePointerMappingAlternation(t *testing.T) {
+	mappings := cacheMappingsWithSlideInfo{
+		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000, Size: 0x100}},
+		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x2000, Size: 0x100}},
+		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x3000, Size: 0x100}},
+	}
+	for _, reverse := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reverse=%v", reverse), func(t *testing.T) {
+			image := &CacheImage{cache: &File{
+				MappingsWithSlideInfo: map[mtypes.UUID]cacheMappingsWithSlideInfo{{1}: mappings},
+			}}
+			fallbacks := 0
+			lookup := func(addr uint64) (mtypes.UUID, *CacheMappingWithSlideInfo) {
+				fallbacks++
+				return image.cache.mappingForVMAddress(addr)
+			}
+			for call := range 1000 {
+				n := call % 2
+				if reverse {
+					n = 1 - n
+				}
+				addr := mappings[n].Address + uint64(call%0x100)
+				if got := image.slidePointer(addr, lookup); got != addr {
+					t.Fatalf("call %d: got %#x, want %#x", call, got, addr)
+				}
+				if fallbacks > 2 {
+					t.Fatalf("call %d: %d fallbacks, want at most two", call, fallbacks)
+				}
+			}
+			if fallbacks != 2 {
+				t.Fatalf("got %d cold fallbacks, want two", fallbacks)
+			}
+			// Exercise eviction with each slot as the most recently useful one.
+			for _, hot := range []int{0, 1} {
+				image.slidePointer(mappings[hot].Address, lookup)
+				image.slidePointer(mappings[2].Address, lookup)
+				before := fallbacks
+				image.slidePointer(mappings[hot].Address, lookup)
+				if fallbacks != before {
+					t.Fatalf("evicted most recently useful mapping %d", hot)
+				}
+			}
+		})
+	}
+}
