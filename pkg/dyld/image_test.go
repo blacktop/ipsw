@@ -7,6 +7,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/blacktop/go-macho"
@@ -362,6 +363,76 @@ func TestSlidePointerEncodedDoesNotAllocate(t *testing.T) {
 	}
 }
 
+func TestSlidePointerMappingHint(t *testing.T) {
+	mappings := cacheMappingsWithSlideInfo{
+		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000, Size: 0x100}},
+		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x2000, Size: 0x100}},
+	}
+	image := &CacheImage{cache: &File{
+		MappingsWithSlideInfo: map[mtypes.UUID]cacheMappingsWithSlideInfo{{1}: mappings},
+		SlideInfo:             CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000},
+	}}
+	for _, mapping := range mappings {
+		for _, addr := range []uint64{mapping.Address, mapping.Address + mapping.Size - 1} {
+			if got := image.SlidePointer(addr); got != addr {
+				t.Fatalf("SlidePointer(%#x) = %#x", addr, got)
+			}
+			if image.lastMapping.Load() != mapping {
+				t.Fatal("hint did not retain the latest matching mapping")
+			}
+		}
+	}
+	for _, tt := range []struct{ addr, want uint64 }{{0, 0}, {0x2100, 0x102100}, {0x8000000000000010, 0x100010}} {
+		if got := image.SlidePointer(tt.addr); got != tt.want {
+			t.Fatalf("SlidePointer(%#x) = %#x, want %#x", tt.addr, got, tt.want)
+		}
+		if image.lastMapping.Load() != mappings[1] {
+			t.Fatal("non-mapping pointer discarded the hint")
+		}
+	}
+}
+
+func TestSlidePointerConcurrentImages(t *testing.T) {
+	f := &File{
+		MappingsWithSlideInfo: make(map[mtypes.UUID]cacheMappingsWithSlideInfo),
+		SlideInfo:             CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000},
+	}
+	for n := range 4 {
+		f.MappingsWithSlideInfo[mtypes.UUID{byte(n + 1)}] = cacheMappingsWithSlideInfo{{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000 + uint64(n)*0x1000, Size: 0x100}}}
+	}
+	images := [2]*CacheImage{{cache: f}, {cache: f}}
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for n, image := range images {
+		// Two readers per image exercise both independent hints and concurrent
+		// loads/stores of a shared hint. The mapping registry stays read-only.
+		for reader := range 2 {
+			wg.Go(func() {
+				<-start
+				for call := range 1000 {
+					addr := 0x1000 + uint64(2*n+(call+reader)%2)*0x1000 + uint64(call%0x100)
+					if got := image.SlidePointer(addr); got != addr {
+						t.Errorf("image %d: SlidePointer(%#x) = %#x", n, addr, got)
+						return
+					}
+					if got := image.SlidePointer(0x8000000000000010); got != 0x100010 {
+						t.Errorf("image %d: encoded pointer = %#x, want 0x100010", n, got)
+						return
+					}
+				}
+			})
+		}
+	}
+	close(start)
+	wg.Wait()
+	for n, image := range images {
+		mapping := image.lastMapping.Load()
+		if mapping == nil || (mapping.Address != 0x1000+uint64(2*n)*0x1000 && mapping.Address != 0x2000+uint64(2*n)*0x1000) {
+			t.Errorf("image %d did not retain its own mapping hint", n)
+		}
+	}
+}
+
 func BenchmarkSlidePointerEncoded(b *testing.B) {
 	f := &File{MappingsWithSlideInfo: make(map[mtypes.UUID]cacheMappingsWithSlideInfo), SlideInfo: CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000}}
 	for i := range 80 {
@@ -372,5 +443,24 @@ func BenchmarkSlidePointerEncoded(b *testing.B) {
 		if image.SlidePointer(0x8000000000000010) != 0x100010 {
 			b.Fatal("wrong pointer")
 		}
+	}
+}
+
+func BenchmarkSlidePointerUnslidHint(b *testing.B) {
+	f := &File{MappingsWithSlideInfo: make(map[mtypes.UUID]cacheMappingsWithSlideInfo)}
+	for i := range 80 {
+		f.MappingsWithSlideInfo[mtypes.UUID{byte(i + 1)}] = cacheMappingsWithSlideInfo{{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x180000000 + uint64(i)*0x10000, Size: 0x10000}}}
+	}
+	// Interleave two images with different hot mappings, as when walking their
+	// CFStrings. Each image retains locality even though the addresses alternate.
+	images := [2]*CacheImage{{cache: f}, {cache: f}}
+	addresses := [2]uint64{0x180000008, 0x1804f0008}
+	n := 0
+	b.ReportAllocs()
+	for b.Loop() {
+		if got := images[n].SlidePointer(addresses[n]); got != addresses[n] {
+			b.Fatalf("SlidePointer() = %#x, want %#x", got, addresses[n])
+		}
+		n ^= 1
 	}
 }

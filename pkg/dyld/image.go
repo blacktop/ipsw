@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/tabwriter"
 
 	"github.com/apex/log"
@@ -294,6 +295,11 @@ type CacheImage struct {
 	m     *macho.File
 	pm    *macho.File // partial macho
 	sinfo map[uint64]uint64
+
+	// Mappings are immutable after registration; misses still consult the cache
+	// so mappings registered later remain visible. Concurrent readers may share
+	// this image, so publishing the most recent hit must be atomic.
+	lastMapping atomic.Pointer[CacheMappingWithSlideInfo]
 }
 
 // NewCacheReader returns a CacheReader that reads from r
@@ -446,7 +452,11 @@ func (i *CacheImage) SlidePointer(addr uint64) uint64 {
 		return addr
 	}
 	// check if addr is in the cache (not slid)
+	if mapping := i.lastMapping.Load(); mapping != nil && mapping.Address <= addr && addr < mapping.Address+mapping.Size {
+		return addr
+	}
 	if _, mapping := i.cache.mappingForVMAddress(addr); mapping != nil {
+		i.lastMapping.Store(mapping)
 		return addr
 	}
 	// try and slide the encoded pointer
