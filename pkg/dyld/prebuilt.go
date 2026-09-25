@@ -318,8 +318,14 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			pset.MustBeMissingPaths = append(pset.MustBeMissingPaths, strings.TrimSuffix(s, "\x00"))
 		}
 	}
-	if pset.ObjcSelectorHashTableOffset > 0 && len(pset.Loaders) == 0 {
-		return nil, fmt.Errorf("prebuilt objc selector table requires at least one loader (LoadersArrayCount=%d)", pset.LoadersArrayCount)
+	if len(pset.Loaders) == 0 && (pset.ObjcSelectorHashTableOffset > 0 || pset.ObjcClassHashTableOffset > 0 || pset.ObjcProtocolHashTableOffset > 0) {
+		err := fmt.Errorf("prebuilt objc table requires at least one loader (LoadersArrayCount=%d)", pset.LoadersArrayCount)
+		if pset.ObjcSelectorHashTableOffset > 0 {
+			// Preserve the existing selector diagnostic while adding offset context.
+			err = fmt.Errorf("prebuilt objc selector table requires at least one loader (LoadersArrayCount=%d)", pset.LoadersArrayCount)
+		}
+		return nil, fmt.Errorf("%w: ObjcSelectorHashTableOffset=%#x, ObjcClassHashTableOffset=%#x, ObjcProtocolHashTableOffset=%#x",
+			err, pset.ObjcSelectorHashTableOffset, pset.ObjcClassHashTableOffset, pset.ObjcProtocolHashTableOffset)
 	}
 	// FIXME: when dyld src is out for iOS 18.0/macOS 15.0
 	if pset.ObjcSelectorHashTableOffset > 0 && !pset.Loaders[0].Loader.HasUUIDLoadCommand() {

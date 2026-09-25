@@ -252,16 +252,62 @@ func TestPrebuiltNestedArrayBeyondSetLength(t *testing.T) {
 }
 
 func TestPrebuiltSelectorTableRequiresLoader(t *testing.T) {
+	testPrebuiltEmptyLoaders(t, "selector")
+}
+
+func TestPrebuiltClassTableRequiresLoader(t *testing.T) {
+	testPrebuiltEmptyLoaders(t, "class")
+}
+
+func TestPrebuiltProtocolTableRequiresLoader(t *testing.T) {
+	testPrebuiltEmptyLoaders(t, "protocol")
+}
+
+func TestPrebuiltEmptySetWithoutObjCTables(t *testing.T) {
+	testPrebuiltEmptyLoaders(t, "")
+}
+
+func testPrebuiltEmptyLoaders(t *testing.T, table string) {
+	t.Helper()
 	f, r, h := prebuiltTestFile(t, 0, 0)
-	h.ObjcSelectorHashTableOffset = h.LoadersArrayOffset
+	switch table {
+	case "selector":
+		h.ObjcSelectorHashTableOffset = h.LoadersArrayOffset
+	case "class":
+		h.ObjcClassHashTableOffset = h.LoadersArrayOffset
+	case "protocol":
+		h.ObjcProtocolHashTableOffset = h.LoadersArrayOffset
+	}
 	var encoded bytes.Buffer
 	if err := binary.Write(&encoded, binary.LittleEndian, h); err != nil {
 		t.Fatal(err)
 	}
 	copy(r.data[0x400:], encoded.Bytes())
-	_, err := f.parsePrebuiltLoaderSet(io.NewSectionReader(r, 0x400, 1<<63-1))
-	if err == nil || !strings.Contains(err.Error(), "objc selector table requires at least one loader") {
-		t.Fatalf("want missing loader error, got %v", err)
+	got, err := f.parsePrebuiltLoaderSet(io.NewSectionReader(r, 0x400, 1<<63-1))
+	if table == "" {
+		if err != nil {
+			t.Fatalf("empty set without ObjC tables: %v", err)
+		}
+		if got == nil || len(got.Loaders) != 0 || got.SelectorTable != nil || got.ClassTable != nil || got.ProtocolTable != nil {
+			t.Fatalf("want empty set without ObjC tables, got %+v", got)
+		}
+		return
+	}
+	if got != nil || err == nil {
+		t.Fatalf("want missing loader error and nil set, got %+v, %v", got, err)
+	}
+	for _, want := range []string{
+		"requires at least one loader (LoadersArrayCount=0)",
+		fmt.Sprintf("ObjcSelectorHashTableOffset=%#x", h.ObjcSelectorHashTableOffset),
+		fmt.Sprintf("ObjcClassHashTableOffset=%#x", h.ObjcClassHashTableOffset),
+		fmt.Sprintf("ObjcProtocolHashTableOffset=%#x", h.ObjcProtocolHashTableOffset),
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("want %q in missing loader error, got %v", want, err)
+		}
+	}
+	if table == "selector" && !strings.Contains(err.Error(), "prebuilt objc selector table requires at least one loader (LoadersArrayCount=0)") {
+		t.Errorf("selector error text changed: %v", err)
 	}
 }
 
