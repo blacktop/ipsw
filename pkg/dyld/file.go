@@ -124,6 +124,18 @@ type File struct {
 
 	// sortedImages is Images sorted by LoadAddress for O(log N) binary search
 	sortedImages []*CacheImage
+
+	imageSegmentsOnce sync.Once
+	imageSegments     []imageSegmentRange
+	imageSegmentsErr  error
+}
+
+// maxEnd is the largest end through this entry. It bounds the backward search
+// for overlapping ranges, whose winner must follow Images order, not VM order.
+type imageSegmentRange struct {
+	start, end, maxEnd uint64
+	image              *CacheImage
+	order              int
 }
 
 // Name returns the on-disk path of the main cache file, or "" if the File was
@@ -2024,17 +2036,60 @@ func (f *File) GetImageContainingTextAddr(addr uint64) (*CacheImage, error) {
 
 // GetImageContainingVMAddr returns a dylib whose segment contains a given virtual address
 func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
-	for _, img := range f.Images {
-		m, err := img.GetPartialMacho()
-		if err != nil {
-			return nil, err
-		}
-		defer m.Close()
-		if seg := m.FindSegmentForVMAddr(address); seg != nil {
-			return img, nil
+	if img, err := f.GetImageContainingTextAddr(address); err == nil {
+		return img, nil
+	}
+	f.imageSegmentsOnce.Do(f.buildImageSegmentIndex)
+	idx := sort.Search(len(f.imageSegments), func(i int) bool {
+		return f.imageSegments[i].start > address
+	}) - 1
+	var image *CacheImage
+	order := len(f.Images)
+	for ; idx >= 0 && f.imageSegments[idx].maxEnd > address; idx-- {
+		r := &f.imageSegments[idx]
+		if address < r.end && r.order < order {
+			image, order = r.image, r.order
 		}
 	}
+	if image != nil {
+		return image, nil
+	}
+	if f.imageSegmentsErr != nil {
+		return nil, f.imageSegmentsErr
+	}
 	return nil, fmt.Errorf("address %#x not in any dylib", address)
+}
+
+func (f *File) buildImageSegmentIndex() {
+	for order, img := range f.Images {
+		m, err := img.GetPartialMacho()
+		if err != nil {
+			// The old scan could still find an address in an earlier image.
+			// Keep that prefix and return this error only when it misses.
+			f.imageSegmentsErr = err
+			break
+		}
+		for _, seg := range m.Segments() {
+			end := seg.Addr + seg.Memsz
+			// Empty and wrapping ranges cannot match FindSegmentForVMAddr.
+			if end > seg.Addr {
+				f.imageSegments = append(f.imageSegments, imageSegmentRange{
+					start: seg.Addr, end: end, image: img, order: order,
+				})
+			}
+		}
+		// GetPartialMacho caches m on the image. Match the old scan's Close
+		// calls without retaining Mach-O files or accumulating deferred closes.
+		m.Close()
+	}
+	sort.Slice(f.imageSegments, func(i, j int) bool {
+		return f.imageSegments[i].start < f.imageSegments[j].start
+	})
+	var maxEnd uint64
+	for i := range f.imageSegments {
+		maxEnd = max(maxEnd, f.imageSegments[i].end)
+		f.imageSegments[i].maxEnd = maxEnd
+	}
 }
 
 // HasImagePath returns the index of a given image path
