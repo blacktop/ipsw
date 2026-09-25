@@ -2076,9 +2076,6 @@ func (f *File) GetImageContainingTextAddr(addr uint64) (*CacheImage, error) {
 
 // GetImageContainingVMAddr returns a dylib whose segment contains a given virtual address
 func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
-	if img, err := f.GetImageContainingTextAddr(address); err == nil {
-		return img, nil
-	}
 	f.imageSegmentsOnce.Do(f.buildImageSegmentIndex)
 	idx := sort.Search(len(f.imageSegments), func(i int) bool {
 		return f.imageSegments[i].start > address

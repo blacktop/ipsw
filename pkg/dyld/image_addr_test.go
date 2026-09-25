@@ -126,17 +126,18 @@ func TestImageContainingVMAddrSynthetic(t *testing.T) {
 	}
 }
 
-func TestImageContainingVMAddrTextFastPath(t *testing.T) {
-	img := &CacheImage{}
+func TestImageContainingVMAddrTextUsesSegmentIndex(t *testing.T) {
+	m := &macho.File{}
+	m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__TEXT", Addr: 100, Memsz: 100}})
+	img := &CacheImage{pm: m}
 	img.LoadAddress, img.TextSegmentSize = 100, 100
 	f := &File{Images: cacheImages{img}, sortedImages: []*CacheImage{img}}
-	// No backing cache or Mach-O: parsing this image would panic.
 	got, err := f.GetImageContainingVMAddr(150)
 	if got != img || err != nil {
 		t.Fatalf("text lookup = %p, %v", got, err)
 	}
-	if f.imageSegments != nil {
-		t.Fatal("text lookup built the segment index")
+	if len(f.imageSegments) != 1 {
+		t.Fatalf("text lookup built %d ranges, want 1", len(f.imageSegments))
 	}
 }
 
@@ -222,4 +223,35 @@ func TestImageContainingVMAddrRealCache(t *testing.T) {
 		}
 	}
 	t.Logf("compared %d addresses: %d segment samples, 10000 inside mappings, 1000 outside mappings", count, segmentCount)
+}
+
+func TestImageContainingVMAddrTextPreservesLinearPrecedence(t *testing.T) {
+	makeImage := func(name string, start, size uint64) *CacheImage {
+		m := &macho.File{}
+		m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__TEXT", Addr: start, Memsz: size}})
+		image := &CacheImage{Name: name, pm: m}
+		image.LoadAddress = start
+		image.TextSegmentSize = uint32(size)
+		return image
+	}
+	t.Run("overlap", func(t *testing.T) {
+		first, second := makeImage("first", 100, 200), makeImage("second", 200, 100)
+		f := &File{Images: cacheImages{first, second}, sortedImages: []*CacheImage{first, second}}
+		want, wantErr := linearImageContainingVMAddr(f, 250)
+		got, err := f.GetImageContainingVMAddr(250)
+		if got != want || fmt.Sprint(err) != fmt.Sprint(wantErr) {
+			t.Fatalf("got image=%p error=%v, want image=%p error=%v", got, err, want, wantErr)
+		}
+	})
+	t.Run("earlier_parse_error", func(t *testing.T) {
+		good := makeImage("good", 200, 100)
+		f := &File{}
+		f.Images = cacheImages{&CacheImage{cache: f}, good}
+		f.sortedImages = []*CacheImage{good}
+		want, wantErr := linearImageContainingVMAddr(f, 250)
+		got, err := f.GetImageContainingVMAddr(250)
+		if got != want || fmt.Sprint(err) != fmt.Sprint(wantErr) {
+			t.Fatalf("got image=%v error=%v, want image=%v error=%v", got != nil, err, want != nil, wantErr)
+		}
+	})
 }
