@@ -223,15 +223,53 @@ func readPrebuiltLoaderSetHeader(sr *io.SectionReader) (prebuiltLoaderSetHeader,
 	return header, nil
 }
 
+// checkPrebuiltArray validates the on-disk extent at the reader's current
+// position before allocating. Nested payloads may lie beyond the set Length;
+// only the reader used for the actual array read determines their extent.
+func checkPrebuiltArray(sr *io.SectionReader, elementSize, count uint64, field string) error {
+	if count == 0 {
+		return nil
+	}
+	maxBytes := uint64(^uint(0) >> 1)
+	if elementSize == 0 || count > maxBytes/elementSize {
+		return fmt.Errorf("prebuilt %s byte length overflows: count %d, element size %d", field, count, elementSize)
+	}
+	length := count * elementSize
+	offset, err := sr.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return fmt.Errorf("prebuilt %s position: %w", field, err)
+	}
+	if offset < 0 || uint64(offset) > uint64(1<<63-1)-(length-1) {
+		return fmt.Errorf("prebuilt %s final offset overflows", field)
+	}
+	var last [1]byte
+	if n, err := sr.ReadAt(last[:], offset+int64(length-1)); n != len(last) {
+		if err == nil {
+			err = io.ErrUnexpectedEOF
+		}
+		return fmt.Errorf("prebuilt %s final byte: %w", field, err)
+	}
+	return nil
+}
+
 func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet, error) {
 	header, err := readPrebuiltLoaderSetHeader(sr)
 	if err != nil {
+		if header.Magic == PrebuiltLoaderSetMagic {
+			sr.Seek(int64(header.LoadersArrayOffset), io.SeekStart)
+			if arrayErr := checkPrebuiltArray(sr, 4, uint64(header.LoadersArrayCount), "LoadersArrayCount"); arrayErr != nil {
+				return nil, fmt.Errorf("%w: %v", arrayErr, err)
+			}
+		}
 		return nil, err
 	}
 	pset := PrebuiltLoaderSet{prebuiltLoaderSetHeader: header}
 
 	sr.Seek(int64(pset.LoadersArrayOffset), io.SeekStart)
 
+	if err := checkPrebuiltArray(sr, 4, uint64(pset.LoadersArrayCount), "LoadersArrayCount"); err != nil {
+		return nil, err
+	}
 	loaderOffsets := make([]uint32, pset.LoadersArrayCount)
 	if err := binary.Read(sr, binary.LittleEndian, &loaderOffsets); err != nil {
 		return nil, err
@@ -250,6 +288,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 
 	if pset.CachePatchCount > 0 { // FIXME: this is in "/usr/bin/abmlite" but the values don't make sense (dyld_closure_util gets the same values)
 		sr.Seek(int64(pset.CachePatchOffset), io.SeekStart)
+		if err := checkPrebuiltArray(sr, uint64(binary.Size(CachePatch{})), uint64(pset.CachePatchCount), "CachePatchCount"); err != nil {
+			return nil, err
+		}
 		pset.Patches = make([]CachePatch, pset.CachePatchCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pset.Patches); err != nil {
 			return nil, err
@@ -264,6 +305,10 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 	}
 	if pset.MustBeMissingPathsCount > 0 {
 		sr.Seek(int64(pset.MustBeMissingPathsOffset), io.SeekStart)
+		// Each missing path occupies at least its terminating NUL byte.
+		if err := checkPrebuiltArray(sr, 1, uint64(pset.MustBeMissingPathsCount), "MustBeMissingPathsCount"); err != nil {
+			return nil, err
+		}
 		br := bufio.NewReader(sr)
 		for range int(pset.MustBeMissingPathsCount) {
 			s, err := br.ReadString('\x00')
@@ -281,15 +326,24 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			return nil, fmt.Errorf("failed to read prebuilt objc selector optimization string table: %v", err)
 		}
 		tabAddr, _ := sr.Seek(0, io.SeekCurrent)
-		o.Tab = make([]byte, o.objCStringTable.Mask+1)
+		if err := checkPrebuiltArray(sr, 1, uint64(o.objCStringTable.Mask)+1, "objc selector Mask+1"); err != nil {
+			return nil, err
+		}
+		o.Tab = make([]byte, uint64(o.objCStringTable.Mask)+1)
 		if err := binary.Read(sr, f.ByteOrder, &o.Tab); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc selector optimization tabs: %v", err)
+		}
+		if err := checkPrebuiltArray(sr, 1, uint64(o.objCStringTable.Capacity), "objc selector Capacity"); err != nil {
+			return nil, err
 		}
 		o.Checkbytes = make([]byte, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Checkbytes); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc selector optimization checkbytes: %v", err)
 		}
 		sr.Seek(int64(tabAddr)+int64(o.RoundedTabSize+o.RoundedCheckBytesSize), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 8, uint64(o.objCStringTable.Capacity), "objc selector Capacity"); err != nil {
+			return nil, err
+		}
 		o.Offsets = make([]BindTargetRef, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Offsets); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc selector optimization offsets: %v", err)
@@ -304,18 +358,30 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			return nil, fmt.Errorf("failed to read prebuilt objc class optimization string table: %v", err)
 		}
 		tabAddr, _ := sr.Seek(0, io.SeekCurrent)
-		o.Tab = make([]byte, o.objCStringTable.Mask+1)
+		if err := checkPrebuiltArray(sr, 1, uint64(o.objCStringTable.Mask)+1, "objc class Mask+1"); err != nil {
+			return nil, err
+		}
+		o.Tab = make([]byte, uint64(o.objCStringTable.Mask)+1)
 		if err := binary.Read(sr, f.ByteOrder, &o.Tab); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc class optimization tabs: %v", err)
+		}
+		if err := checkPrebuiltArray(sr, 1, uint64(o.objCStringTable.Capacity), "objc class Capacity"); err != nil {
+			return nil, err
 		}
 		o.Checkbytes = make([]byte, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Checkbytes); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc class optimization checkbytes: %v", err)
 		}
 		sr.Seek(int64(tabAddr)+int64(o.RoundedTabSize+o.RoundedCheckBytesSize), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 8, uint64(o.objCStringTable.Capacity), "objc class Capacity"); err != nil {
+			return nil, err
+		}
 		o.Offsets = make([]BindTargetRef, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Offsets); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc class optimization class name offsets: %v", err)
+		}
+		if err := checkPrebuiltArray(sr, 8, uint64(o.objCStringTable.Capacity), "objc class Capacity"); err != nil {
+			return nil, err
 		}
 		o.Classes = make([]BindTargetRef, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Classes); err != nil {
@@ -324,6 +390,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		var dupCount uint64
 		if err := binary.Read(sr, f.ByteOrder, &dupCount); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc class optimization duplicate count: %v", err)
+		}
+		if err := checkPrebuiltArray(sr, 8, uint64(dupCount), "objc class dupCount"); err != nil {
+			return nil, err
 		}
 		o.Duplicates = make([]BindTargetRef, dupCount)
 		if err := binary.Read(sr, f.ByteOrder, &o.Duplicates); err != nil {
@@ -339,18 +408,30 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			return nil, fmt.Errorf("failed to read prebuilt objc protocol optimization string table: %v", err)
 		}
 		tabAddr, _ := sr.Seek(0, io.SeekCurrent)
-		o.Tab = make([]byte, o.objCStringTable.Mask+1)
+		if err := checkPrebuiltArray(sr, 1, uint64(o.objCStringTable.Mask)+1, "objc protocol Mask+1"); err != nil {
+			return nil, err
+		}
+		o.Tab = make([]byte, uint64(o.objCStringTable.Mask)+1)
 		if err := binary.Read(sr, f.ByteOrder, &o.Tab); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc protocol optimization tabs: %v", err)
+		}
+		if err := checkPrebuiltArray(sr, 1, uint64(o.objCStringTable.Capacity), "objc protocol Capacity"); err != nil {
+			return nil, err
 		}
 		o.Checkbytes = make([]byte, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Checkbytes); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc protocol optimization checkbytes: %v", err)
 		}
 		sr.Seek(int64(tabAddr)+int64(o.RoundedTabSize+o.RoundedCheckBytesSize), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 8, uint64(o.objCStringTable.Capacity), "objc protocol Capacity"); err != nil {
+			return nil, err
+		}
 		o.Offsets = make([]BindTargetRef, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Offsets); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc protocol optimization protocol name offsets: %v", err)
+		}
+		if err := checkPrebuiltArray(sr, 8, uint64(o.objCStringTable.Capacity), "objc protocol Capacity"); err != nil {
+			return nil, err
 		}
 		o.Classes = make([]BindTargetRef, o.objCStringTable.Capacity)
 		if err := binary.Read(sr, f.ByteOrder, &o.Classes); err != nil {
@@ -359,6 +440,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		var dupCount uint64
 		if err := binary.Read(sr, f.ByteOrder, &dupCount); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt objc protocol optimization duplicate count: %v", err)
+		}
+		if err := checkPrebuiltArray(sr, 8, uint64(dupCount), "objc protocol dupCount"); err != nil {
+			return nil, err
 		}
 		o.Duplicates = make([]BindTargetRef, dupCount)
 		if err := binary.Read(sr, f.ByteOrder, &o.Duplicates); err != nil {
@@ -380,6 +464,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			if err := binary.Read(sr, f.ByteOrder, &hashBufferCount); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift type conformance hashBufferCount: %v", err)
 			}
+			if err := checkPrebuiltArray(sr, 8, uint64(hashBufferCount), "swift type hashBufferCount"); err != nil {
+				return nil, err
+			}
 			hashBuffer := make([]uint64, hashBufferCount)
 			if err := binary.Read(sr, f.ByteOrder, &hashBuffer); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift type conformance hashBuffer: %v", err)
@@ -387,6 +474,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			var nodeBufferCount uint64
 			if err := binary.Read(sr, f.ByteOrder, &nodeBufferCount); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift type conformance nodeBufferCount: %v", err)
+			}
+			if err := checkPrebuiltArray(sr, uint64(binary.Size(SwiftTypeProtocolNodeEntryT{})), uint64(nodeBufferCount), "swift type nodeBufferCount"); err != nil {
+				return nil, err
 			}
 			pset.SwiftTypeProtocolTable = make([]SwiftTypeProtocolNodeEntryT, nodeBufferCount)
 			if err := binary.Read(sr, f.ByteOrder, &pset.SwiftTypeProtocolTable); err != nil {
@@ -403,6 +493,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			if err := binary.Read(sr, f.ByteOrder, &hashBufferCount); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance hashBufferCount: %v", err)
 			}
+			if err := checkPrebuiltArray(sr, 8, uint64(hashBufferCount), "swift metadata hashBufferCount"); err != nil {
+				return nil, err
+			}
 			hashBuffer := make([]uint64, hashBufferCount)
 			if err := binary.Read(sr, f.ByteOrder, &hashBuffer); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance hashBuffer: %v", err)
@@ -410,6 +503,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			var nodeBufferCount uint64
 			if err := binary.Read(sr, f.ByteOrder, &nodeBufferCount); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance nodeBufferCount: %v", err)
+			}
+			if err := checkPrebuiltArray(sr, uint64(binary.Size(SwiftMetadataConformanceNodeEntryT{})), uint64(nodeBufferCount), "swift metadata nodeBufferCount"); err != nil {
+				return nil, err
 			}
 			pset.SwiftMetadataProtocolTable = make([]SwiftMetadataConformanceNodeEntryT, nodeBufferCount)
 			if err := binary.Read(sr, f.ByteOrder, &pset.SwiftMetadataProtocolTable); err != nil {
@@ -426,6 +522,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			if err := binary.Read(sr, f.ByteOrder, &hashBufferCount); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift foreign type  conformance hashBufferCount: %v", err)
 			}
+			if err := checkPrebuiltArray(sr, 8, uint64(hashBufferCount), "swift foreign type hashBufferCount"); err != nil {
+				return nil, err
+			}
 			hashBuffer := make([]uint64, hashBufferCount)
 			if err := binary.Read(sr, f.ByteOrder, &hashBuffer); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift foreign type  conformance hashBuffer: %v", err)
@@ -433,6 +532,9 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 			var nodeBufferCount uint64
 			if err := binary.Read(sr, f.ByteOrder, &nodeBufferCount); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt swift foreign type  conformance nodeBufferCount: %v", err)
+			}
+			if err := checkPrebuiltArray(sr, uint64(binary.Size(SwiftForeignTypeConformanceNodeEntryT{})), uint64(nodeBufferCount), "swift foreign type nodeBufferCount"); err != nil {
+				return nil, err
 			}
 			pset.SwiftForeignTypeProtocolTable = make([]SwiftForeignTypeConformanceNodeEntryT, nodeBufferCount)
 			if err := binary.Read(sr, f.ByteOrder, &pset.SwiftForeignTypeProtocolTable); err != nil {
@@ -515,6 +617,9 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 	}
 	if pbl.Header.RegionsCount() > 0 {
 		sr.Seek(int64(pbl.Header.RegionsOffset), io.SeekStart)
+		if err := checkPrebuiltArray(sr, uint64(binary.Size(Region{})), uint64(pbl.Header.RegionsCount()), "RegionsCount"); err != nil {
+			return nil, err
+		}
 		pbl.Regions = make([]Region, pbl.Header.RegionsCount())
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.Regions); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader regions: %v", err)
@@ -522,13 +627,23 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 	}
 	if pbl.Header.DependentLoaderRefsArrayOffset > 0 {
 		sr.Seek(int64(pbl.Header.DependentLoaderRefsArrayOffset), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 2, uint64(pbl.Header.DepCount), "DepCount"); err != nil {
+			return nil, err
+		}
 		depsArray := make([]LoaderRef, pbl.Header.DepCount)
 		if err := binary.Read(sr, binary.LittleEndian, &depsArray); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader dependent loader refs: %v", err)
 		}
-		kindsArray := make([]DependentKind, pbl.Header.DepCount)
 		if pbl.Header.DependentKindArrayOffset > 0 {
 			sr.Seek(int64(pbl.Header.DependentKindArrayOffset), io.SeekStart)
+		} else {
+			sr.Seek(int64(pbl.Header.DependentLoaderRefsArrayOffset), io.SeekStart)
+		}
+		if err := checkPrebuiltArray(sr, 1, uint64(pbl.Header.DepCount), "DepCount dependent kinds"); err != nil {
+			return nil, err
+		}
+		kindsArray := make([]DependentKind, pbl.Header.DepCount)
+		if pbl.Header.DependentKindArrayOffset > 0 {
 			if err := binary.Read(sr, binary.LittleEndian, &kindsArray); err != nil {
 				return nil, fmt.Errorf("failed to read prebuilt loader dependent kinds: %v", err)
 			}
@@ -546,6 +661,9 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 	}
 	if pbl.Header.BindTargetRefsCount > 0 {
 		sr.Seek(int64(pbl.Header.BindTargetRefsOffset), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 8, uint64(pbl.Header.BindTargetRefsCount), "BindTargetRefsCount"); err != nil {
+			return nil, err
+		}
 		pbl.BindTargets = make([]BindTargetRef, pbl.Header.BindTargetRefsCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.BindTargets); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader bind target refs: %v", err)
@@ -553,6 +671,9 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 	}
 	if pbl.Header.OverrideBindTargetRefsCount > 0 {
 		sr.Seek(int64(pbl.Header.OverrideBindTargetRefsOffset), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 8, uint64(pbl.Header.OverrideBindTargetRefsCount), "OverrideBindTargetRefsCount"); err != nil {
+			return nil, err
+		}
 		pbl.OverrideBindTargets = make([]BindTargetRef, pbl.Header.OverrideBindTargetRefsCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.OverrideBindTargets); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader override bind target refs: %v", err)
@@ -566,11 +687,17 @@ func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error
 		}
 		pbl.ObjcFixupInfo = &ofi
 		sr.Seek(int64(pbl.Header.ObjcBinaryInfoOffset)+int64(pbl.ObjcFixupInfo.ProtocolFixupsOffset), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 1, uint64(pbl.ObjcFixupInfo.ProtocolListCount), "ProtocolListCount"); err != nil {
+			return nil, err
+		}
 		pbl.ObjcCanonicalProtocolFixups = make([]bool, pbl.ObjcFixupInfo.ProtocolListCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.ObjcCanonicalProtocolFixups); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader objc canonical protocol fixups: %v", err)
 		}
 		sr.Seek(int64(pbl.Header.ObjcBinaryInfoOffset)+int64(pbl.ObjcFixupInfo.SelectorReferencesFixupsOffset), io.SeekStart)
+		if err := checkPrebuiltArray(sr, 8, uint64(pbl.ObjcFixupInfo.SelectorReferencesFixupsCount), "SelectorReferencesFixupsCount"); err != nil {
+			return nil, err
+		}
 		pbl.ObjcSelectorFixups = make([]BindTargetRef, pbl.ObjcFixupInfo.SelectorReferencesFixupsCount)
 		if err := binary.Read(sr, binary.LittleEndian, &pbl.ObjcSelectorFixups); err != nil {
 			return nil, fmt.Errorf("failed to read prebuilt loader objc selector fixups: %v", err)

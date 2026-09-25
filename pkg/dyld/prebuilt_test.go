@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"strings"
 	"testing"
 	"unsafe"
 )
@@ -139,5 +140,112 @@ func TestPrebuiltLoaderSetAcceptsCompleteEOFReads(t *testing.T) {
 	}
 	if _, err := f.parsePrebuiltLoaderSet(io.NewSectionReader(prebuiltEOFReader{bytes.NewReader(r.data)}, 0x400, 1<<63-1)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPrebuiltMalformedArrayCounts(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*prebuiltLoaderSetHeader, *bytes.Buffer)
+	}{
+		{"LoadersArrayCount", func(h *prebuiltLoaderSetHeader, b *bytes.Buffer) { h.LoadersArrayCount = ^uint32(0) }},
+		{"objc selector Mask+1", func(h *prebuiltLoaderSetHeader, b *bytes.Buffer) {
+			h.ObjcSelectorHashTableOffset = uint32(b.Len())
+			binary.Write(b, binary.LittleEndian, objCStringTable{Mask: ^uint32(0)})
+		}},
+		{"objc selector Capacity", func(h *prebuiltLoaderSetHeader, b *bytes.Buffer) {
+			h.ObjcSelectorHashTableOffset = uint32(b.Len())
+			binary.Write(b, binary.LittleEndian, objCStringTable{Capacity: ^uint32(0)})
+			b.WriteByte(0) // One valid tab byte precedes the absent checkbytes.
+		}},
+		{"swift type nodeBufferCount", func(h *prebuiltLoaderSetHeader, b *bytes.Buffer) {
+			h.SwiftTypeConformanceTableOffset = uint32(b.Len())
+			binary.Write(b, binary.LittleEndian, SwiftConformanceMultiMap{})
+			binary.Write(b, binary.LittleEndian, uint64(0)) // Empty hash buffer.
+			binary.Write(b, binary.LittleEndian, uint64(1<<32))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, source, h := prebuiltTestFile(t, 1, 0)
+			f.ByteOrder = binary.LittleEndian
+			b := bytes.NewBuffer(append([]byte(nil), source.data[0x400:]...))
+			tc.setup(&h, b)
+			var header bytes.Buffer
+			if err := binary.Write(&header, binary.LittleEndian, h); err != nil {
+				t.Fatal(err)
+			}
+			copy(b.Bytes(), header.Bytes())
+			// Watch all attempted reads beyond the real data, including failed probes.
+			r := &countingReaderAt{data: b.Bytes(), watchOff: int64(b.Len()), watchEnd: 1<<63 - 1}
+			_, err := f.parsePrebuiltLoaderSet(io.NewSectionReader(r, 0, 1<<63-1))
+			if err == nil || !strings.Contains(err.Error(), tc.name) {
+				t.Fatalf("want %s error, got %v", tc.name, err)
+			}
+			if r.reads != 1 || r.bytesRead != 1 {
+				t.Fatalf("out-of-data reads=%d bytes=%d, want one final-byte probe", r.reads, r.bytesRead)
+			}
+		})
+	}
+}
+
+func TestPrebuiltArrayExtent(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		offset      int64
+		size, count uint64
+		wantError   bool
+		wantReads   int
+	}{
+		{"empty", 8, 8, 0, false, 0},
+		{"exact end", 0, 4, 2, false, 1},
+		{"past end", 0, 4, 3, true, 1},
+		{"product overflow", 0, 8, ^uint64(0), true, 0},
+		{"int overflow", 0, 1, uint64(^uint(0)>>1) + 1, true, 0},
+		{"offset overflow", 1<<63 - 2, 4, 1, true, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &countingReaderAt{data: make([]byte, 8), watchEnd: 1<<63 - 1}
+			sr := io.NewSectionReader(r, 0, 1<<63-1)
+			if _, err := sr.Seek(tc.offset, io.SeekStart); err != nil {
+				t.Fatal(err)
+			}
+			err := checkPrebuiltArray(sr, tc.size, tc.count, "testCount")
+			if (err != nil) != tc.wantError || (err != nil && !strings.Contains(err.Error(), "testCount")) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if r.reads != tc.wantReads || r.bytesRead != int64(tc.wantReads) {
+				t.Fatalf("reads=%d bytes=%d, want %d single-byte probes", r.reads, r.bytesRead, tc.wantReads)
+			}
+			if pos, _ := sr.Seek(0, io.SeekCurrent); pos != tc.offset {
+				t.Fatalf("probe moved position to %d", pos)
+			}
+		})
+	}
+}
+
+func TestPrebuiltNestedArrayBeyondSetLength(t *testing.T) {
+	f, r, h := prebuiltTestFile(t, 1, 0)
+	loaderOffset := binary.LittleEndian.Uint32(r.data[0x400+h.LoadersArrayOffset:])
+	bodyOffset := int(0x400+loaderOffset) + binary.Size(Loader{})
+	var body prebuiltLoaderHeader
+	if err := binary.Read(bytes.NewReader(r.data[bodyOffset:]), binary.LittleEndian, &body); err != nil {
+		t.Fatal(err)
+	}
+	body.BindTargetRefsOffset = uint16(h.Length - loaderOffset)
+	body.BindTargetRefsCount = 1
+	var encoded bytes.Buffer
+	if err := binary.Write(&encoded, binary.LittleEndian, body); err != nil {
+		t.Fatal(err)
+	}
+	copy(r.data[bodyOffset:], encoded.Bytes())
+	// The payload starts exactly outside the declared set, but is readable from
+	// the nested loader reader. Length must not become a nested payload limit.
+	r.data = append(r.data, make([]byte, 8)...)
+	got, err := f.parsePrebuiltLoaderSet(io.NewSectionReader(r, 0x400, 1<<63-1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Loaders) != 1 || len(got.Loaders[0].BindTargets) != 1 {
+		t.Fatalf("nested bind targets not parsed: %+v", got.Loaders)
 	}
 }
