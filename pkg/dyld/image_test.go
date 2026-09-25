@@ -331,3 +331,46 @@ func TestGetMachoSharesStringPool(t *testing.T) {
 		t.Fatalf("second image read the shared string pool %d more times, want 0", r.reads-reads)
 	}
 }
+
+func TestSlidePointerMappingBoundaries(t *testing.T) {
+	uuid := mtypes.UUID{1}
+	f := &File{
+		MappingsWithSlideInfo: map[mtypes.UUID]cacheMappingsWithSlideInfo{uuid: {
+			{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000, Size: 0x100}},
+		}},
+		SlideInfo: CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000},
+	}
+	image := &CacheImage{cache: f}
+	for _, tt := range []struct{ address, want uint64 }{
+		{0, 0}, {0x1000, 0x1000}, {0x10ff, 0x10ff}, {0x1100, 0x101100}, {0x8000000000000010, 0x100010},
+	} {
+		if got := image.SlidePointer(tt.address); got != tt.want {
+			t.Fatalf("SlidePointer(%#x)=%#x want=%#x", tt.address, got, tt.want)
+		}
+	}
+	// New subcache registration must remain visible without rebuilding an index.
+	f.MappingsWithSlideInfo[mtypes.UUID{2}] = cacheMappingsWithSlideInfo{{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1100, Size: 0x100}}}
+	if got := image.SlidePointer(0x1100); got != 0x1100 {
+		t.Fatalf("new mapping returned %#x", got)
+	}
+}
+
+func TestSlidePointerEncodedDoesNotAllocate(t *testing.T) {
+	image := &CacheImage{cache: &File{SlideInfo: CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000}}}
+	if got := testing.AllocsPerRun(100, func() { _ = image.SlidePointer(0x8000000000000010) }); got != 0 {
+		t.Fatalf("encoded pointer allocated %v times", got)
+	}
+}
+
+func BenchmarkSlidePointerEncoded(b *testing.B) {
+	f := &File{MappingsWithSlideInfo: make(map[mtypes.UUID]cacheMappingsWithSlideInfo), SlideInfo: CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000}}
+	for i := range 80 {
+		f.MappingsWithSlideInfo[mtypes.UUID{byte(i + 1)}] = cacheMappingsWithSlideInfo{{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x180000000 + uint64(i)*0x10000, Size: 0x10000}}}
+	}
+	image := &CacheImage{cache: f}
+	for b.Loop() {
+		if image.SlidePointer(0x8000000000000010) != 0x100010 {
+			b.Fatal("wrong pointer")
+		}
+	}
+}

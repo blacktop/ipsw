@@ -446,7 +446,7 @@ func (i *CacheImage) SlidePointer(addr uint64) uint64 {
 		return addr
 	}
 	// check if addr is in the cache (not slid)
-	if _, _, err := i.cache.GetMappingForVMAddress(addr); err == nil {
+	if _, mapping := i.cache.mappingForVMAddress(addr); mapping != nil {
 		return addr
 	}
 	// try and slide the encoded pointer

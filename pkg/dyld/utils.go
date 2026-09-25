@@ -153,14 +153,24 @@ func (f *File) GetMappingForOffsetForUUID(uuid types.UUID, offset uint64) (*Cach
 
 // GetMappingForVMAddress returns the mapping containing a given virtual address
 func (f *File) GetMappingForVMAddress(address uint64) (types.UUID, *CacheMappingWithSlideInfo, error) {
+	uuid, mapping := f.mappingForVMAddress(address)
+	if mapping == nil {
+		return types.UUID{}, nil, fmt.Errorf("address %#x not within any mapping's address range", address)
+	}
+	return uuid, mapping, nil
+}
+
+// mappingForVMAddress also serves callers for which an unmapped encoded pointer
+// is expected, so those callers need not construct and discard an error.
+func (f *File) mappingForVMAddress(address uint64) (types.UUID, *CacheMappingWithSlideInfo) {
 	for uuid := range f.MappingsWithSlideInfo {
 		for _, mapping := range f.MappingsWithSlideInfo[uuid] {
 			if mapping.Address <= address && address < mapping.Address+mapping.Size {
-				return uuid, mapping, nil
+				return uuid, mapping
 			}
 		}
 	}
-	return types.UUID{}, nil, fmt.Errorf("address %#x not within any mapping's address range", address)
+	return types.UUID{}, nil
 }
 
 // ReadBytesForUUID returns bytes at a given offset for a given cache UUID

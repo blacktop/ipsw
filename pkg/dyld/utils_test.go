@@ -79,3 +79,11 @@ func TestCacheOffsets(t *testing.T) {
 		check(t, 0, types.UUID{}, 0, true)
 	})
 }
+
+func TestGetMappingForVMAddressMissError(t *testing.T) {
+	f := &File{}
+	_, mapping, err := f.GetMappingForVMAddress(0x1234)
+	if mapping != nil || err == nil || err.Error() != "address 0x1234 not within any mapping's address range" {
+		t.Fatalf("mapping=%v err=%v", mapping, err)
+	}
+}
