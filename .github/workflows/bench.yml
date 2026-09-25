@@ -1,0 +1,94 @@
+name: Benchmarks
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Resolve revisions
+        id: revisions
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        working-directory: candidate
+        run: |
+          candidate_sha=$(git rev-parse HEAD)
+          base_sha="$BASE_SHA"
+          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+            base_sha=$(git rev-parse HEAD^)
+          fi
+          echo "candidate=$candidate_sha" >> "$GITHUB_OUTPUT"
+          echo "base=$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check out base
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ steps.revisions.outputs.base }}
+          path: base
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: candidate/go.mod
+          cache: false
+
+      - name: Record runner and revisions
+        env:
+          BASE_SHA: ${{ steps.revisions.outputs.base }}
+          CANDIDATE_SHA: ${{ steps.revisions.outputs.candidate }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench-results"
+          {
+            printf 'Runner: ubuntu-24.04\nImage: %s\nImage version: %s\n' "$ImageOS" "$ImageVersion"
+            awk -F ': ' '/^model name/ { print "CPU: " $2; exit }' /proc/cpuinfo
+            go version
+            printf 'Base: %s\nCandidate: %s\n' "$BASE_SHA" "$CANDIDATE_SHA"
+            printf 'Samples: 10 per benchmark per tree\nOrder: candidate then base, sequential on one runner\n'
+            printf 'Benchstat: v0.0.0-20260908200009-22c9c6c9d4da\n'
+          } > "$RUNNER_TEMP/bench-results/metadata.txt"
+
+      - name: Compare synthetic benchmarks
+        run: bash candidate/hack/bench/compare.sh candidate base "$RUNNER_TEMP/bench-results"
+
+      - name: Summarize
+        if: always()
+        run: |
+          for file in benchstat metadata; do
+            if [[ -f "$RUNNER_TEMP/bench-results/$file.txt" ]]; then
+              {
+                printf '\n### %s\n\n```text\n' "$file"
+                cat "$RUNNER_TEMP/bench-results/$file.txt"
+                printf '\n```\n'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Upload measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: benchmark-results
+          path: |
+            ${{ runner.temp }}/bench-results/base.txt
+            ${{ runner.temp }}/bench-results/candidate.txt
+            ${{ runner.temp }}/bench-results/benchstat.txt
+            ${{ runner.temp }}/bench-results/metadata.txt
+          if-no-files-found: error
+          retention-days: 14

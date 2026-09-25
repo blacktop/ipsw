@@ -13,24 +13,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
-// openSelf opens the test binary itself as a real arm64 Mach-O so the
-// benchmarks exercise representative load commands, sections, cstrings, and
-// function starts without needing IPSW fixtures.
-func openSelf(b *testing.B) *macho.File {
-	b.Helper()
-	exe, err := os.Executable()
-	if err != nil {
-		b.Fatal(err)
-	}
-	m, err := macho.Open(exe)
-	if err != nil {
-		b.Skipf("test binary is not a plain Mach-O here: %v", err)
-	}
-	b.Cleanup(func() { m.Close() })
-	return m
-}
-
-// openSelfT is the *testing.T twin of openSelf for non-benchmark tests.
+// openSelfT opens the host test binary for non-benchmark tests.
 func openSelfT(t *testing.T) *macho.File {
 	t.Helper()
 	exe, err := os.Executable()
@@ -48,7 +31,7 @@ func openSelfT(t *testing.T) *macho.File {
 // BenchmarkGenerateDiffInfo measures the per-binary scan cost on the cold
 // path: every Mach-O in every volume goes through this once per side.
 func BenchmarkGenerateDiffInfo(b *testing.B) {
-	m := openSelf(b)
+	m := openBenchFixture(b)
 	conf := &DiffConfig{Markdown: true, DiffTool: "git"}
 	b.ReportAllocs()
 	for b.Loop() {
@@ -59,7 +42,7 @@ func BenchmarkGenerateDiffInfo(b *testing.B) {
 // BenchmarkGenerateDiffInfoStrsStarts is the same scan with the heavy flags
 // the canonical CI invocation passes (--strs --starts).
 func BenchmarkGenerateDiffInfoStrsStarts(b *testing.B) {
-	m := openSelf(b)
+	m := openBenchFixture(b)
 	conf := &DiffConfig{Markdown: true, DiffTool: "git", CStrings: true, FuncStarts: true}
 	b.ReportAllocs()
 	for b.Loop() {
@@ -70,7 +53,7 @@ func BenchmarkGenerateDiffInfoStrsStarts(b *testing.B) {
 // BenchmarkDiffInfoEquivalentDSC measures the common unchanged DSC-image path.
 // Identical sorted inputs should return without normalization allocations.
 func BenchmarkDiffInfoEquivalentDSC(b *testing.B) {
-	m := openSelf(b)
+	m := openBenchFixture(b)
 	conf := &DiffConfig{
 		CStrings:           true,
 		FuncStarts:         true,
@@ -89,7 +72,7 @@ func BenchmarkDiffInfoEquivalentDSC(b *testing.B) {
 // machos job performs once per old-side binary (write) and once per matched
 // new-side binary (read).
 func BenchmarkDiffInfoGobRoundTrip(b *testing.B) {
-	m := openSelf(b)
+	m := openBenchFixture(b)
 	conf := &DiffConfig{Markdown: true, DiffTool: "git", CStrings: true, FuncStarts: true}
 	info := GenerateDiffInfo(m, conf)
 	dir := b.TempDir()
@@ -123,7 +106,7 @@ func BenchmarkIsMachO(b *testing.B) {
 // with DiffTool "git"), so thousands of changed binaries mean thousands of
 // process spawns.
 func BenchmarkGitDiffSubprocess(b *testing.B) {
-	m := openSelf(b)
+	m := openBenchFixture(b)
 	conf := &DiffConfig{Markdown: true, DiffTool: "git", CStrings: true, FuncStarts: true}
 	info := GenerateDiffInfo(m, conf)
 	src := info.String()
