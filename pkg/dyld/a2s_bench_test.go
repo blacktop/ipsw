@@ -2,6 +2,8 @@ package dyld
 
 import (
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 )
 
@@ -41,4 +43,17 @@ func benchmarkA2SNames() []string {
 		names[i] = fmt.Sprintf("_symbol_%04d", i)
 	}
 	return names
+}
+
+func BenchmarkA2STableSave(b *testing.B) {
+	table := NewA2STable(0)
+	for i := range 100_000 {
+		table.Set(uint64(i)*16, fmt.Sprintf("_symbol_%d_%s", i, strings.Repeat("x", i%64)))
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := table.Save(io.Discard); err != nil {
+			b.Fatal(err)
+		}
+	}
 }

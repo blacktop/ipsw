@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"sort"
 
@@ -169,8 +170,12 @@ func (t *A2STable) Save(w io.Writer) error {
 		strOff uint32
 	}
 
+	strTabSize, err := a2sStringTableSize(t.m, math.MaxUint32)
+	if err != nil {
+		return err
+	}
 	entries := make([]entry, 0, len(t.m))
-	var strBuf []byte
+	strBuf := make([]byte, 0, strTabSize)
 
 	for addr, name := range t.m {
 		entries = append(entries, entry{
@@ -213,6 +218,20 @@ func (t *A2STable) Save(w io.Writer) error {
 	}
 
 	return bw.Flush()
+}
+
+// a2sStringTableSize returns the size of the string table that holds every
+// name NUL-terminated, or an error if it would exceed limit. The format
+// stores string offsets and the table size as uint32.
+func a2sStringTableSize(names map[uint64]string, limit uint64) (int, error) {
+	var size uint64
+	for _, name := range names {
+		size += uint64(len(name)) + 1
+		if size > limit || size > math.MaxInt {
+			return 0, fmt.Errorf("a2s: string table exceeds %d bytes", limit)
+		}
+	}
+	return int(size), nil
 }
 
 // Load memory-maps the cache file for O(log n) lookups with zero startup cost.
