@@ -1,8 +1,12 @@
 package dyld
 
 import (
+	"cmp"
 	"fmt"
 	"io"
+	"math/rand/v2"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -55,5 +59,43 @@ func BenchmarkA2STableSave(b *testing.B) {
 		if err := table.Save(io.Discard); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// a2sSortEntry has the layout of the entries Save sorts.
+type a2sSortEntry struct {
+	addr   uint64
+	strOff uint32
+}
+
+// BenchmarkA2SEntrySort compares Save's previous and current sort calls on
+// the same shuffled input, restored before every iteration.
+func BenchmarkA2SEntrySort(b *testing.B) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	src := make([]a2sSortEntry, 1_000_000)
+	for i := range src {
+		src[i] = a2sSortEntry{addr: rng.Uint64(), strOff: uint32(i)}
+	}
+	work := make([]a2sSortEntry, len(src))
+	for _, bc := range []struct {
+		name string
+		sort func([]a2sSortEntry)
+	}{
+		{"impl=sort.Slice", func(e []a2sSortEntry) {
+			sort.Slice(e, func(i, j int) bool { return e[i].addr < e[j].addr })
+		}},
+		{"impl=slices.SortFunc", func(e []a2sSortEntry) {
+			slices.SortFunc(e, func(x, y a2sSortEntry) int { return cmp.Compare(x.addr, y.addr) })
+		}},
+	} {
+		b.Run(bc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				copy(work, src)
+				b.StartTimer()
+				bc.sort(work)
+			}
+		})
 	}
 }

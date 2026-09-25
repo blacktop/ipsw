@@ -3,12 +3,13 @@ package dyld
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
 	"os"
-	"sort"
+	"slices"
 
 	"github.com/blacktop/go-macho/types"
 )
@@ -186,8 +187,8 @@ func (t *A2STable) Save(w io.Writer) error {
 		strBuf = append(strBuf, 0) // null terminator
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].addr < entries[j].addr
+	slices.SortFunc(entries, func(a, b entry) int {
+		return cmp.Compare(a.addr, b.addr)
 	})
 
 	bw := bufio.NewWriterSize(w, 1<<20)

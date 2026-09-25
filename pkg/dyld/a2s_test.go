@@ -3,8 +3,10 @@ package dyld
 import (
 	"encoding/binary"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -88,5 +90,51 @@ func TestA2SStringTableSizeLimit(t *testing.T) {
 	}
 	if size, err := a2sStringTableSize(map[uint64]string{}, 0); err != nil || size != 0 {
 		t.Errorf("empty table: size %d, err %v; want 0, nil", size, err)
+	}
+}
+
+// TestA2STableSaveOrdersFullRangeAddresses covers addresses that a signed or
+// subtracting comparison would misorder; lookups in the loaded table binary
+// search the saved order. The two-entry tables force the sort to compare a
+// pair more than 1<<63 apart.
+func TestA2STableSaveOrdersFullRangeAddresses(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		names map[uint64]string
+	}{
+		{"across the range", map[uint64]string{
+			0:                  "_zero",
+			1:                  "_one",
+			0x180000000:        "_cache",
+			math.MaxInt64 - 1:  "_below_sign",
+			math.MaxInt64:      "_max_signed",
+			1 << 63:            "_sign_bit",
+			1<<63 + 0x1000:     "_above_sign",
+			math.MaxUint64 - 1: "_below_max",
+			math.MaxUint64:     "_max",
+		}},
+		{"one and max", map[uint64]string{1: "_one", math.MaxUint64: "_max"}},
+		{"low and above the sign bit", map[uint64]string{0x10: "_low", 1<<63 + 0x20: "_high"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			table := NewA2STable(0)
+			for addr, name := range tc.names {
+				table.Set(addr, name)
+			}
+			loaded, _ := saveAndLoad(t, table)
+			var addrs []uint64
+			loaded.Range(func(addr uint64, _ string) bool {
+				addrs = append(addrs, addr)
+				return true
+			})
+			if len(addrs) != len(tc.names) || !slices.IsSorted(addrs) {
+				t.Fatalf("saved addresses = %#x, want %d addresses in ascending order", addrs, len(tc.names))
+			}
+			for addr, want := range tc.names {
+				if got, ok := loaded.Get(addr); !ok || got != want {
+					t.Errorf("Get(%#x) = %q, %v; want %q", addr, got, ok, want)
+				}
+			}
+		})
 	}
 }
