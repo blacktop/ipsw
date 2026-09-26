@@ -5,8 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -677,7 +679,8 @@ func (i *CacheImage) Analyze() error {
 			}
 		}
 
-		for start, target := range i.Analysis.Helpers {
+		for _, start := range slices.Sorted(maps.Keys(i.Analysis.Helpers)) {
+			target := i.Analysis.Helpers[start]
 			if slide, ok := i.sinfo[start]; ok {
 				target = slide
 			}
@@ -695,7 +698,8 @@ func (i *CacheImage) Analyze() error {
 			return fmt.Errorf("failed to parse GOT for %s: %w", i.Name, err)
 		}
 
-		for entry, target := range i.Analysis.GotPointers {
+		for _, entry := range slices.Sorted(maps.Keys(i.Analysis.GotPointers)) {
+			target := i.Analysis.GotPointers[entry]
 			if slide, ok := i.sinfo[entry]; ok {
 				target = slide
 			}
@@ -730,7 +734,8 @@ func (i *CacheImage) Analyze() error {
 			return fmt.Errorf("failed to parse stubs for %s: %w", i.Name, err)
 		}
 
-		for stub, target := range i.Analysis.SymbolStubs {
+		for _, stub := range slices.Sorted(maps.Keys(i.Analysis.SymbolStubs)) {
+			target := i.Analysis.SymbolStubs[stub]
 			if slide, ok := i.sinfo[stub]; ok {
 				target = slide
 			}
@@ -1255,6 +1260,16 @@ func (i *CacheImage) GetLocalSymbolsAsMachoSymbols() []macho.Symbol {
 	return syms
 }
 
+// A resolved re-export names an address owned by another image.
+func shouldPublishTrieAddress(sym trie.TrieExport) bool {
+	return !sym.Flags.ReExport()
+}
+
+// Undefined values and indirect string-table offsets are not symbol addresses.
+func shouldPublishSymtabAddress(sym macho.Symbol) bool {
+	return !sym.Type.IsUndefinedSym() && !sym.Type.IsIndirectSym()
+}
+
 // ParsePublicSymbols parses and caches, with the option to dump, all the exports, symtab and dyld_info symbols in the image/dylib
 func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 
@@ -1278,7 +1293,9 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				if dump {
 					fmt.Fprintf(w, "%s\n", sym)
 				} else {
-					i.cache.AddressToSymbol.Set(sym.Address, sym.Name)
+					if shouldPublishTrieAddress(sym) {
+						i.cache.AddressToSymbol.Set(sym.Address, sym.Name)
+					}
 					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 						Name:    sym.Name,
 						Address: sym.Address,
@@ -1308,7 +1325,9 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 			if dump {
 				fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
 			} else {
-				i.cache.AddressToSymbol.Set(sym.Value, sym.Name)
+				if shouldPublishSymtabAddress(sym) {
+					i.cache.AddressToSymbol.Set(sym.Value, sym.Name)
+				}
 				i.PublicSymbols = append(i.PublicSymbols, &Symbol{
 					Name:    sym.Name,
 					Address: sym.Value,

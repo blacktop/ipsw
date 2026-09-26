@@ -7,7 +7,47 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/trie"
+	"github.com/blacktop/go-macho/types"
 )
+
+func TestPublicSymbolAddressPublication(t *testing.T) {
+	t.Run("trie", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			sym  trie.TrieExport
+			want bool
+		}{
+			{"regular export", trie.TrieExport{Name: "__platform_bzero", Address: 0x180001000}, true},
+			{"resolved re-export", trie.TrieExport{Name: "_bzero", Address: 0x180001000, Flags: types.EXPORT_SYMBOL_FLAGS_REEXPORT}, false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if got := shouldPublishTrieAddress(tc.sym); got != tc.want {
+					t.Fatalf("shouldPublishTrieAddress(%+v) = %v, want %v", tc.sym, got, tc.want)
+				}
+			})
+		}
+	})
+	t.Run("symtab", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			sym  macho.Symbol
+			want bool
+		}{
+			{"defined symbol", macho.Symbol{Name: "_defined", Type: types.N_SECT | types.N_EXT, Sect: 1, Value: 0x180001000}, true},
+			{"undefined symbol", macho.Symbol{Name: "_undefined", Type: types.N_UNDF | types.N_EXT}, false},
+			{"indirect symbol", macho.Symbol{Name: "_alias", Type: types.N_INDR | types.N_EXT, Value: 42}, false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if got := shouldPublishSymtabAddress(tc.sym); got != tc.want {
+					t.Fatalf("shouldPublishSymtabAddress(%+v) = %v, want %v", tc.sym, got, tc.want)
+				}
+			})
+		}
+	})
+}
 
 // Keep the pre-reuse naming loop as an independent reference for the real-cache
 // replay as well as the synthetic invalidation tests.
