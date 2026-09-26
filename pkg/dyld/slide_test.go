@@ -3,8 +3,10 @@ package dyld
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -193,5 +195,33 @@ func TestSlideMetadataKeyIncludesUUIDAndMapping(t *testing.T) {
 	}
 	if len(f.slideInfos) != 3 || tracker.metadataBytes != 3*wantBytes {
 		t.Fatalf("conflated cache keys: %d entries, %d bytes", len(f.slideInfos), tracker.metadataBytes)
+	}
+}
+
+func TestSlideMetadataReleasedOnClose(t *testing.T) {
+	for version := uint32(1); version <= 5; version++ {
+		t.Run(fmt.Sprint(version), func(t *testing.T) {
+			f, mapping, tracker, _ := slideCacheFixture(t, version)
+			f.closers = map[mtypes.UUID]io.Closer{f.UUID: io.NopCloser(bytes.NewReader(nil))}
+			if _, err := f.GetRebaseInfoForPages(f.UUID, mapping, 1, 2); err != nil {
+				t.Fatal(err)
+			}
+			if len(f.slideInfos) != 1 {
+				t.Fatalf("got %d cached mappings, want 1", len(f.slideInfos))
+			}
+			if err := f.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if len(f.slideInfos) != 0 {
+				t.Fatalf("Close retained %d cached mappings", len(f.slideInfos))
+			}
+			metadataBytes, pointerReads := tracker.metadataBytes, len(tracker.pointerOffsets)
+			if _, err := f.GetRebaseInfoForPages(f.UUID, mapping, 1, 2); !errors.Is(err, os.ErrClosed) {
+				t.Fatalf("lookup after Close: got %v, want os.ErrClosed", err)
+			}
+			if len(f.slideInfos) != 0 || tracker.metadataBytes != metadataBytes || len(tracker.pointerOffsets) != pointerReads {
+				t.Fatal("lookup after Close repopulated the cache or read slide data")
+			}
+		})
 	}
 }

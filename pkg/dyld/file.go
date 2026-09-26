@@ -79,8 +79,9 @@ type File struct {
 
 	Images cacheImages
 
-	slideInfoMu sync.Mutex
-	slideInfos  map[slideInfoKey]*cachedSlideInfo
+	slideInfoMu      sync.Mutex
+	slideInfos       map[slideInfoKey]*cachedSlideInfo
+	slideInfosClosed bool
 
 	SlideInfo        slideInfo
 	PatchInfoVersion uint32
@@ -293,7 +294,8 @@ func (f *File) openCacheMember(name string, want mtypes.UUID) (int64, error) {
 
 // Close releases the address-to-symbol table, the string table copies held for
 // cache files that aren't mmap'd, the cached dylibs trie, the image segment
-// index, and every mapping Open created. A File built with NewFile owns no mappings.
+// index, the slide-info tables, and every mapping Open created.
+// A File built with NewFile owns no mappings.
 func (f *File) Close() error {
 	f.imageSegmentsMu.Lock()
 	defer f.imageSegmentsMu.Unlock()
@@ -313,6 +315,10 @@ func (f *File) Close() error {
 	f.dylibsTrieMu.Lock()
 	f.dylibsTrieData = nil
 	f.dylibsTrieMu.Unlock()
+	f.slideInfoMu.Lock()
+	f.slideInfos = nil
+	f.slideInfosClosed = true
+	f.slideInfoMu.Unlock()
 	for uuid, closer := range f.closers {
 		delete(f.closers, uuid)
 		delete(f.r, uuid) // a lookup after Close fails as a nil reader, not a fault
@@ -1002,6 +1008,10 @@ type cachedSlideInfo struct {
 
 func (f *File) loadSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideInfo, pages bool) (*cachedSlideInfo, error) {
 	f.slideInfoMu.Lock()
+	if f.slideInfosClosed {
+		f.slideInfoMu.Unlock()
+		return nil, os.ErrClosed
+	}
 	key := slideInfoKey{uuid, mapping.CacheMappingAndSlideInfo}
 	cached := f.slideInfos[key]
 	if cached == nil {
