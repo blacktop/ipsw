@@ -12,8 +12,8 @@ BenchmarkNormalizeSymbolForDiff/no-counter
 BenchmarkNormalizeSymbolForDiff/digit-no-counter
 BenchmarkNormalizeSymbolForDiff/counter
 BenchmarkDiffNormalizedSymbols
-BenchmarkGenerateDiffInfo
-BenchmarkGenerateDiffInfoStrsStarts
+BenchmarkGenerateDiffInfo/warm-object
+BenchmarkGenerateDiffInfoStrsStarts/warm-object
 BenchmarkDiffInfoEquivalentDSC
 BenchmarkIsMachO
 BenchmarkDiffInfoGobRoundTrip

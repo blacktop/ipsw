@@ -28,26 +28,31 @@ func openSelfT(t *testing.T) *macho.File {
 	return m
 }
 
-// BenchmarkGenerateDiffInfo measures the per-binary scan cost on the cold
-// path: every Mach-O in every volume goes through this once per side.
+// BenchmarkGenerateDiffInfo measures scans of one reused, parsed macho.File.
+// This warm-object benchmark includes cached state, not cold per-image parsing.
 func BenchmarkGenerateDiffInfo(b *testing.B) {
-	m := openBenchFixture(b)
-	conf := &DiffConfig{Markdown: true, DiffTool: "git"}
-	b.ReportAllocs()
-	for b.Loop() {
-		_ = GenerateDiffInfo(m, conf)
-	}
+	b.Run("warm-object", func(b *testing.B) {
+		m := openBenchFixture(b)
+		conf := &DiffConfig{Markdown: true, DiffTool: "git"}
+		b.ReportAllocs()
+		for b.Loop() {
+			_ = GenerateDiffInfo(m, conf)
+		}
+	})
 }
 
-// BenchmarkGenerateDiffInfoStrsStarts is the same scan with the heavy flags
-// the canonical CI invocation passes (--strs --starts).
+// BenchmarkGenerateDiffInfoStrsStarts measures warm-object scans with --strs
+// and --starts. It reuses one parsed macho.File, including cached function
+// starts, and does not measure cold per-image parsing.
 func BenchmarkGenerateDiffInfoStrsStarts(b *testing.B) {
-	m := openBenchFixture(b)
-	conf := &DiffConfig{Markdown: true, DiffTool: "git", CStrings: true, FuncStarts: true}
-	b.ReportAllocs()
-	for b.Loop() {
-		_ = GenerateDiffInfo(m, conf)
-	}
+	b.Run("warm-object", func(b *testing.B) {
+		m := openBenchFixture(b)
+		conf := &DiffConfig{Markdown: true, DiffTool: "git", CStrings: true, FuncStarts: true}
+		b.ReportAllocs()
+		for b.Loop() {
+			_ = GenerateDiffInfo(m, conf)
+		}
+	})
 }
 
 // BenchmarkDiffInfoEquivalentDSC measures the common unchanged DSC-image path.

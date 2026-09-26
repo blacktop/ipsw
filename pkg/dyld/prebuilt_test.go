@@ -93,15 +93,6 @@ func TestPrebuiltLoaderSetBounds(t *testing.T) {
 	}
 }
 
-func BenchmarkGetDylibPrebuiltLoader(b *testing.B) {
-	f, _, _ := prebuiltTestFile(b, 4096, 4095)
-	for b.Loop() {
-		if _, err := f.GetDylibPrebuiltLoader("/lib/test"); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 func TestGetDylibPrebuiltLoaderReadsOnlySelectedOffset(t *testing.T) {
 	f, r, _ := prebuiltTestFile(t, 4096, 4095)
 	if _, err := f.GetDylibPrebuiltLoader("/lib/test"); err != nil {

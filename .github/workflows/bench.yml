@@ -60,7 +60,6 @@ jobs:
             awk -F ': ' '/^model name/ { print "CPU: " $2; exit }' /proc/cpuinfo
             go version
             printf 'Base: %s\nCandidate: %s\n' "$BASE_SHA" "$CANDIDATE_SHA"
-            printf 'Samples: 10 per benchmark per tree\nOrder: candidate then base, sequential on one runner\n'
             printf 'Benchstat: v0.0.0-20260908200009-22c9c6c9d4da\n'
           } > "$RUNNER_TEMP/bench-results/metadata.txt"
 
