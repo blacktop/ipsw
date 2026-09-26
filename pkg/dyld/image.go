@@ -1057,7 +1057,7 @@ func (i *CacheImage) ParseSwiftStrings() error {
 
 // localNlistBuffer reads this image's entries from the cache's local-symbol nlist table
 // and returns the cache file holding them and the serialized entry size.
-// Entries referring to empty or nonexistent sections are discarded.
+// When section metadata is available, entries outside their section are discarded.
 func (i *CacheImage) localNlistBuffer() (types.UUID, []byte, int, error) {
 	uuid := i.cache.UUID
 	if i.cache.IsDyld4 {
@@ -1079,7 +1079,8 @@ func (i *CacheImage) localNlistBuffer() (types.UUID, []byte, int, error) {
 	}
 	m, err := i.GetPartialMacho()
 	if err != nil {
-		return uuid, nil, 0, fmt.Errorf("failed to get MachO for image %s: %w", filepath.Base(i.Name), err)
+		log.Warnf("failed to get MachO for image %s; keeping unfiltered local symbols: %v", i.Name, err)
+		return uuid, buf, size, nil
 	}
 	kept, skipped := 0, 0
 	for off := 0; off < len(buf); off += size {
@@ -1087,14 +1088,25 @@ func (i *CacheImage) localNlistBuffer() (types.UUID, []byte, int, error) {
 		// Section ordinals are 1-based; zero is NO_SECT. Cache builders can
 		// empty a section while leaving its old local symbols in .symbols.
 		sect := int(nlist.Sect)
-		if sect != 0 && (sect > len(m.Sections) || m.Sections[sect-1].Size == 0) {
-			skipped++
-			continue
+		if sect != 0 {
+			if sect > len(m.Sections) {
+				skipped++
+				continue
+			}
+			section := m.Sections[sect-1]
+			// Subtract only after checking the lower bound to avoid overflow
+			// when the section's address and size are added.
+			if nlist.Value < section.Addr || nlist.Value-section.Addr >= section.Size {
+				skipped++
+				continue
+			}
 		}
 		copy(buf[kept:kept+size], buf[off:off+size])
 		kept += size
 	}
-	log.Debugf("skipped %d local symbols referring to empty or nonexistent sections in %s", skipped, filepath.Base(i.Name))
+	if skipped > 0 {
+		log.Debugf("skipped %d local symbols outside their section range or referring to nonexistent sections in %s", skipped, filepath.Base(i.Name))
+	}
 	return uuid, buf[:kept], size, nil
 }
 

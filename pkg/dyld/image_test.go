@@ -149,7 +149,7 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 			f.LocalSymInfo.StringsSize = uint32(len(strings))
 			img := &CacheImage{Name: "/usr/lib/libSynthetic.dylib", cache: f}
 			img.pm = &macho.File{}
-			img.pm.Sections = []*mtypes.Section{{SectionHeader: mtypes.SectionHeader{Size: 0x1000}}}
+			img.pm.Sections = []*mtypes.Section{{SectionHeader: mtypes.SectionHeader{Addr: values[0], Size: 0x1000}}}
 			img.NlistCount = uint32(len(values))
 			f.Images = cacheImages{img}
 
@@ -172,22 +172,49 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 }
 
 func TestLocalSymbolsSectionFilter(t *testing.T) {
-	for _, sect := range []uint8{1, 3, 255} {
-		t.Run(fmt.Sprintf("invalid_section_%d", sect), func(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		sect       uint8
+		value      uint64
+		size       int
+		allDropped bool
+	}{
+		{name: "empty_section", sect: 1, value: 0x1000, size: 16},
+		{name: "missing_section_3", sect: 3, value: 0x1000, size: 16},
+		{name: "missing_section_255", sect: 255, value: 0x1000, size: 16},
+		{name: "below_section", sect: 2, value: 0x100f, size: 16},
+		{name: "at_section_end", sect: 2, value: 0x1110, size: 16},
+		{name: "above_section", sect: 2, value: 0x1111, size: 16},
+		{name: "32_bit_outside_section", sect: 2, value: 0x1110, size: 12},
+		{name: "all_dropped", sect: 2, value: 0x1110, size: 16, allDropped: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
 			// One stale local precedes a valid local, just as in the .symbols
 			// file after the builder empties __objc_stubs.
 			data := make([]byte, 0x100)
 			pool := []byte("\x00_stale\x00_normal\x00")
-			for n, section := range []uint8{sect, 2} {
-				off := 16 + n*16
+			for n, section := range []uint8{tt.sect, 2} {
+				off := 16 + n*tt.size
 				binary.LittleEndian.PutUint32(data[off:], uint32(1+n*7))
 				data[off+4] = 0x0e
 				data[off+5] = section
-				binary.LittleEndian.PutUint64(data[off+8:], uint64(0x1000+n*16))
+				value := tt.value
+				if n == 1 {
+					value = 0x1010 // The inclusive section start is kept.
+				}
+				if tt.size == 16 {
+					binary.LittleEndian.PutUint64(data[off+8:], value)
+				} else {
+					binary.LittleEndian.PutUint32(data[off+8:], uint32(value))
+				}
 			}
 			copy(data[0x80:], pool)
 			hdr := CacheHeader{LocalSymbolsOffset: 1}
-			copy(hdr.Magic[:], "dyld_v1  arm64e")
+			if tt.size == 16 {
+				copy(hdr.Magic[:], "dyld_v1  arm64e")
+			} else {
+				copy(hdr.Magic[:], "dyld_v1arm64_32")
+			}
 			f := fileReading(data)
 			f.Headers = map[mtypes.UUID]CacheHeader{f.UUID: hdr}
 			f.LocalSymInfo.NListFileOffset = 16
@@ -195,6 +222,9 @@ func TestLocalSymbolsSectionFilter(t *testing.T) {
 			f.LocalSymInfo.StringsSize = uint32(len(pool))
 			img := &CacheImage{Name: "/usr/lib/libSynthetic.dylib", cache: f}
 			img.NlistCount = 2
+			if tt.allDropped {
+				img.NlistCount = 1
+			}
 			img.pm = &macho.File{}
 			img.pm.Sections = []*mtypes.Section{
 				{SectionHeader: mtypes.SectionHeader{Name: "__objc_stubs", Seg: "__TEXT", Size: 0}},
@@ -202,8 +232,18 @@ func TestLocalSymbolsSectionFilter(t *testing.T) {
 			}
 			f.Images = cacheImages{img}
 
-			if name, err := img.FindLocalSymbolAtAddr(0x1000); err == nil || name != "" {
+			if name, err := img.FindLocalSymbolAtAddr(tt.value); err == nil || name != "" {
 				t.Fatalf("stale lookup = %q, %v; want no symbol", name, err)
+			}
+			if tt.allDropped {
+				_, buf, size, err := img.localNlistBuffer()
+				if err != nil || len(buf) != 0 || size != tt.size {
+					t.Fatalf("all-dropped buffer = %x, %d, %v", buf, size, err)
+				}
+				if err := img.ParseLocalSymbols(false); err != nil || len(img.LocalSymbols) != 0 {
+					t.Fatalf("all-dropped locals = %v, %v", img.LocalSymbols, err)
+				}
+				return
 			}
 			if name, err := img.FindLocalSymbolAtAddr(0x1010); err != nil || name != "_normal" {
 				t.Fatalf("normal lookup = %q, %v", name, err)
@@ -214,13 +254,43 @@ func TestLocalSymbolsSectionFilter(t *testing.T) {
 			if len(img.LocalSymbols) != 1 || img.LocalSymbols[0].Name != "_normal" {
 				t.Fatalf("published locals = %v; want only _normal", img.LocalSymbols)
 			}
-			if name, ok := f.AddressToSymbol.Get(0x1000); ok {
+			if name, ok := f.AddressToSymbol.Get(tt.value); ok {
 				t.Fatalf("published stale a2s entry %q", name)
 			}
 			if name, ok := f.AddressToSymbol.Get(0x1010); !ok || name != "_normal" {
 				t.Fatalf("normal a2s entry = %q, %v", name, ok)
 			}
 		})
+	}
+}
+
+func TestLocalSymbolsPartialMachoFailureKeepsEntries(t *testing.T) {
+	data := make([]byte, 16+3*16)
+	for n, sect := range []uint8{0, 1, 255} {
+		off := 16 + n*16
+		binary.LittleEndian.PutUint32(data[off:], uint32(n+1))
+		data[off+4] = 0x0e
+		data[off+5] = sect
+		binary.LittleEndian.PutUint64(data[off+8:], uint64(0x1000+n*16))
+	}
+	f := fileReading(data)
+	hdr := CacheHeader{LocalSymbolsOffset: 1}
+	copy(hdr.Magic[:], "dyld_v1  arm64e")
+	f.Headers = map[mtypes.UUID]CacheHeader{f.UUID: hdr}
+	f.LocalSymInfo.NListFileOffset = 16
+	img := &CacheImage{Name: "/usr/lib/libMissing.dylib", cache: f}
+	img.NlistCount = 3
+	f.Images = cacheImages{img}
+	// No image mappings are available, but the local-symbol table is readable.
+	if _, err := img.GetPartialMacho(); err == nil {
+		t.Fatal("expected partial Mach-O lookup to fail")
+	}
+	uuid, buf, size, err := img.localNlistBuffer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uuid != f.UUID || size != 16 || !bytes.Equal(buf, data[16:]) {
+		t.Fatalf("localNlistBuffer() = %v, %x, %d; want %v, %x, 16", uuid, buf, size, f.UUID, data[16:])
 	}
 }
 
