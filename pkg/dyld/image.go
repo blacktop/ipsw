@@ -1055,11 +1055,9 @@ func (i *CacheImage) ParseSwiftStrings() error {
 	return nil
 }
 
-// FindLocalSymbolAtAddr searches only this image's DSC local symbol nlist entries
-// for a symbol at the given address, without populating the full a2s cache.
-// Returns the symbol name or an error if not found.
 // localNlistBuffer reads this image's entries from the cache's local-symbol nlist table
-// and returns the cache file holding them and the serialized entry size
+// and returns the cache file holding them and the serialized entry size.
+// Entries referring to empty or nonexistent sections are discarded.
 func (i *CacheImage) localNlistBuffer() (types.UUID, []byte, int, error) {
 	uuid := i.cache.UUID
 	if i.cache.IsDyld4 {
@@ -1076,9 +1074,33 @@ func (i *CacheImage) localNlistBuffer() (types.UUID, []byte, int, error) {
 	if _, err := i.cache.r[uuid].ReadAt(buf, offset); err != nil {
 		return uuid, nil, 0, fmt.Errorf("failed to read nlist entries for %s: %w", filepath.Base(i.Name), err)
 	}
-	return uuid, buf, size, nil
+	if len(buf) == 0 {
+		return uuid, buf, size, nil
+	}
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return uuid, nil, 0, fmt.Errorf("failed to get MachO for image %s: %w", filepath.Base(i.Name), err)
+	}
+	kept, skipped := 0, 0
+	for off := 0; off < len(buf); off += size {
+		nlist := parseNlist(buf[off : off+size])
+		// Section ordinals are 1-based; zero is NO_SECT. Cache builders can
+		// empty a section while leaving its old local symbols in .symbols.
+		sect := int(nlist.Sect)
+		if sect != 0 && (sect > len(m.Sections) || m.Sections[sect-1].Size == 0) {
+			skipped++
+			continue
+		}
+		copy(buf[kept:kept+size], buf[off:off+size])
+		kept += size
+	}
+	log.Debugf("skipped %d local symbols referring to empty or nonexistent sections in %s", skipped, filepath.Base(i.Name))
+	return uuid, buf[:kept], size, nil
 }
 
+// FindLocalSymbolAtAddr searches only this image's DSC local symbol nlist entries
+// for a symbol at the given address, without populating the full a2s cache.
+// Returns the symbol name or an error if not found.
 func (i *CacheImage) FindLocalSymbolAtAddr(addr uint64) (string, error) {
 	uuid, nlistBuf, size, err := i.localNlistBuffer()
 	if err != nil {

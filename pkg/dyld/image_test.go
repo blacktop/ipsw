@@ -130,7 +130,7 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 				off := 16 + n*tt.size
 				binary.LittleEndian.PutUint32(data[off:], uint32(len(strings)))
 				data[off+4] = 0x0e
-				data[off+5] = 1
+				data[off+5] = uint8(1 - n) // Exercise both section 1 and NO_SECT.
 				if tt.size == 16 {
 					binary.LittleEndian.PutUint64(data[off+8:], value)
 				} else {
@@ -148,6 +148,8 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 			f.LocalSymInfo.StringsFileOffset = 0x80
 			f.LocalSymInfo.StringsSize = uint32(len(strings))
 			img := &CacheImage{Name: "/usr/lib/libSynthetic.dylib", cache: f}
+			img.pm = &macho.File{}
+			img.pm.Sections = []*mtypes.Section{{SectionHeader: mtypes.SectionHeader{Size: 0x1000}}}
 			img.NlistCount = uint32(len(values))
 			f.Images = cacheImages{img}
 
@@ -164,6 +166,59 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 				if sym.Name != names[n] || sym.Value != values[n] {
 					t.Errorf("symbol %d = %s %#x, want %s %#x", n, sym.Name, sym.Value, names[n], values[n])
 				}
+			}
+		})
+	}
+}
+
+func TestLocalSymbolsSectionFilter(t *testing.T) {
+	for _, sect := range []uint8{1, 3, 255} {
+		t.Run(fmt.Sprintf("invalid_section_%d", sect), func(t *testing.T) {
+			// One stale local precedes a valid local, just as in the .symbols
+			// file after the builder empties __objc_stubs.
+			data := make([]byte, 0x100)
+			pool := []byte("\x00_stale\x00_normal\x00")
+			for n, section := range []uint8{sect, 2} {
+				off := 16 + n*16
+				binary.LittleEndian.PutUint32(data[off:], uint32(1+n*7))
+				data[off+4] = 0x0e
+				data[off+5] = section
+				binary.LittleEndian.PutUint64(data[off+8:], uint64(0x1000+n*16))
+			}
+			copy(data[0x80:], pool)
+			hdr := CacheHeader{LocalSymbolsOffset: 1}
+			copy(hdr.Magic[:], "dyld_v1  arm64e")
+			f := fileReading(data)
+			f.Headers = map[mtypes.UUID]CacheHeader{f.UUID: hdr}
+			f.LocalSymInfo.NListFileOffset = 16
+			f.LocalSymInfo.StringsFileOffset = 0x80
+			f.LocalSymInfo.StringsSize = uint32(len(pool))
+			img := &CacheImage{Name: "/usr/lib/libSynthetic.dylib", cache: f}
+			img.NlistCount = 2
+			img.pm = &macho.File{}
+			img.pm.Sections = []*mtypes.Section{
+				{SectionHeader: mtypes.SectionHeader{Name: "__objc_stubs", Seg: "__TEXT", Size: 0}},
+				{SectionHeader: mtypes.SectionHeader{Name: "__text", Seg: "__TEXT", Addr: 0x1010, Size: 0x100}},
+			}
+			f.Images = cacheImages{img}
+
+			if name, err := img.FindLocalSymbolAtAddr(0x1000); err == nil || name != "" {
+				t.Fatalf("stale lookup = %q, %v; want no symbol", name, err)
+			}
+			if name, err := img.FindLocalSymbolAtAddr(0x1010); err != nil || name != "_normal" {
+				t.Fatalf("normal lookup = %q, %v", name, err)
+			}
+			if err := img.ParseLocalSymbols(false); err != nil {
+				t.Fatal(err)
+			}
+			if len(img.LocalSymbols) != 1 || img.LocalSymbols[0].Name != "_normal" {
+				t.Fatalf("published locals = %v; want only _normal", img.LocalSymbols)
+			}
+			if name, ok := f.AddressToSymbol.Get(0x1000); ok {
+				t.Fatalf("published stale a2s entry %q", name)
+			}
+			if name, ok := f.AddressToSymbol.Get(0x1010); !ok || name != "_normal" {
+				t.Fatalf("normal a2s entry = %q, %v", name, ok)
 			}
 		})
 	}
