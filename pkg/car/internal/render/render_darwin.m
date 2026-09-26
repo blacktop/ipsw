@@ -1,4 +1,4 @@
-//go:build darwin && cgo
+//go:build darwin && !ios && cgo
 
 #import <AppKit/AppKit.h>
 #import <ImageIO/ImageIO.h>
