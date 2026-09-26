@@ -2200,6 +2200,10 @@ type cachedStrtab struct {
 	buf []byte
 }
 
+// maxStrtabUnionGrowth allows nearby tables to share a buffer without copying
+// arbitrarily large gaps between distant LC_SYMTAB ranges into memory.
+const maxStrtabUnionGrowth = 64 << 20
+
 // stringTableLookup implements go-macho's FileConfig.StringTableLookup for an
 // image whose __LINKEDIT lives in cache file uuid: it returns a function that
 // yields the NUL-terminated name at an offset into the shared LC_SYMTAB string
@@ -2258,9 +2262,8 @@ func (f *File) sharedStringTable(uuid mtypes.UUID, off int64, size uint64) ([]by
 	if cached && off >= c.off && end <= c.off+int64(len(c.buf)) {
 		return c.buf[off-c.off : end-c.off : end-c.off], nil
 	}
-	// Not cached yet, or a range the cached one doesn't cover: read the union
-	// of the two, so one buffer per cache file serves every dylib's table and
-	// tables that differ slightly between dylibs don't each pin a copy.
+	// Union nearby ranges so tables that differ slightly can share a buffer.
+	// For distant ranges, replace the cache with only the requested table.
 	readOff, readEnd := off, end
 	if cached {
 		if c.off < readOff {
@@ -2268,6 +2271,11 @@ func (f *File) sharedStringTable(uuid mtypes.UUID, off int64, size uint64) ([]by
 		}
 		if cend := c.off + int64(len(c.buf)); cend > readEnd {
 			readEnd = cend
+		}
+		// Subtract the larger range rather than adding the allowance to it,
+		// avoiding overflow in the allocation bound.
+		if uint64(readEnd-readOff)-max(size, uint64(len(c.buf))) > maxStrtabUnionGrowth {
+			readOff, readEnd = off, end
 		}
 	}
 	// Probe the range's last byte before allocating, so a corrupt LC_SYMTAB

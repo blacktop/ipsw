@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -402,6 +403,70 @@ func TestStringTableLookupPartiallyOverlappingRanges(t *testing.T) {
 	}
 	// The original closure still owns its original extent after replacement.
 	checkStrtabNames(t, first)
+}
+
+// virtualStrtabReader serves an 8 GiB file without storing it. Oversized reads
+// fail before touching the destination, exposing accidental gap-spanning reads.
+type virtualStrtabReader struct{}
+
+func (virtualStrtabReader) ReadAt(p []byte, off int64) (int, error) {
+	const span = int64(8 << 30)
+	if len(p) > 1<<20 {
+		return 0, errors.New("string table read exceeds 1 MiB")
+	}
+	if off < 0 || off > span || int64(len(p)) > span-off {
+		return 0, io.EOF
+	}
+	clear(p)
+	for _, table := range []struct {
+		off  int64
+		name string
+	}{
+		{strtabOff, "_first\x00"},
+		{strtabOff + 4<<30, "_second\x00"},
+	} {
+		start := max(off, table.off)
+		end := min(off+int64(len(p)), table.off+int64(len(table.name)))
+		if start < end {
+			copy(p[start-off:end-off], table.name[start-table.off:end-table.off])
+		}
+	}
+	return len(p), nil
+}
+
+func TestStringTableLookupDistantRanges(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reverse=%t", reverse), func(t *testing.T) {
+			offsets := []int64{strtabOff, strtabOff + 4<<30}
+			wants := []string{"_first", "_second"}
+			if reverse {
+				offsets[0], offsets[1] = offsets[1], offsets[0]
+				wants[0], wants[1] = wants[1], wants[0]
+			}
+			f, uuid := strtabTestFile(virtualStrtabReader{})
+			first, err := f.stringTableLookup(uuid, offsets[0], 4<<10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			saved := first(0)
+			if saved != wants[0] {
+				t.Fatalf("first name = %q, want %q", saved, wants[0])
+			}
+			second, err := f.stringTableLookup(uuid, offsets[1], 4<<10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := second(0); got != wants[1] {
+				t.Errorf("second name = %q, want %q", got, wants[1])
+			}
+			if c := f.strtabs[uuid]; c.off != offsets[1] || len(c.buf) > 1<<20 {
+				t.Errorf("cached range = %#x+%d, want requested offset and at most 1 MiB", c.off, len(c.buf))
+			}
+			if saved != wants[0] || first(0) != wants[0] {
+				t.Error("replacement invalidated the first name or lookup")
+			}
+		})
+	}
 }
 
 func TestSharedStringTableBounds(t *testing.T) {
