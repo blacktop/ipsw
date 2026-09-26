@@ -259,8 +259,8 @@ func TestA2SLoadedUnion(t *testing.T) {
 		}
 	}
 	strBase := a2sHeaderSize + len(want)*a2sEntrySize
-	if string(raw[strBase:]) != "new\x00replacement\x00tail\x00untouched\x00" {
-		t.Errorf("names not sorted: %q", raw[strBase:])
+	if string(raw[strBase:]) != "new\x00untouched\x00replacement\x00tail\x00" {
+		t.Errorf("names not in address order: %q", raw[strBase:])
 	}
 }
 
@@ -275,12 +275,19 @@ func TestA2SSaveSortedNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := out.Bytes()
-	if got := string(raw[a2sHeaderSize+4*a2sEntrySize:]); got != "\x00a\x00a\x00z\x00" {
-		t.Errorf("string table = %q, want lexical name order", got)
+	if got := string(raw[a2sHeaderSize+4*a2sEntrySize:]); got != "z\x00a\x00a\x00\x00" {
+		t.Errorf("string table = %q, want address order", got)
 	}
-	for i, want := range []uint32{5, 1, 3, 0} {
+	for i, want := range []uint32{0, 2, 4, 6} {
 		if got := binary.LittleEndian.Uint32(raw[a2sHeaderSize+i*a2sEntrySize+8:]); got != want {
 			t.Errorf("entry %d offset = %d, want %d", i, got, want)
 		}
+	}
+	var again bytes.Buffer
+	if err := table.Save(&again); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(raw, again.Bytes()) {
+		t.Error("saving the same table twice is not byte-identical")
 	}
 }

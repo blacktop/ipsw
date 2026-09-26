@@ -227,24 +227,19 @@ func (t *A2STable) Save(w io.Writer) error {
 	entries := make([]entry, 0, len(names))
 	strBuf := make([]byte, 0, strTabSize)
 
-	// Pack names lexically, breaking ties by address for deterministic offsets.
-	addresses := slices.Sorted(maps.Keys(names))
-	slices.SortStableFunc(addresses, func(a, b uint64) int {
-		return cmp.Compare(names[a], names[b])
-	})
-	for _, addr := range addresses {
-		name := names[addr]
-		entries = append(entries, entry{
-			addr:   addr,
-			strOff: uint32(len(strBuf)),
-		})
-		strBuf = append(strBuf, name...)
-		strBuf = append(strBuf, 0) // null terminator
+	for addr := range names {
+		entries = append(entries, entry{addr: addr})
 	}
-
 	slices.SortFunc(entries, func(a, b entry) int {
 		return cmp.Compare(a.addr, b.addr)
 	})
+
+	// Pack names in address order for deterministic offsets.
+	for i := range entries {
+		entries[i].strOff = uint32(len(strBuf))
+		strBuf = append(strBuf, names[entries[i].addr]...)
+		strBuf = append(strBuf, 0) // null terminator
+	}
 
 	bw := bufio.NewWriterSize(w, 1<<20)
 
