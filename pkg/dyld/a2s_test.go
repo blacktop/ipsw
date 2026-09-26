@@ -264,7 +264,7 @@ func TestA2SLoadedUnion(t *testing.T) {
 	}
 }
 
-func TestA2SSaveSortedNames(t *testing.T) {
+func TestA2SSaveAddressOrderNames(t *testing.T) {
 	table := NewA2STable(0)
 	table.Set(1, "z")
 	table.Set(2, "a")

@@ -29,6 +29,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -321,9 +322,15 @@ var dyldExtractCmd = &cobra.Command{
 					if err != nil {
 						return err
 					}
-					for addr, sym := range stubIslands {
+					stubAddresses := make([]uint64, 0, len(stubIslands))
+					for addr := range stubIslands {
+						stubAddresses = append(stubAddresses, addr)
+					}
+					// Each address maps to one name, so address order is a total order.
+					slices.Sort(stubAddresses)
+					for _, addr := range stubAddresses {
 						syms = append(syms, macho.Symbol{
-							Name:  sym,
+							Name:  stubIslands[addr],
 							Value: addr,
 							Desc:  0xa00,
 						})
