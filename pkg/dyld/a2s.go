@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"os"
 	"slices"
@@ -37,7 +38,7 @@ type A2STable struct {
 	strBase    int    // offset of string table in data
 	strTabSize int    // size of string table in bytes
 
-	// build mode; cache construction mutates this on one goroutine before Save/Load.
+	// Additions and overrides; mutation requires exclusive access.
 	m map[uint64]string
 
 	changes uint64
@@ -57,10 +58,14 @@ func NewA2STable(sizeHint int) *A2STable {
 
 // Get looks up a symbol by address.
 func (t *A2STable) Get(addr uint64) (string, bool) {
-	if t.m != nil {
-		s, ok := t.m[addr]
-		return s, ok
+	if s, ok := t.m[addr]; ok {
+		return s, true
 	}
+	return t.getMapped(addr)
+}
+
+// getMapped looks up an address in the immutable mapped entries.
+func (t *A2STable) getMapped(addr uint64) (string, bool) {
 	if t.data == nil {
 		return "", false
 	}
@@ -109,13 +114,13 @@ func (t *A2STable) GetValue(addr uint64) string {
 	return s
 }
 
-// Set adds or updates a symbol mapping. Only valid in build mode.
+// Set adds or overrides a symbol mapping, including on a loaded table.
 func (t *A2STable) Set(addr uint64, name string) {
+	if old, ok := t.Get(addr); ok && old == name {
+		return
+	}
 	if t.m == nil {
 		t.m = make(map[uint64]string)
-	}
-	if old, ok := t.m[addr]; ok && old == name {
-		return
 	}
 	t.m[addr] = name
 	t.changed()
@@ -135,33 +140,46 @@ func (t *A2STable) Has(addr uint64) bool {
 
 // Len returns the number of entries.
 func (t *A2STable) Len() int {
-	if t.m != nil {
+	if t.data == nil {
 		return len(t.m)
 	}
-	return int(t.count)
+	count := int(t.count)
+	for addr := range t.m {
+		if _, ok := t.getMapped(addr); !ok {
+			count++
+		}
+	}
+	return count
 }
 
-// Range iterates over all entries. If fn returns false, iteration stops.
+// Range iterates over the union in ascending address order, with additions
+// overriding mapped entries. If fn returns false, iteration stops.
 func (t *A2STable) Range(fn func(uint64, string) bool) {
-	if t.m != nil {
-		for addr, sym := range t.m {
+	additions := slices.Sorted(maps.Keys(t.m))
+	next := 0
+	for i := 0; t.data != nil && i < int(t.count); i++ {
+		off := a2sHeaderSize + i*a2sEntrySize
+		addr := binary.LittleEndian.Uint64(t.data[off:])
+		for next < len(additions) && additions[next] < addr {
+			key := additions[next]
+			if !fn(key, t.m[key]) {
+				return
+			}
+			next++
+		}
+		if next < len(additions) && additions[next] == addr {
+			if !fn(addr, t.m[addr]) {
+				return
+			}
+			next++
+		} else if sym, ok := t.stringAt(off); ok {
 			if !fn(addr, sym) {
 				return
 			}
 		}
-		return
 	}
-	if t.data == nil {
-		return
-	}
-	for i := 0; i < int(t.count); i++ {
-		off := a2sHeaderSize + i*a2sEntrySize
-		addr := binary.LittleEndian.Uint64(t.data[off:])
-		sym, ok := t.stringAt(off)
-		if !ok {
-			continue
-		}
-		if !fn(addr, sym) {
+	for _, addr := range additions[next:] {
+		if !fn(addr, t.m[addr]) {
 			return
 		}
 	}
@@ -174,6 +192,7 @@ func (t *A2STable) Close() error {
 	if t.data != nil {
 		err := a2sMunmap(t.data)
 		t.data = nil
+		t.count = 0
 		return err
 	}
 	return nil
@@ -181,8 +200,19 @@ func (t *A2STable) Close() error {
 
 // Save writes the table to w in binary format v2: sorted entries + null-terminated string table.
 func (t *A2STable) Save(w io.Writer) error {
-	if t.m == nil {
+	if t.m == nil && t.data == nil {
 		return fmt.Errorf("a2s: nothing to save")
+	}
+	names := t.m
+	if t.data != nil {
+		names = make(map[uint64]string, t.Len())
+		t.Range(func(addr uint64, name string) bool {
+			names[addr] = name
+			return true
+		})
+	}
+	if uint64(len(names)) > math.MaxUint32 {
+		return fmt.Errorf("a2s: too many entries")
 	}
 
 	type entry struct {
@@ -190,14 +220,20 @@ func (t *A2STable) Save(w io.Writer) error {
 		strOff uint32
 	}
 
-	strTabSize, err := a2sStringTableSize(t.m, math.MaxUint32)
+	strTabSize, err := a2sStringTableSize(names, math.MaxUint32)
 	if err != nil {
 		return err
 	}
-	entries := make([]entry, 0, len(t.m))
+	entries := make([]entry, 0, len(names))
 	strBuf := make([]byte, 0, strTabSize)
 
-	for addr, name := range t.m {
+	// Pack names lexically, breaking ties by address for deterministic offsets.
+	addresses := slices.Sorted(maps.Keys(names))
+	slices.SortStableFunc(addresses, func(a, b uint64) int {
+		return cmp.Compare(names[a], names[b])
+	})
+	for _, addr := range addresses {
+		name := names[addr]
 		entries = append(entries, entry{
 			addr:   addr,
 			strOff: uint32(len(strBuf)),
