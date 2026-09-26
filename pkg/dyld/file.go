@@ -128,9 +128,11 @@ type File struct {
 	// sortedImages is Images sorted by LoadAddress for O(log N) binary search
 	sortedImages []*CacheImage
 
-	imageSegmentsOnce sync.Once
-	imageSegments     []imageSegmentRange
-	imageSegmentsErr  error
+	imageSegmentsMu     sync.Mutex
+	imageSegmentsNext   int
+	imageSegmentsClosed bool
+	imageSegments       []imageSegmentRange
+	imageSegmentsErr    error
 }
 
 // maxEnd is the largest end through this entry. It bounds the backward search
@@ -290,10 +292,15 @@ func (f *File) openCacheMember(name string, want mtypes.UUID) (int64, error) {
 }
 
 // Close releases the address-to-symbol table, the string table copies held for
-// cache files that aren't mmap'd, the cached dylibs trie, and every mapping
-// Open created. A File built with NewFile owns no mappings, so Close releases
-// only the first three.
+// cache files that aren't mmap'd, the cached dylibs trie, the image segment
+// index, and every mapping Open created. A File built with NewFile owns no mappings.
 func (f *File) Close() error {
+	f.imageSegmentsMu.Lock()
+	defer f.imageSegmentsMu.Unlock()
+	f.imageSegments = nil
+	f.imageSegmentsNext = 0
+	f.imageSegmentsErr = nil
+	f.imageSegmentsClosed = true
 	var errs []error
 	if f.AddressToSymbol != nil {
 		if err := f.AddressToSymbol.Close(); err != nil {
@@ -2076,7 +2083,11 @@ func (f *File) GetImageContainingTextAddr(addr uint64) (*CacheImage, error) {
 
 // GetImageContainingVMAddr returns a dylib whose segment contains a given virtual address
 func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
-	f.imageSegmentsOnce.Do(f.buildImageSegmentIndex)
+	f.imageSegmentsMu.Lock()
+	defer f.imageSegmentsMu.Unlock()
+	if f.imageSegmentsClosed {
+		return nil, os.ErrClosed
+	}
 	idx := sort.Search(len(f.imageSegments), func(i int) bool {
 		return f.imageSegments[i].start > address
 	}) - 1
@@ -2094,22 +2105,27 @@ func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
 	if f.imageSegmentsErr != nil {
 		return nil, f.imageSegmentsErr
 	}
-	return nil, fmt.Errorf("address %#x not in any dylib", address)
-}
-
-func (f *File) buildImageSegmentIndex() {
-	for order, img := range f.Images {
+	// Only scan the unseen prefix needed by this lookup. Sort once after the
+	// batch, including on parse failure, so subsequent hits need no allocation.
+	if f.imageSegmentsNext < len(f.Images) {
+		defer f.sortImageSegmentIndex()
+	}
+	for f.imageSegmentsNext < len(f.Images) {
+		order := f.imageSegmentsNext
+		img := f.Images[order]
 		m, err := img.GetPartialMacho()
 		if err != nil {
 			// The old scan could still find an address in an earlier image.
 			// Keep that prefix and return this error only when it misses.
 			f.imageSegmentsErr = err
-			break
+			return nil, err
 		}
+		contains := false
 		for _, seg := range m.Segments() {
 			end := seg.Addr + seg.Memsz
 			// Empty and wrapping ranges cannot match FindSegmentForVMAddr.
 			if end > seg.Addr {
+				contains = contains || (address >= seg.Addr && address < end)
 				f.imageSegments = append(f.imageSegments, imageSegmentRange{
 					start: seg.Addr, end: end, image: img, order: order,
 				})
@@ -2118,7 +2134,15 @@ func (f *File) buildImageSegmentIndex() {
 		// GetPartialMacho caches m on the image. Match the old scan's Close
 		// calls without retaining Mach-O files or accumulating deferred closes.
 		m.Close()
+		f.imageSegmentsNext++
+		if contains {
+			return img, nil
+		}
 	}
+	return nil, fmt.Errorf("address %#x not in any dylib", address)
+}
+
+func (f *File) sortImageSegmentIndex() {
 	sort.Slice(f.imageSegments, func(i, j int) bool {
 		return f.imageSegments[i].start < f.imageSegments[j].start
 	})

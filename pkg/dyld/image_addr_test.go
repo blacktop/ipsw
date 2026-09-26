@@ -255,3 +255,53 @@ func TestImageContainingVMAddrTextPreservesLinearPrecedence(t *testing.T) {
 		}
 	})
 }
+
+func TestImageContainingVMAddrIncrementalClose(t *testing.T) {
+	image := func(start uint64) *CacheImage {
+		m := &macho.File{}
+		m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Addr: start, Memsz: 10}})
+		return &CacheImage{pm: m}
+	}
+	first, second := image(200), image(100)
+	f := &File{Images: cacheImages{first, second}}
+	f.Images = append(f.Images, &CacheImage{cache: f})
+	for i, tc := range []struct {
+		addr uint64
+		want *CacheImage
+		next int
+	}{
+		{200, first, 1},
+		{209, first, 1},
+		{100, second, 2},
+		{200, first, 2},
+	} {
+		got, err := f.GetImageContainingVMAddr(tc.addr)
+		if got != tc.want || err != nil || f.imageSegmentsNext != tc.next || len(f.imageSegments) != tc.next || f.imageSegmentsErr != nil {
+			t.Fatalf("step %d: got %p, %v; cursor=%d ranges=%d parse error=%v", i, got, err, f.imageSegmentsNext, len(f.imageSegments), f.imageSegmentsErr)
+		}
+	}
+	if _, err := f.GetImageContainingVMAddr(300); err == nil {
+		t.Fatal("expected parse error beyond collected prefix")
+	}
+	savedErr := f.imageSegmentsErr
+	// Replacing the malformed input must not retry a recorded parse failure.
+	f.Images[2] = image(300)
+	if _, err := f.GetImageContainingVMAddr(300); err != savedErr {
+		t.Fatalf("parse error changed: %v, want %v", err, savedErr)
+	}
+	if got, err := f.GetImageContainingVMAddr(200); got != first || err != nil {
+		t.Fatalf("collected hit after error: %p, %v", got, err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if f.imageSegments != nil || f.imageSegmentsNext != 0 || f.imageSegmentsErr != nil {
+		t.Fatal("Close retained segment index state")
+	}
+	if _, err := f.GetImageContainingVMAddr(200); err != os.ErrClosed {
+		t.Fatalf("lookup after Close: %v", err)
+	}
+	if f.imageSegments != nil {
+		t.Fatal("lookup rebuilt index after Close")
+	}
+}
