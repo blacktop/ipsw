@@ -92,7 +92,7 @@ func (b *File) Sys() any {
 }
 
 func (b *BOM) GetPaths() ([]os.FileInfo, error) {
-	paths, err := b.ReadTree("Paths")
+	trees, err := b.ReadTrees("Paths")
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (b *BOM) GetPaths() ([]os.FileInfo, error) {
 	parents := make(map[uint32]uint32)
 	filepaths := make(map[uint32]string)
 
-	for {
+	for _, paths := range trees {
 		for _, index := range paths.Indices {
 			var pinfo pathInfo
 			if err := binary.Read(index.ValueReader, binary.BigEndian, &pinfo); err != nil {
@@ -147,33 +147,6 @@ func (b *BOM) GetPaths() ([]os.FileInfo, error) {
 			fileInfo = append(fileInfo, f)
 		}
 
-		if paths.Forward == 0 {
-			break
-		} else {
-			paths, err = b.readTree(paths.Forward)
-			if err != nil {
-				return nil, err
-			}
-			paths.Indices = make([]TreeIndex, paths.Count)
-			for i := uint16(0); i < paths.Count; i++ {
-				var ti TreeIndex
-				if err := binary.Read(paths.r, binary.BigEndian, &ti.Value); err != nil {
-					return nil, err
-				}
-				if err := binary.Read(paths.r, binary.BigEndian, &ti.Key); err != nil {
-					return nil, err
-				}
-				ti.KeyReader, err = b.blockReader(ti.Key)
-				if err != nil {
-					return nil, err
-				}
-				ti.ValueReader, err = b.blockReader(ti.Value)
-				if err != nil {
-					return nil, err
-				}
-				paths.Indices[i] = ti
-			}
-		}
 	}
 
 	return fileInfo, nil

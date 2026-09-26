@@ -9,7 +9,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"os"
+	"io"
 
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-termimg"
@@ -58,54 +58,6 @@ func (s CSISignature) String() string {
 	default:
 		return fmt.Sprintf("unknown(%#x)", uint32(s))
 	}
-}
-
-type renditionFlags uint32
-
-func (f renditionFlags) IsVectorBased() bool {
-	return types.ExtractBits(uint64(f), 0, 1) == 1
-}
-func (f renditionFlags) IsOpaque() bool {
-	return types.ExtractBits(uint64(f), 1, 1) == 1
-}
-func (f renditionFlags) BitmapEncoding() compressionType {
-	return compressionType(types.ExtractBits(uint64(f), 2, 4))
-}
-func (f renditionFlags) OptOutOfThinning() bool {
-	return types.ExtractBits(uint64(f), 6, 1) == 1
-}
-func (f renditionFlags) IsFlippable() bool {
-	return types.ExtractBits(uint64(f), 7, 1) == 1
-}
-func (f renditionFlags) IsTintable() bool {
-	return types.ExtractBits(uint64(f), 8, 1) == 1
-}
-func (f renditionFlags) PreservedVectorRepresentation() bool {
-	return types.ExtractBits(uint64(f), 9, 1) == 1
-}
-func (f renditionFlags) PreserveForArchiveOnly() bool {
-	return types.ExtractBits(uint64(f), 10, 1) == 1
-}
-func (f renditionFlags) String() string {
-	return fmt.Sprintf(
-		"Flags:\n"+
-			"  is_vector_based:                 %t\n"+
-			"  is_opaque:                       %t\n"+
-			"  bitmap_encoding:                 %s\n"+
-			"  opt_out_of_thinning:             %t\n"+
-			"  is_flippable:                    %t\n"+
-			"  is_tintable:                     %t\n"+
-			"  preserved_vector_representation: %t\n"+
-			"  preserve_for_archive_only:       %t",
-		f.IsVectorBased(),
-		f.IsOpaque(),
-		f.BitmapEncoding(),
-		f.OptOutOfThinning(),
-		f.IsFlippable(),
-		f.IsTintable(),
-		f.PreservedVectorRepresentation(),
-		f.PreserveForArchiveOnly(),
-	)
 }
 
 type colorSpaceID uint32
@@ -232,6 +184,9 @@ func (s *sliceResource) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(r, binary.LittleEndian, &s.NumSlices); err != nil {
 		return fmt.Errorf("failed to read NumSlices: %w", err)
 	}
+	if uint64(s.NumSlices)*16 > uint64(r.Len()) {
+		return fmt.Errorf("NumSlices exceeds resource data")
+	}
 	s.Slices = make([]struct {
 		X, Y          uint32
 		Width, Height uint32
@@ -256,6 +211,9 @@ func (s *sampleResource) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(r, binary.LittleEndian, &s.NumSamples); err != nil {
 		return fmt.Errorf("failed to read NumSamples: %w", err)
 	}
+	if uint64(s.NumSamples)*4 > uint64(r.Len()) {
+		return fmt.Errorf("NumSamples exceeds resource data")
+	}
 	s.Samples = make([]struct {
 		A, R, G, B uint8
 	}, s.NumSamples)
@@ -278,6 +236,9 @@ func (m *metricsResource) UnmarshalBinary(data []byte) error {
 	r := bytes.NewReader(data)
 	if err := binary.Read(r, binary.LittleEndian, &m.NumMetrics); err != nil {
 		return fmt.Errorf("failed to read NumMetrics: %w", err)
+	}
+	if uint64(m.NumMetrics)*24 > uint64(r.Len()) {
+		return fmt.Errorf("NumMetrics exceeds resource data")
 	}
 	m.Metrics = make([]struct {
 		LeftInset, TopInset, RightInset, BottomInset int32
@@ -323,6 +284,9 @@ func (l *layerResource) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(r, binary.LittleEndian, &l.Flags); err != nil {
 		return fmt.Errorf("failed to read Flags: %w", err)
 	}
+	if uint64(l.NumLayers)*32 > uint64(r.Len()) {
+		return fmt.Errorf("NumLayers exceeds resource data")
+	}
 	l.Layers = make([]struct {
 		Flags csiLayerReferenceFlags
 		Frame struct {
@@ -350,8 +314,11 @@ func (l *layerResource) UnmarshalBinary(data []byte) error {
 		if err := binary.Read(r, binary.LittleEndian, &l.Layers[i].Length); err != nil {
 			return fmt.Errorf("failed to read Length for layer %d: %w", i, err)
 		}
+		if uint64(l.Layers[i].Length) > uint64(r.Len()) {
+			return fmt.Errorf("layer %d data exceeds resource", i)
+		}
 		l.Layers[i].Data = make([]byte, l.Layers[i].Length)
-		if _, err := r.Read(l.Layers[i].Data); err != nil {
+		if _, err := io.ReadFull(r, l.Layers[i].Data); err != nil {
 			return fmt.Errorf("failed to read Data for layer %d: %w", i, err)
 		}
 	}
@@ -383,8 +350,11 @@ func (m *metadataResource) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(r, binary.LittleEndian, &m.Flags); err != nil {
 		return fmt.Errorf("failed to read Flags: %w", err)
 	}
+	if uint64(m.Length) > uint64(r.Len()) {
+		return fmt.Errorf("metadata length exceeds resource data")
+	}
 	m.Data = make([]byte, m.Length)
-	if _, err := r.Read(m.Data); err != nil {
+	if _, err := io.ReadFull(r, m.Data); err != nil {
 		return fmt.Errorf("failed to read Data: %w", err)
 	}
 	return nil
@@ -460,52 +430,10 @@ const (
 	CUIPSDGradientStyleInvalid CUIPSDGradientStyle = 0
 )
 
-type csigradientdata struct {
-	Signature            [4]byte // CsiGradientSignature
-	Flags                CSIGradientDataFlags
-	Length               uint32
-	Style                CUIPSDGradientStyle
-	Version              uint32
-	BlendMode            uint32
-	FillRed              float64
-	FillGreen            float64
-	FillBlue             float64
-	FillAlpha            float64
-	Angle                float64 // only valid if style is CUIPSDGradientStyleSweep
-	Smoothing            float64 // only valid if style is CUIPSDGradientStyleLinear or CUIPSDGradientStyleRadial
-	ColorStopCount       uint32
-	ColorMidpointCount   uint32
-	OpacityStopCount     uint32
-	OpacityMidpointCount uint32
-	// NodeList             []uint8
-}
-
-// TODO: this is probably wrong
-type gradientStartStops struct {
-	Start float32
-	Stop  float32
-}
-
-// TODO: this is probably wrong
-type gradientStop struct {
-	Stop       float32
-	NameLength uint32
-	Name       []byte
-}
-
-type csiNamedGradient struct {
-	Signature  [4]byte // 'GGRA'
-	ColorCount uint32
-	Type       uint64
-	StartStops []gradientStartStops
-	Stops      []gradientStop
-}
-
 type csiSystemColorName struct {
 	Signature [4]byte // CsiColorSignature
 	Version   uint32
 	Length    uint32
-	Name      []byte
 }
 
 type csiMultiImgSetImageSize struct {
@@ -519,13 +447,6 @@ type csiMultisizeImageSet struct {
 	Version     uint32
 	NImageSizes uint32
 	ImageSizes  []csiMultiImgSetImageSize
-}
-
-type csiExternaLinkData struct {
-	Signature          [4]byte // CsiExternalLinkSignature
-	Flags              uint32
-	NumberExternalTags uint32
-	ElementList        []byte // TODO: how to parse this?
 }
 
 type linkRect struct {
@@ -545,7 +466,9 @@ type csiInternalLinkData struct {
 }
 
 func (l *csiInternalLinkData) UnmarshalBinary(r *bytes.Reader) error {
-	if err := binary.Read(r, binary.LittleEndian, &l.Signature); err != nil {
+	// As with the CSI header, the four-character signature is stored reversed
+	// on disk ("KLNI"); the remaining numeric fields are little-endian.
+	if err := binary.Read(r, binary.BigEndian, &l.Signature); err != nil {
 		return fmt.Errorf("failed to read Signature: %w", err)
 	}
 	if l.Signature != CsiInternalLinkSignature {
@@ -563,8 +486,11 @@ func (l *csiInternalLinkData) UnmarshalBinary(r *bytes.Reader) error {
 	if err := binary.Read(r, binary.LittleEndian, &l.Length); err != nil {
 		return fmt.Errorf("failed to read Length: %w", err)
 	}
+	if l.Length%4 != 0 || uint64(l.Length) > uint64(r.Len()) {
+		return fmt.Errorf("invalid internal reference token length: %d (available %d)", l.Length, r.Len())
+	}
 	data := make([]byte, l.Length)
-	if _, err := r.Read(data); err != nil {
+	if _, err := io.ReadFull(r, data); err != nil {
 		return fmt.Errorf("failed to read ReferenceData: %w", err)
 	}
 	l.Reference = make([]renditionAttribute, len(data)/binary.Size(renditionAttribute{}))
@@ -576,33 +502,6 @@ func (l *csiInternalLinkData) UnmarshalBinary(r *bytes.Reader) error {
 	}
 	return nil
 }
-
-type originalSize struct {
-	Width  uint32
-	Height uint32
-}
-
-type alphaCropFrame struct {
-	X      uint32
-	Y      uint32
-	Width  uint32
-	Height uint32
-}
-
-type csiAlphaCroppingData struct {
-	Signature      [4]byte // ?
-	Flags          uint32
-	OriginalSize   originalSize
-	alphaCropFrame alphaCropFrame
-}
-
-type mipLevelReference struct {
-	Length        uint32 // length in bytes of token list, including null terminator
-	Flags         uint32 // 0
-	ReferenceData []byte // renditionAttribute token list referencing texture image
-}
-
-type cuiThemeTexturePixelFormat uint32
 
 const (
 	ThemeTexturePixelFormatInvalid        = 0
@@ -641,38 +540,10 @@ const (
 	ThemeTexturePixelFormatAstc_8x8Ldr    = 212
 )
 
-type cuiThemeTextureType uint16
-
 const (
 	ThemeTextureType2D   = 1
 	ThemeTextureTypeCube = 5
 )
-
-type csiTextureData struct {
-	Signature     [4]byte // CsiTextureDataSignature
-	Flags         uint32
-	TextureFormat cuiThemeTexturePixelFormat
-	TextureDepth  uint32 //  1
-	ArrayLength   uint32 //  1
-	TextureType   cuiThemeTextureType
-	MipLevelCount uint16
-	MipReferences []mipLevelReference
-}
-
-type csiEffectlist struct {
-	Count       uint32
-	AccumLength []uint32
-}
-
-type csiEffectData struct {
-	Signature   [4]byte // CsiEffectDataSignature
-	Version     uint32
-	Flags       uint32
-	_           uint32
-	EffectIndex csiEffectlist
-}
-
-type cuiShapeEffectType [4]byte
 
 const ( // TODO: convert these into uint32 ?
 	ShapeEffectColorFill     = `Colr`
@@ -705,17 +576,6 @@ const (
 	EffectParameterBevelStyle
 )
 
-type csiEffectParameter struct {
-	Name  cuiShapeEffectParameter
-	Value any // can be float64, uint32 enum, uint16 angle (-180 to 180), or rgb color
-}
-
-type csiEffectParameterBlock struct {
-	Type           cuiShapeEffectType
-	ParameterCount uint32
-	Parameters     []csiEffectParameter
-}
-
 func alpha(f float64) uint8 {
 	if f >= 1 {
 		return 255
@@ -743,23 +603,4 @@ func colorInTerminal(c color.RGBA) (string, error) {
 	}
 
 	return ti.Render()
-}
-
-func createColorPNG(name string, c color.RGBA) error {
-	colorFile, err := os.Create(name)
-	if err != nil {
-		return fmt.Errorf("failed to create color.png file: %v", err)
-	}
-	width := 250
-	height := 250
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	for y := range height {
-		for x := range width {
-			img.SetRGBA(x, y, c)
-		}
-	}
-	if err := png.Encode(colorFile, img); err != nil {
-		return fmt.Errorf("failed to encode color.png file: %v", err)
-	}
-	return nil
 }

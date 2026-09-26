@@ -5,20 +5,20 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"image"
 	"image/color"
-	"image/png"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/go-termimg"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bom"
+	"github.com/blacktop/ipsw/pkg/car/internal/compression"
+	"github.com/blacktop/ipsw/pkg/car/internal/pixel"
+	"github.com/blacktop/ipsw/pkg/car/internal/render"
 )
 
 // NOTES:
@@ -30,6 +30,13 @@ type Config struct {
 	Output  string
 	Export  bool
 	Verbose bool
+	// MetadataOnly inventories renditions without decoding or exporting pixels.
+	MetadataOnly     bool
+	Query            *VariantQuery
+	Render           bool
+	Raw              bool
+	ApplyOrientation bool
+	ASTCDecoder      string
 }
 
 type Asset struct {
@@ -48,18 +55,24 @@ type Asset struct {
 	Globals       []byte // bplist data
 	Localizations map[string]uint32
 
-	conf *Config
+	UnknownBlocks []OpaqueBlock
+	Diagnostics   []CatalogDiagnostic
+
+	conf               *Config
+	selectionReady     bool
+	retainedBlockBytes int
 }
 
 func (a *Asset) GetName(id uint16) string {
+	var name string
 	for k, v := range a.FacetKeyDB {
 		for _, attr := range v.Attributes {
-			if attr.Name == uint16(Identifier) && attr.Value == id {
-				return k
+			if attr.Name == uint16(Identifier) && attr.Value == id && (name == "" || k < name) {
+				name = k
 			}
 		}
 	}
-	return ""
+	return name
 }
 
 func (a *Asset) GetFaceKey(id uint16) (*renditionKeyToken, error) {
@@ -243,6 +256,26 @@ type Rendition struct {
 	Attributes    map[string]uint16
 	Resources     []csiResource
 	Asset         any
+	// Key contains every RENDITIONS key value, including values beyond KEYFORMAT.
+	Key          []uint16
+	PixelFormat  string
+	DecodeError  error
+	ResolveError error
+	ExportError  error
+	ExportPath   string
+	Width        uint32
+	Height       uint32
+	Scale        uint32 // CSI scale factor: 100 is 1x.
+	Compression  string
+	Orientation  uint32
+	ColorSpace   colorSpaceID
+	Selected     bool
+	Deferred     bool
+	Warnings     []string
+	link         *csiInternalLinkData
+	header       csiHeader
+	payload      []byte
+	rawCSI       []byte
 }
 
 func (r Rendition) ID() uint16 {
@@ -277,11 +310,17 @@ func Parse(name string, conf *Config) (*Asset, error) {
 	}
 	modeTime := fi.ModTime().Local().Unix()
 
+	if err := validateCatalogBOM(f, fi.Size()); err != nil {
+		return nil, fmt.Errorf("invalid CAR BOM: %w", err)
+	}
 	bm, err := bom.New(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse BOM file: %v", err)
 	}
 
+	if conf == nil {
+		conf = &Config{}
+	}
 	a := Asset{conf: conf}
 
 	a.AppearanceDB = make(map[string]uint16)
@@ -294,41 +333,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 		utils.Indent(log.Debug, 2)("Blocks/Trees: " + strings.Join(bm.BlockNames(), ", "))
 	}
 
-	saved := make(map[string]int)
-	// helpers for unique naming and saving outputs
-	uniqName := func(base, ext string) string {
-		name := base
-		if _, ok := saved[name]; ok {
-			saved[name] += 1
-			name += fmt.Sprintf("_%d", saved[name])
-		} else {
-			saved[name] = 0
-		}
-		if len(ext) > 0 && !strings.HasSuffix(strings.ToLower(name), strings.ToLower(ext)) {
-			name += ext
-		}
-		return name
-	}
-	saveBytes := func(base, ext string, data []byte) error {
-		if a.conf == nil || !a.conf.Export || len(a.conf.Output) == 0 {
-			return nil
-		}
-		fname := uniqName(base, ext)
-		return os.WriteFile(filepath.Join(a.conf.Output, fname), data, 0o644)
-	}
-	savePNG := func(base string, img image.Image) error {
-		if a.conf == nil || !a.conf.Export || len(a.conf.Output) == 0 {
-			return nil
-		}
-		fname := uniqName(base, ".png")
-		f, err := os.Create(filepath.Join(a.conf.Output, fname))
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		return png.Encode(f, img)
-	}
-
+	hasRenditions := false
 	for _, v := range bm.Vars {
 		switch v.Name {
 		/**********
@@ -393,41 +398,39 @@ func Parse(name string, conf *Config) (*Asset, error) {
 					}
 				}
 			}
-		case "EXTERNAL_KEYS":
-			log.Error("BOM block EXTERNAL_KEYS parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
+		case "EXTERNAL_KEYS", "BEZELS", "ELEMENT_INFO", "FONTS", "FONTSIZES", "GLYPHS", "PART_INFO":
+			if err := a.retainBlock(bm, v.Name, "known optional block is not interpreted"); err != nil {
+				return nil, err
+			}
 		/*********
 		 * TREES *
 		 *********/
 		case "APPEARANCEKEYS":
-			tree, err := bm.ReadTree("APPEARANCEKEYS")
+			trees, err := bm.ReadTrees("APPEARANCEKEYS")
 			if err != nil {
 				return nil, fmt.Errorf("failed to read APPEARANCEKEYS tree: %v", err)
 			}
-			for _, item := range tree.Indices {
-				key, err := io.ReadAll(item.KeyReader)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read key for APPEARANCEKEYS: %v", err)
+			for _, tree := range trees {
+				for _, item := range tree.Indices {
+					key, err := io.ReadAll(item.KeyReader)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read key for APPEARANCEKEYS: %v", err)
+					}
+					var value uint16
+					if err := binary.Read(item.ValueReader, binary.LittleEndian, &value); err != nil {
+						return nil, fmt.Errorf("failed to read value for key %s: %v", string(key), err)
+					}
+					a.AppearanceDB[string(key)] = value
 				}
-				var value uint16
-				if err := binary.Read(item.ValueReader, binary.LittleEndian, &value); err != nil {
-					return nil, fmt.Errorf("failed to read value for key %s: %v", string(key), err)
-				}
-				a.AppearanceDB[string(key)] = value
 			}
-		case "BEZELS":
-			log.Error("BOM tree BEZELS not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
 		case "BITMAPKEYS":
 			// NOTE: /System/Library/PrivateFrameworks/ChatKit.framework/Assets.car is SUPER weird (keys are many different types)
-			tree, err := bm.ReadTree("BITMAPKEYS")
+			trees, err := bm.ReadTrees("BITMAPKEYS")
 			if err != nil {
 				return nil, fmt.Errorf("failed to read BITMAPKEYS tree: %v", err)
 			}
-			for _, item := range tree.Indices {
-				if a.conf.Verbose {
-					if err := dumpTreeIndice("BITMAPKEYS", item); err != nil {
-						return nil, fmt.Errorf("failed to dump BITMAPKEYS tree indice: %v", err)
-					}
-				} else {
+			for _, tree := range trees {
+				for _, item := range tree.Indices {
 					value, err := io.ReadAll(item.ValueReader)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read BITMAPKEYS value: %v", err)
@@ -436,6 +439,12 @@ func Parse(name string, conf *Config) (*Asset, error) {
 					keyData, err := io.ReadAll(item.KeyReader)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read BITMAPKEYS key data: %v", err)
+					}
+					if a.conf.Verbose {
+						item.KeyReader, item.ValueReader = bytes.NewReader(keyData), bytes.NewReader(value)
+						if err := dumpTreeIndice("BITMAPKEYS", item); err != nil {
+							return nil, fmt.Errorf("failed to dump BITMAPKEYS tree indice: %v", err)
+						}
 					}
 					switch {
 					case len(keyData) == 0:
@@ -478,46 +487,39 @@ func Parse(name string, conf *Config) (*Asset, error) {
 					}
 				}
 			}
-		case "ELEMENT_INFO":
-			log.Error("BOM tree ELEMENT_INFO parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
 		case "FACETKEYS":
 			if err := a.parseFacetKeys(bm); err != nil {
 				return nil, fmt.Errorf("failed to parse FACETKEYS trees: %v", err)
 			}
-		case "FONTS":
-			log.Error("BOM tree FONTS parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
-		case "FONTSIZES":
-			log.Error("BOM tree FONTSIZES parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
-		case "GLYPHS":
-			log.Error("BOM tree GLYPHS parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
 		case "LOCALIZATIONKEYS":
-			tree, err := bm.ReadTree("LOCALIZATIONKEYS")
+			trees, err := bm.ReadTrees("LOCALIZATIONKEYS")
 			if err != nil {
 				return nil, fmt.Errorf("failed to read LOCALIZATIONKEYS tree: %v", err)
 			}
-			for _, item := range tree.Indices {
-				key, err := io.ReadAll(item.KeyReader)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read LOCALIZATIONKEYS key: %v", err)
+			for _, tree := range trees {
+				for _, item := range tree.Indices {
+					key, err := io.ReadAll(item.KeyReader)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read LOCALIZATIONKEYS key: %v", err)
+					}
+					valueData, err := io.ReadAll(item.ValueReader)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read LOCALIZATIONKEYS value data: %v", err)
+					}
+					var value uint32
+					switch len(valueData) {
+					case 2:
+						value = uint32(binary.LittleEndian.Uint16(valueData))
+					case 4:
+						value = binary.LittleEndian.Uint32(valueData)
+					default:
+						return nil, fmt.Errorf("failed to read LOCALIZATIONKEYS value: %v; data=\n%s", err, hex.Dump(valueData))
+					}
+					a.Localizations[string(key)] = uint32(value)
 				}
-				valueData, err := io.ReadAll(item.ValueReader)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read LOCALIZATIONKEYS value data: %v", err)
-				}
-				var value uint32
-				switch len(valueData) {
-				case 2:
-					value = uint32(binary.LittleEndian.Uint16(valueData))
-				case 4:
-					value = binary.LittleEndian.Uint32(valueData)
-				default:
-					return nil, fmt.Errorf("failed to read LOCALIZATIONKEYS value: %v; data=\n%s", err, hex.Dump(valueData))
-				}
-				a.Localizations[string(key)] = uint32(value)
 			}
-		case "PART_INFO":
-			log.Error("BOM tree PART_INFO parsing not implemented yet - please open an issue on github.com/blacktop/ipsw/issues")
 		case "RENDITIONS":
+			hasRenditions = true
 			if err := a.parseKeyFormat(bm); err != nil {
 				return nil, fmt.Errorf("failed to parse asset KeyFormat %v", err)
 			}
@@ -527,386 +529,278 @@ func Parse(name string, conf *Config) (*Asset, error) {
 			}
 			for _, tree := range rtrees {
 				for _, item := range tree.Indices {
-					rend := Rendition{
-						Attributes: make(map[string]uint16),
-					}
-					// parse key data
-					keyData, err := io.ReadAll(item.KeyReader)
+					keyData, err := compression.ReadLimited(item.KeyReader, 2*65536)
 					if err != nil {
-						return nil, fmt.Errorf("failed to read 'RENDITIONS' key data: %v", err)
+						return nil, fmt.Errorf("read rendition key: %w", err)
 					}
-					attrs := make([]uint16, len(keyData)/binary.Size(uint16(0)))
-					if err := binary.Read(bytes.NewReader(keyData), binary.LittleEndian, &attrs); err != nil {
-						return nil, fmt.Errorf("failed to read 'RENDITIONS' key attributes: %v", err)
-					}
-					for idx, k := range a.KeyFormat {
-						rend.Attributes[k.String()] = attrs[idx]
-					}
-					// TODO: this might be wasteful if we don't need to read the whole thing
-					// parse value data
-					vdata, err := io.ReadAll(item.ValueReader)
+					vdata, err := compression.ReadLimited(item.ValueReader, pixel.MaxBytes)
 					if err != nil {
-						return nil, fmt.Errorf("failed to read 'RENDITIONS' value data: %v", err)
+						return nil, fmt.Errorf("read rendition value: %w", err)
 					}
-					vr := bytes.NewReader(vdata)
-					cheader, err := readCSIFileHeader(vr)
+					rend, err := a.parseRendition(keyData, vdata)
 					if err != nil {
-						return nil, fmt.Errorf("failed to read 'RENDITIONS' csiHeader: %v", err)
+						return nil, err
 					}
-					resourceData := make([]byte, cheader.ChainSize)
-					if _, err := vr.Read(resourceData); err != nil {
-						return nil, fmt.Errorf("failed to read 'RENDITIONS' resource data: %v", err)
-					}
-					rr := bytes.NewReader(resourceData)
-					for rr.Len() > 0 {
-						var rsc csiResource
-						if err := binary.Read(rr, binary.LittleEndian, &rsc.ID); err != nil {
-							return nil, fmt.Errorf("failed to read 'RENDITIONS' resource ID: %v", err)
-						}
-						if err := binary.Read(rr, binary.LittleEndian, &rsc.Length); err != nil {
-							return nil, fmt.Errorf("failed to read 'RENDITIONS' resource length: %v", err)
-						}
-						rsc.Data = make([]byte, rsc.Length)
-						if _, err := rr.Read(rsc.Data); err != nil {
-							return nil, fmt.Errorf("failed to read 'RENDITIONS' resource data: %v", err)
-						}
-						rend.Resources = append(rend.Resources, rsc)
-					}
-
-					if rendName, _, ok := bytes.Cut(cheader.Metadata.Name[:], []byte{0}); ok {
-						rend.RenditionName = string(rendName)
-					} else {
-						rend.RenditionName = string(bytes.TrimRight(cheader.Metadata.Name[:], "\x00"))
-					}
-					if len(rend.RenditionName) == 0 {
-						rend.RenditionName = "CoreStructuredImage"
-					}
-					rend.Type = cheader.Metadata.Layout.String()
-					rend.Size = int(cheader.ImageIndex.AccumLength[len(cheader.ImageIndex.AccumLength)-1])
-
-					if vr.Len() > 0 {
-						pixelFormat := string(utils.ReverseBytes(cheader.PixelFormat[:]))
-						// log.WithFields(log.Fields{
-						// 	"rendition":   rend.RenditionName,
-						// 	"pixelFormat": pixelFormat,
-						// }).Info("RENDITION pixel format")
-						switch pixelFormat {
-						case PixFmtARGB, PixFmtARGB16, PixFmtRGB555, PixFmtGray, PixFmtGray16:
-							rend.Type = fmt.Sprintf("Image (%s)", cheader.Metadata.Layout.String())
-							if a.conf.Verbose {
-								log.WithFields(log.Fields{
-									"rendition": rend.RenditionName,
-									"layout":    cheader.Metadata.Layout,
-								}).Debug("IMAGE layout")
-							}
-							switch cheader.Metadata.Layout {
-							case PackedImage:
-								// 	// PackedImage has a special structure - the image data is embedded differently
-								// 	// For now, log that it's a packed image and skip decoding
-								// 	log.Debugf("PackedImage layout for %s - special handling needed", rend.RenditionName)
-								// 	// Store the raw data as the asset
-								// 	data, err := io.ReadAll(vr)
-								// 	if err != nil {
-								// 		return nil, fmt.Errorf("failed to read PackedImage data: %v", err)
-								// 	}
-								// 	er := bytes.NewReader(data)
-								// 	var elem csiElement
-								// 	if err := binary.Read(er, binary.LittleEndian, &elem); err != nil {
-								// 		return nil, fmt.Errorf("failed to read PackedImage element: %v", err)
-								// 	}
-								// 	if elem.Signature != [4]byte{'M', 'L', 'E', 'C'} { // 'MLEC'
-								// 		return nil, fmt.Errorf("invalid PackedImage signature: %s", elem.Signature)
-								// 	}
-								// 	edata := make([]byte, elem.Length)
-								// 	if _, err := io.ReadFull(er, edata); err != nil {
-								// 		return nil, fmt.Errorf("failed to read LZFSE PackedImage data: %v", err)
-								// 	}
-								// 	switch elem.Encoding {
-								// 	case RLE:
-								// 		rend.Asset = decodeRLE(edata)
-								// 	case LZFSE:
-								// 		decompressedData, err := comp.Decompress(edata, comp.LZFSE)
-								// 		if err != nil {
-								// 			return nil, fmt.Errorf("failed to decompress LZFSE PackedImage data: %v", err)
-								// 		}
-								// 		rend.Asset = decompressedData
-								// 	default:
-								// 		log.WithField("encoding", elem.Encoding).Warnf("Unsupported PackedImage encoding for %s", rend.RenditionName)
-								// 		rend.Asset = edata
-								// 	}
-								// TODO: handle other layout special cases
-								log.WithField("layout", cheader.Metadata.Layout).Debugf("Unsupported PackedImage layout for %s", rend.RenditionName)
-								fallthrough
-							default:
-								// Extract optional ImageRowBytes from resources for correct stride
-								var rowBytes uint32
-								for _, rsc := range rend.Resources {
-									if rsc.ID == ImageRowBytesID && len(rsc.Data) >= 4 {
-										_ = binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &rowBytes)
-										break
-									}
-								}
-								img, err := decodeImage(vr, *cheader, conf, int(rowBytes))
-								if err != nil {
-									if a.conf.Verbose {
-										log.Errorf("failed to decode image '%s': %v; data:\n%s", rend.RenditionName, err, hex.Dump(vdata))
-									} else {
-										log.Errorf("failed to decode image '%s': %v", rend.RenditionName, err)
-									}
-									// return nil, err
-								}
-								if img != nil && err == nil {
-									if err := savePNG(rend.RenditionName, img); err != nil {
-										return nil, err
-									}
-									if a.conf.Verbose {
-										// display image in terminal
-										log.Debug(rend.RenditionName)
-										var dat bytes.Buffer
-										buf := bufio.NewWriter(&dat)
-										if err := png.Encode(buf, img); err != nil {
-											return nil, err
-										}
-										buf.Flush()
-										ti, err := termimg.From(bytes.NewReader(dat.Bytes()))
-										if err != nil {
-											return nil, fmt.Errorf("failed to create termimg from image: %v", err)
-										}
-										if err := ti.Print(); err != nil {
-											return nil, fmt.Errorf("failed to print termimg: %v", err)
-										}
-									}
-									rend.Asset = img
-								}
-							}
-						case PixFmtPDF:
-							rend.Type = "PDF"
-							// Read PDF data
-							pdfData, err := io.ReadAll(vr)
-							if err != nil {
-								log.Errorf("failed to read PDF data: %v", err)
-							} else {
-								// Store raw PDF data as asset
-								rend.Asset = pdfData
-								if err := saveBytes(rend.RenditionName, ".pdf", pdfData); err != nil {
-									return nil, err
-								}
-							}
-						case PixFmtJPEG:
-							rend.Type = "JPEG"
-							// Read JPEG data
-							jpegData, err := io.ReadAll(vr)
-							if err != nil {
-								log.Errorf("failed to read JPEG data: %v", err)
-							} else {
-								// Store raw JPEG data as asset
-								rend.Asset = jpegData
-								if err := saveBytes(rend.RenditionName, ".jpg", jpegData); err != nil {
-									return nil, err
-								}
-							}
-						case PixFmtHEIF:
-							rend.Type = "HEIF"
-							// Read HEIF data
-							heifData, err := io.ReadAll(vr)
-							if err != nil {
-								log.Errorf("failed to read HEIF data: %v", err)
-							} else {
-								// Store raw HEIF data as asset
-								rend.Asset = heifData
-								if err := saveBytes(rend.RenditionName, ".heic", heifData); err != nil {
-									return nil, err
-								}
-							}
-						case PixFmtRawData:
-							rend.Type = "Data"
-							var rawd csiRawData
-							if err := binary.Read(vr, binary.LittleEndian, &rawd.Signature); err != nil {
-								return nil, fmt.Errorf("failed to read rendition raw data signature: %v", err)
-							}
-							if rawd.Signature != [4]byte{'D', 'W', 'A', 'R'} { // 'RAWD'
-								return nil, fmt.Errorf("invalid rendition raw data signature: %s", rawd.Signature)
-							}
-							if err := binary.Read(vr, binary.LittleEndian, &rawd.Flags); err != nil {
-								return nil, fmt.Errorf("failed to read rendition raw data flags: %v", err)
-							}
-							if err := binary.Read(vr, binary.LittleEndian, &rawd.Length); err != nil {
-								return nil, fmt.Errorf("failed to read rendition raw data length: %v", err)
-							}
-							if rawd.Length != uint32(vr.Len()) {
-								return nil, fmt.Errorf("rendition raw data length mismatch: expected %d, got %d", rawd.Length, vr.Len())
-							}
-							if rawd.Length > 0 {
-								if a.conf != nil && a.conf.Export && len(a.conf.Output) > 0 {
-									data := make([]byte, rawd.Length)
-									if _, err := vr.Read(data); err != nil {
-										return nil, fmt.Errorf("failed to read rendition raw data: %v", err)
-									}
-									fname := a.GetName(rend.ID())
-									if len(fname) == 0 {
-										fname = rend.RenditionName + ".raw"
-									}
-									if err := os.WriteFile(filepath.Join(a.conf.Output, fname), data, 0644); err != nil {
-										return nil, err
-									}
-								}
-							}
-						case "\x00\x00\x00\x00":
-							// log.WithFields(log.Fields{
-							// 	"name":   rend.RenditionName,
-							// 	"name2":  string(bytes.Trim(cheader.Metadata.Name[:], "\x00")),
-							// 	"layout": cheader.Metadata.Layout,
-							// }).Info("RENDITION layout")
-							switch cheader.Metadata.Layout {
-							case OnePart, ThreePartHorizontal, ThreePartVertical, NinePart, TwelvePart, ManyPart:
-								fallthrough
-							case Gradient:
-								fallthrough
-							case Effect:
-								fallthrough
-							case Animation:
-								fallthrough
-							case Vector:
-								fallthrough
-							case IconImage:
-								fallthrough
-							case RawData:
-								fallthrough
-							case ExternalLink:
-								fallthrough
-							case ImageStack:
-								log.Errorf("RENDITION layout %s not supported yet - please open an issue on github.com/blacktop/ipsw/issues", cheader.Metadata.Layout)
-							case InternalLink:
-								var ilink csiInternalLinkData
-								if err := ilink.UnmarshalBinary(vr); err != nil {
-									return nil, fmt.Errorf("failed to parse rendition internal link: %v", err)
-								}
-								rend.Asset = ilink
-							case PackedImage:
-								fallthrough
-							case NamedContents:
-								fallthrough
-							case ThinningPlaceholder:
-								fallthrough
-							case TextureRendition:
-								fallthrough
-							case TextureImage:
-								log.Errorf("RENDITION layout %s not supported yet - please open an issue on github.com/blacktop/ipsw/issues", cheader.Metadata.Layout)
-							case Color:
-								var c csiColor
-								if err := binary.Read(vr, binary.LittleEndian, &c.Signature); err != nil {
-									return nil, fmt.Errorf("failed to read rendition color signature: %v", err)
-								}
-								if err := binary.Read(vr, binary.LittleEndian, &c.Version); err != nil {
-									return nil, fmt.Errorf("failed to read rendition color version: %v", err)
-								}
-								if err := binary.Read(vr, binary.LittleEndian, &c.Info); err != nil {
-									return nil, fmt.Errorf("failed to read rendition color info: %v", err)
-								}
-								if err := binary.Read(vr, binary.LittleEndian, &c.NumberOfComponents); err != nil {
-									return nil, fmt.Errorf("failed to read rendition color number of components: %v", err)
-								}
-								c.Components = make([]float64, c.NumberOfComponents)
-								if err := binary.Read(vr, binary.LittleEndian, &c.Components); err != nil {
-									return nil, fmt.Errorf("failed to read rendition color components: %v", err)
-								}
-								if c.Info.ColorType() == SystemColorFollows {
-									var sysc csiSystemColorName
-									if err := binary.Read(vr, binary.LittleEndian, &sysc.Signature); err != nil {
-										return nil, fmt.Errorf("failed to read rendition system color signature: %v", err)
-									}
-									if err := binary.Read(vr, binary.LittleEndian, &sysc.Version); err != nil {
-										return nil, fmt.Errorf("failed to read rendition system color version: %v", err)
-									}
-									if err := binary.Read(vr, binary.LittleEndian, &sysc.Length); err != nil {
-										return nil, fmt.Errorf("failed to read rendition system color name length: %v", err)
-									}
-									sysc.Name = make([]byte, sysc.Length)
-									if _, err := vr.Read(sysc.Name); err != nil {
-										return nil, fmt.Errorf("failed to read rendition system color name: %v", err)
-									}
-									rend.Asset = sysc // FIXME: this will stomp the outer color?
-								}
-								rend.Asset = c
-							case MultiSizeImageSet:
-								var msi csiMultisizeImageSet
-								if err := binary.Read(vr, binary.LittleEndian, &msi.Signature); err != nil {
-									return nil, err
-								}
-								if err := binary.Read(vr, binary.LittleEndian, &msi.Version); err != nil {
-									return nil, err
-								}
-								if err := binary.Read(vr, binary.LittleEndian, &msi.NImageSizes); err != nil {
-									return nil, err
-								}
-								msi.ImageSizes = make([]csiMultiImgSetImageSize, msi.NImageSizes)
-								if err := binary.Read(vr, binary.LittleEndian, &msi.ImageSizes); err != nil {
-									return nil, err
-								}
-								rend.Asset = msi
-							case ModelIOAsset:
-								fallthrough
-							case ModelMesh:
-								fallthrough
-							case RecognitionGroup:
-								fallthrough
-							case RecognitionObject:
-								fallthrough
-							case ModelIOSubmesh:
-								fallthrough
-							case VectorGlyph:
-								fallthrough
-							case SolidImageStack:
-								fallthrough
-							case IconImageStack:
-								fallthrough
-							case IconGroup:
-								log.Errorf("RENDITION layout %s not supported yet - please open an issue on github.com/blacktop/ipsw/issues", cheader.Metadata.Layout)
-							case NamedGradient:
-								var ng csiNamedGradient
-								if err := binary.Read(vr, binary.LittleEndian, &ng.Signature); err != nil {
-									return nil, fmt.Errorf("failed to read rendition named gradient signature: %v", err)
-								}
-								if err := binary.Read(vr, binary.LittleEndian, &ng.ColorCount); err != nil {
-									return nil, fmt.Errorf("failed to read rendition named gradient color count: %v", err)
-								}
-								if err := binary.Read(vr, binary.LittleEndian, &ng.Type); err != nil {
-									return nil, fmt.Errorf("failed to read rendition named gradient type: %v", err)
-								}
-								ng.StartStops = make([]gradientStartStops, ng.ColorCount)
-								if err := binary.Read(vr, binary.LittleEndian, &ng.StartStops); err != nil {
-									return nil, fmt.Errorf("failed to read rendition named gradient starts: %v", err)
-								}
-								ng.Stops = make([]gradientStop, ng.ColorCount)
-								for i := range ng.Stops {
-									if err := binary.Read(vr, binary.LittleEndian, &ng.Stops[i].Stop); err != nil {
-										return nil, fmt.Errorf("failed to read rendition named gradient stop color: %v", err)
-									}
-									if err := binary.Read(vr, binary.LittleEndian, &ng.Stops[i].NameLength); err != nil {
-										return nil, fmt.Errorf("failed to read rendition named gradient stop name length: %v", err)
-									}
-									ng.Stops[i].Name = make([]byte, ng.Stops[i].NameLength)
-									if _, err := vr.Read(ng.Stops[i].Name); err != nil {
-										return nil, fmt.Errorf("failed to read rendition named gradient stop name: %v", err)
-									}
-								}
-								rend.Asset = ng
-							default:
-								return nil, fmt.Errorf("unknown RENDITION layout: %d - please open an issue on github.com/blacktop/ipsw/issues", cheader.Metadata.Layout)
-							}
-						default:
-							log.Errorf("unknown pixel format: %s", pixelFormat)
-						}
-					}
-					a.ImageDB = append(a.ImageDB, rend)
+					a.ImageDB = append(a.ImageDB, *rend)
 				}
 			}
 		default:
-			return nil, fmt.Errorf("unknown BOM block/tree: '%s' - please open an issue on github.com/blacktop/ipsw/issues", name)
+			if err := a.retainBlock(bm, v.Name, "unknown optional block retained"); err != nil {
+				return nil, err
+			}
 		}
 	}
 
+	if a.Tag != [4]byte{'R', 'A', 'T', 'C'} {
+		return nil, fmt.Errorf("missing CARHEADER")
+	}
+	if a.RenditionCount > 0 && !hasRenditions {
+		return nil, fmt.Errorf("missing RENDITIONS tree for %d declared renditions", a.RenditionCount)
+	}
+	if err := a.selectRenditions(); err != nil {
+		return nil, err
+	}
+	if !a.conf.MetadataOnly && !a.conf.Raw {
+		for i := range a.ImageDB {
+			if a.isSelected(i) {
+				_ = a.ensureDecoded(i)
+			}
+		}
+		if err := a.resolveReferences(); err != nil {
+			return nil, err
+		}
+	}
+	a.exportRenditions()
 	return &a, nil
+}
+
+// parseRendition rejects corrupt key/header/resource framing. Payload failures remain
+// on the rendition so callers can inspect the complete catalog and export other entries.
+func (a *Asset) parseRendition(keyData, data []byte) (*Rendition, error) {
+	if len(keyData) < len(a.KeyFormat)*2 || len(keyData)%2 != 0 {
+		return nil, fmt.Errorf("rendition key has %d bytes for %d tokens", len(keyData), len(a.KeyFormat))
+	}
+	rend := &Rendition{Key: make([]uint16, len(keyData)/2), Attributes: make(map[string]uint16), Deferred: true, rawCSI: data}
+	for i := range rend.Key {
+		rend.Key[i] = binary.LittleEndian.Uint16(keyData[i*2:])
+	}
+	for i, attr := range a.KeyFormat {
+		rend.Attributes[attr.String()] = rend.Key[i]
+	}
+	vr := bytes.NewReader(data)
+	header, err := readCSIFileHeader(vr)
+	if err != nil {
+		return nil, fmt.Errorf("read rendition header: %w", err)
+	}
+	if uint64(header.ChainSize) > uint64(vr.Len()) {
+		return nil, fmt.Errorf("rendition resource chain exceeds value")
+	}
+	resources := make([]byte, header.ChainSize)
+	if _, err := io.ReadFull(vr, resources); err != nil {
+		return nil, err
+	}
+	rr := bytes.NewReader(resources)
+	for rr.Len() > 0 {
+		var resource csiResource
+		if err := binary.Read(rr, binary.LittleEndian, &resource.ID); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(rr, binary.LittleEndian, &resource.Length); err != nil {
+			return nil, err
+		}
+		if uint64(resource.Length) > uint64(rr.Len()) {
+			return nil, fmt.Errorf("rendition resource exceeds chain")
+		}
+		resource.Data = make([]byte, resource.Length)
+		if _, err := io.ReadFull(rr, resource.Data); err != nil {
+			return nil, err
+		}
+		rend.Resources = append(rend.Resources, resource)
+	}
+	rend.RenditionName = string(bytes.SplitN(header.Metadata.Name[:], []byte{0}, 2)[0])
+	if rend.RenditionName == "" {
+		rend.RenditionName = "CoreStructuredImage"
+	}
+	rend.Width, rend.Height, rend.Scale = header.Width, header.Height, header.ScaleFactor
+	rend.ColorSpace = header.ColorSpace.ColorSpaceID()
+	rend.Colorspace = rend.ColorSpace.String()
+	rend.Type = header.Metadata.Layout.String()
+	rend.PixelFormat = string(utils.ReverseBytes(header.PixelFormat[:]))
+	rend.header = *header
+	rend.Size = int(header.ImageIndex.AccumLength[len(header.ImageIndex.AccumLength)-1])
+	// rawCSI owns the storage for deferred payloads, including unselected entries.
+	rend.payload = data[len(data)-vr.Len():]
+	rend.inspectPayload()
+	if header.Metadata.Layout == InternalLink {
+		// Link framing is metadata; resolving it may require decoding an atlas.
+		// Invalid links remain per-rendition failures when decoding is requested.
+		rend.DecodeError = a.decodeRendition(rend, *header, rend.payload)
+	}
+	return rend, nil
+}
+
+func (a *Asset) decodeRendition(rend *Rendition, header csiHeader, data []byte) error {
+	// These layouts carry drawing instructions, even when the FourCC is ARGB.
+	if unsupportedDrawingLayout(header.Metadata.Layout) {
+		return fmt.Errorf("%w layout: %s", errUnsupportedRendition, header.Metadata.Layout)
+	}
+	if header.Metadata.Layout == InternalLink {
+		var referenceData []byte
+		found := false
+		for _, resource := range rend.Resources {
+			if resource.ID != InternalLinkID {
+				continue
+			}
+			if found {
+				return fmt.Errorf("duplicate internal reference resource")
+			}
+			found = true
+			referenceData = resource.Data
+		}
+		// The usual INLK resource has no bitmap payload, even with an ARGB
+		// pixel format. Retain support for a link stored directly in the payload.
+		if !found {
+			referenceData = data
+		}
+		var link csiInternalLinkData
+		if err := link.UnmarshalBinary(bytes.NewReader(referenceData)); err != nil {
+			return fmt.Errorf("read internal reference: %w", err)
+		}
+		rend.link = &link
+		rend.Asset = link
+		return nil
+	}
+	vr := bytes.NewReader(data)
+	switch rend.PixelFormat {
+	case PixFmtARGB, PixFmtARGB16, PixFmtRGB555, PixFmtGray, PixFmtGray16, PixFmtGrayscale:
+		rend.Type = fmt.Sprintf("Image (%s)", header.Metadata.Layout)
+		// CoreUI also stores HEIC containers inside raster renditions with HEVC encoding.
+		if len(data) >= 12 && string(data[:4]) == "MLEC" && compressionType(binary.LittleEndian.Uint32(data[8:12])) == HEVC {
+			rend.Type = "HEIF"
+			rend.PixelFormat = PixFmtHEIF
+			payload, err := decodeOriginalPayload(data, PixFmtHEIF)
+			if err != nil {
+				return err
+			}
+			return a.setOriginalPayload(rend, payload)
+		}
+		var rowBytes uint32
+		for _, resource := range rend.Resources {
+			if resource.ID == ImageRowBytesID {
+				if len(resource.Data) < 4 {
+					return fmt.Errorf("truncated image row bytes")
+				}
+				rowBytes = binary.LittleEndian.Uint32(resource.Data)
+				break
+			}
+		}
+		img, err := decodeImage(vr, header, a.conf, int(rowBytes))
+		if errors.Is(err, errors.ErrUnsupported) {
+			return fmt.Errorf("%w: %w", errUnsupportedRendition, err)
+		}
+		if err != nil {
+			return err
+		}
+		rend.Asset = img
+		if rend.PixelFormat == PixFmtARGB16 && (rend.ColorSpace == ExtendedSRGB || rend.ColorSpace == ExtendedLinear) {
+			rend.Warnings = append(rend.Warnings, "PNG clamps extended-range samples to [0,1]; use raw CSI export to preserve the source")
+		}
+	case PixFmtPDF, PixFmtJPEG, PixFmtHEIF, PixFmtSVG, PixFmtWebP, PixFmtRawData:
+		rend.Type = strings.TrimSpace(rend.PixelFormat)
+		payload, err := decodeOriginalPayload(data, rend.PixelFormat)
+		if err != nil {
+			return err
+		}
+		return a.setOriginalPayload(rend, payload)
+	case "\x00\x00\x00\x00":
+		switch header.Metadata.Layout {
+		case OnePart, ThreePartHorizontal, ThreePartVertical, NinePart, TwelvePart, ManyPart, Gradient, Effect, Animation, Vector, IconImage, RawData, ExternalLink, ImageStack:
+			return fmt.Errorf("%w layout: %s", errUnsupportedRendition, header.Metadata.Layout)
+		case PackedImage, NamedContents, ThinningPlaceholder, TextureRendition, TextureImage:
+			return fmt.Errorf("%w layout: %s", errUnsupportedRendition, header.Metadata.Layout)
+		case Color:
+			var c csiColor
+			if err := binary.Read(vr, binary.LittleEndian, &c.Signature); err != nil {
+				return fmt.Errorf("failed to read rendition color signature: %v", err)
+			}
+			if err := binary.Read(vr, binary.LittleEndian, &c.Version); err != nil {
+				return fmt.Errorf("failed to read rendition color version: %v", err)
+			}
+			if err := binary.Read(vr, binary.LittleEndian, &c.Info); err != nil {
+				return fmt.Errorf("failed to read rendition color info: %v", err)
+			}
+			if err := binary.Read(vr, binary.LittleEndian, &c.NumberOfComponents); err != nil {
+				return fmt.Errorf("failed to read rendition color number of components: %v", err)
+			}
+			if uint64(c.NumberOfComponents)*8 > uint64(vr.Len()) {
+				return fmt.Errorf("color components exceed payload")
+			}
+			c.Components = make([]float64, c.NumberOfComponents)
+			if err := binary.Read(vr, binary.LittleEndian, &c.Components); err != nil {
+				return fmt.Errorf("failed to read rendition color components: %v", err)
+			}
+			if c.Info.ColorType() == SystemColorFollows {
+				var sysc csiSystemColorName
+				if err := binary.Read(vr, binary.LittleEndian, &sysc.Signature); err != nil {
+					return fmt.Errorf("failed to read rendition system color signature: %v", err)
+				}
+				if err := binary.Read(vr, binary.LittleEndian, &sysc.Version); err != nil {
+					return fmt.Errorf("failed to read rendition system color version: %v", err)
+				}
+				if err := binary.Read(vr, binary.LittleEndian, &sysc.Length); err != nil {
+					return fmt.Errorf("failed to read rendition system color name length: %v", err)
+				}
+				if uint64(sysc.Length) > uint64(vr.Len()) {
+					return fmt.Errorf("system color name exceeds payload")
+				}
+			}
+			rend.Asset = c
+		case MultiSizeImageSet:
+			var msi csiMultisizeImageSet
+			if err := binary.Read(vr, binary.LittleEndian, &msi.Signature); err != nil {
+				return err
+			}
+			if err := binary.Read(vr, binary.LittleEndian, &msi.Version); err != nil {
+				return err
+			}
+			if err := binary.Read(vr, binary.LittleEndian, &msi.NImageSizes); err != nil {
+				return err
+			}
+			if uint64(msi.NImageSizes)*uint64(binary.Size(csiMultiImgSetImageSize{})) > uint64(vr.Len()) {
+				return fmt.Errorf("image sizes exceed payload")
+			}
+			msi.ImageSizes = make([]csiMultiImgSetImageSize, msi.NImageSizes)
+			if err := binary.Read(vr, binary.LittleEndian, &msi.ImageSizes); err != nil {
+				return err
+			}
+			rend.Asset = msi
+		case ModelIOAsset, ModelMesh, RecognitionGroup, RecognitionObject, ModelIOSubmesh, VectorGlyph, SolidImageStack, IconImageStack, IconGroup:
+			return fmt.Errorf("%w layout: %s", errUnsupportedRendition, header.Metadata.Layout)
+
+		default:
+			return fmt.Errorf("%w layout: %d", errUnsupportedRendition, header.Metadata.Layout)
+		}
+	default:
+		return fmt.Errorf("%w pixel format: %q", errUnsupportedRendition, rend.PixelFormat)
+	}
+	return nil
+}
+
+// setOriginalPayload keeps the original bytes unless rasterization is requested.
+func (a *Asset) setOriginalPayload(rend *Rendition, data []byte) error {
+	rend.Asset = data
+	format := renderedPayloadFormat(data, rend.PixelFormat)
+	if a.conf == nil || !a.conf.Render || !isRenderableFormat(format) {
+		return nil
+	}
+	img, err := render.Decode(data, format, int(rend.Width), int(rend.Height))
+	if err != nil {
+		return err
+	}
+	rend.Asset = img
+	rend.ColorSpace = SRGB
+	rend.Colorspace = SRGB.String()
+	return nil
 }
 
 func (a *Asset) parseFacetKeys(bm *bom.BOM) error {
@@ -969,11 +863,14 @@ func (a *Asset) parseKeyFormat(bm *bom.BOM) error {
 	if err := binary.Read(br, binary.LittleEndian, &keyfmt.MaximumRenditionKeyTokenCount); err != nil {
 		return fmt.Errorf("failed to read 'KEYFORMAT' maximum rendition key token count: %v", err)
 	}
+	if keyfmt.MaximumRenditionKeyTokenCount == 0 || keyfmt.MaximumRenditionKeyTokenCount > 65536 {
+		return fmt.Errorf("invalid KEYFORMAT token count: %d", keyfmt.MaximumRenditionKeyTokenCount)
+	}
 	a.KeyFormat = make([]renditionAttributeType, keyfmt.MaximumRenditionKeyTokenCount)
 	if err := binary.Read(br, binary.LittleEndian, &a.KeyFormat); err != nil {
 		return fmt.Errorf("failed to read 'KEYFORMAT' rendition attribute types: %v", err)
 	}
-	return nil
+	return validateKeyFormat(a.KeyFormat)
 }
 
 func (a *Asset) parseKeyFormatWorkaround(bm *bom.BOM) error {
@@ -992,12 +889,15 @@ func (a *Asset) parseKeyFormatWorkaround(bm *bom.BOM) error {
 	if maxTokenCount == 0 {
 		return nil
 	}
+	if maxTokenCount > 65536 {
+		return fmt.Errorf("invalid KEYFORMATWORKAROUND token count: %d", maxTokenCount)
+	}
 
 	a.KeyFormat = make([]renditionAttributeType, maxTokenCount)
 	if err := binary.Read(br, binary.LittleEndian, &a.KeyFormat); err != nil {
 		return fmt.Errorf("failed to read KEYFORMATWORKAROUND rendition attribute types: %v", err)
 	}
-	return nil
+	return validateKeyFormat(a.KeyFormat)
 }
 
 // TODO: this is gross
@@ -1039,46 +939,14 @@ func readCSIFileHeader(r io.Reader) (*csiHeader, error) {
 	if err := binary.Read(r, binary.LittleEndian, &c.ImageIndex.Count); err != nil {
 		return nil, fmt.Errorf("failed to read csiHeader image index count: %v", err)
 	}
+	if c.ImageIndex.Count > 4096 {
+		return nil, fmt.Errorf("image index count exceeds limit: %d", c.ImageIndex.Count)
+	}
 	c.ImageIndex.AccumLength = make([]uint32, c.ImageIndex.Count+1)
 	if err := binary.Read(r, binary.LittleEndian, &c.ImageIndex.AccumLength); err != nil {
 		return nil, fmt.Errorf("failed to read csiHeader image index accum lengths: %v", err)
 	}
 	return &c, nil
-}
-
-// decodeRLE implements a PackBits-like RLE commonly used in CoreUI payloads.
-// Control byte N:
-//   - 0..127   : copy the next (N+1) literal bytes
-//   - 129..255 : repeat the next byte (257 - N) times
-//   - 128      : no-op
-func decodeRLE(src []byte) []byte {
-	var dst []byte
-	for i := 0; i < len(src); {
-		n := int(int8(src[i]))
-		i++
-		switch {
-		case n >= 0:
-			count := n + 1
-			if i+count > len(src) {
-				count = len(src) - i
-			}
-			dst = append(dst, src[i:i+count]...)
-			i += count
-		case n == -128:
-			// nop
-		default:
-			if i >= len(src) {
-				break
-			}
-			b := src[i]
-			i++
-			count := 1 - n
-			for range count {
-				dst = append(dst, b)
-			}
-		}
-	}
-	return dst
 }
 
 func readString(r io.Reader) (string, error) {

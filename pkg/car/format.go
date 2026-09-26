@@ -29,7 +29,7 @@ func (a *Asset) String() string {
 	out.WriteString(colorTitle("Asset\n") + "=====\n") // title
 	out.WriteString(colorField("Header") + ":\n")
 	out.WriteString(fmt.Sprintf(
-		colorSubField("  Version")+":             %s"+
+		colorSubField("  Version")+":             %s\n"+
 			colorSubField("  CoreUI Version")+":      %d\n"+
 			colorSubField("  Storage Version")+":     %d\n"+
 			colorSubField("  Storage Timestamp")+":   %s\n"+
@@ -52,7 +52,7 @@ func (a *Asset) String() string {
 	))
 	out.WriteString(colorField("Metadata") + ":\n")
 	out.WriteString(fmt.Sprintf(
-		"  Authoring Tool:      %s"+
+		"  Authoring Tool:      %s\n"+
 			"  Thinning Args:       %s\n"+
 			"  Deployment Platform: %s %s\n",
 		string(bytes.Trim(a.Metadata.AuthoringTool[:], "\x00")),
@@ -75,7 +75,7 @@ func (a *Asset) String() string {
 	if len(a.ColorDB) > 0 {
 		out.WriteString(colorField("Colors") + ":\n")
 		for k, v := range a.ColorDB {
-			if a.conf.Verbose {
+			if a.conf != nil && a.conf.Verbose {
 				if tout, err := colorInTerminal(v); err == nil {
 					out.WriteString(fmt.Sprintf("- %s:\n\n%s\n\n", k, tout))
 				}
@@ -91,12 +91,43 @@ func (a *Asset) String() string {
 			out.WriteString(fmt.Sprintf("  %s: %d\n", colorSubField(k), v))
 		}
 	}
+	stats := a.Stats()
+	out.WriteString(fmt.Sprintf("Inventory: %d total, %d selected, %d deferred, %d exported\n", stats.Total, stats.Selected, stats.Deferred, stats.Exported))
+	if len(a.Diagnostics) > 0 {
+		out.WriteString(colorField("Catalog diagnostics") + ":\n")
+		for _, diagnostic := range a.Diagnostics {
+			out.WriteString(fmt.Sprintf("  %s: %s\n", diagnostic.Block, diagnostic.Message))
+		}
+	}
 	if len(a.ImageDB) > 0 {
-		out.WriteString(fmt.Sprintf(colorTitle("Assets")+": (%d)\n", len(a.ImageDB)))
-		for _, ass := range a.ImageDB {
+		out.WriteString(fmt.Sprintf(colorTitle("Assets")+": (%d selected)\n", stats.Selected))
+		for i, ass := range a.ImageDB {
+			if !a.isSelected(i) {
+				continue
+			}
 			out.WriteString(" ╭╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴\n")
 			var asset strings.Builder
+			asset.WriteString(fmt.Sprintf("Key: %v\n", ass.Key))
+			if ass.Deferred {
+				asset.WriteString("Decoding: deferred\n")
+			}
+			if _, decoded := ass.Asset.(image.Image); !decoded && (ass.Width != 0 || ass.Height != 0) {
+				asset.WriteString(fmt.Sprintf("Image Size: %dx%d\n", ass.Width, ass.Height))
+			}
+			if ass.Compression != "" {
+				asset.WriteString(fmt.Sprintf("Compression: %s\n", ass.Compression))
+			}
+			if ass.Colorspace != "" {
+				asset.WriteString(fmt.Sprintf("Color space: %s\n", ass.Colorspace))
+			}
+			if ass.Orientation != 0 {
+				asset.WriteString(fmt.Sprintf("Orientation: %d\n", ass.Orientation))
+			}
+			for _, warning := range ass.Warnings {
+				asset.WriteString(fmt.Sprintf("Warning: %s\n", warning))
+			}
 			switch t := ass.Asset.(type) {
+			case nil:
 			case csiColor:
 				asset.WriteString(fmt.Sprintf(colorField("Colorspace")+": %s\n", t.Info.ColorSpaceID()))
 				if len(t.Components) > 0 {
@@ -104,37 +135,18 @@ func (a *Asset) String() string {
 					for _, c := range t.Components {
 						asset.WriteString(fmt.Sprintf("    - %v\n", c))
 					}
-					if a.conf.Verbose {
+					if a.conf != nil && a.conf.Verbose {
 						if tout, err := t.ToTerminal(); err == nil {
 							asset.WriteString(fmt.Sprintf(colorField("Color Preview")+":\n%s\n", tout))
 						}
 					}
 				}
-			case *BGRA:
-				asset.WriteString(fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y))
-				if a.conf.Verbose {
+			case image.Image:
+				asset.WriteString(fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Bounds().Dx(), t.Bounds().Dy()))
+				if a.conf != nil && a.conf.Verbose {
 					if tout, err := termimg.New(t).Render(); err == nil {
 						asset.WriteString(fmt.Sprintf("Image Preview:\n%s\n", tout))
 					}
-				}
-			case *GA8:
-				asset.WriteString(fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y))
-				if a.conf.Verbose {
-					if tout, err := termimg.New(t).Render(); err == nil {
-						asset.WriteString(fmt.Sprintf("Image Preview:\n%s\n", tout))
-					}
-				}
-			case *image.RGBA:
-				asset.WriteString(fmt.Sprintf(colorField("Image Size")+": %dx%d\n", t.Rect.Max.X, t.Rect.Max.Y))
-				if a.conf.Verbose {
-					if tout, err := termimg.New(t).Render(); err == nil {
-						asset.WriteString(fmt.Sprintf("Image Preview:\n%s\n", tout))
-					}
-				}
-			case csiNamedGradient:
-				asset.WriteString(colorField("Gradient") + ":\n")
-				for i := range t.ColorCount {
-					asset.WriteString(fmt.Sprintf("  - %s (%.3f, %.3f)\n", bytes.Trim(t.Stops[i].Name, "\x00"), float32(t.StartStops[i].Start), float32(t.StartStops[i].Stop)))
 				}
 			case csiMultisizeImageSet:
 				asset.WriteString(colorField("MultiSized") + ":\n")
@@ -146,6 +158,19 @@ func (a *Asset) String() string {
 				asset.WriteString(fmt.Sprintf(colorField("Data Size")+": %s (%d bytes)\n", humanize.Bytes(uint64(len(t))), len(t)))
 			default:
 				log.Debugf("%s has unknown asset type: %T", ass.RenditionName, t)
+			}
+			for _, failure := range []struct {
+				stage string
+				err   error
+			}{
+				{"Decode", ass.DecodeError}, {"Reference", ass.ResolveError}, {"Export", ass.ExportError},
+			} {
+				if failure.err != nil {
+					asset.WriteString(fmt.Sprintf("%s error: %v\n", failure.stage, failure.err))
+				}
+			}
+			if ass.ExportPath != "" {
+				asset.WriteString(fmt.Sprintf("Exported: %s\n", ass.ExportPath))
 			}
 			var attrs strings.Builder
 			if len(ass.Attributes) > 0 {
@@ -165,6 +190,7 @@ func (a *Asset) String() string {
 						var slice sliceResource
 						if err := slice.UnmarshalBinary(rsc.Data); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s: (%d)\n", colorSubField(rsc.ID), slice.NumSlices))
 						for _, s := range slice.Slices {
@@ -174,6 +200,7 @@ func (a *Asset) String() string {
 						var metrics metricsResource
 						if err := metrics.UnmarshalBinary(rsc.Data); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s: (%d)\n", colorSubField(rsc.ID), metrics.NumMetrics))
 						for _, m := range metrics.Metrics {
@@ -183,6 +210,7 @@ func (a *Asset) String() string {
 						layer := new(layerResource)
 						if err := layer.UnmarshalBinary(rsc.Data); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s: (%d):\n", colorSubField("Layers"), layer.NumLayers))
 						for _, layer := range layer.Layers {
@@ -194,6 +222,7 @@ func (a *Asset) String() string {
 						var link csiInternalLinkData
 						if err := link.UnmarshalBinary(bytes.NewReader(rsc.Data)); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s: %s(%d,%d) %s(%d)\n", colorSubField(rsc.ID), colorSubField("frame"), link.Frame.X, link.Frame.Y, colorSubField("layout"), link.Layout))
 						for _, ref := range link.Reference {
@@ -203,24 +232,28 @@ func (a *Asset) String() string {
 						var comp compositingResource
 						if err := binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &comp); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s:\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s:\n    %s: %d\n    %s:   %.2f\n", colorSubField(rsc.ID), colorField("BlendMode"), comp.BlendMode, colorField("Opacity"), comp.Opacity))
 					case MetaDataID:
 						var meta metadataResource
 						if err := meta.UnmarshalBinary(rsc.Data); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s: %s\n", colorSubField(rsc.ID), bytes.Trim(meta.Data[:], "\x00")))
 					case MetaDataEXIFOrientationID:
 						var orient uint32
 						if err := binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &orient); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s: %d\n", colorSubField(rsc.ID), orient))
 					case ImageRowBytesID:
 						var rowBytes uint32
 						if err := binary.Read(bytes.NewReader(rsc.Data), binary.LittleEndian, &rowBytes); err != nil {
 							rscs.WriteString(fmt.Sprintf("  %s\n%s", colorSubField(rsc.ID), utils.HexDump(rsc.Data, 0)))
+							continue
 						}
 						rscs.WriteString(fmt.Sprintf("  %s: %s (%d)\n", colorSubField(rsc.ID), humanize.Bytes(uint64(rowBytes)), rowBytes))
 					default:
@@ -351,13 +384,76 @@ func (a *Asset) ToJSON() ([]byte, error) {
 		header["Appearances"] = appearances
 	}
 
+	header["CatalogStats"] = a.Stats()
+	if len(a.Diagnostics) > 0 {
+		header["Diagnostics"] = a.Diagnostics
+	}
+	if len(a.UnknownBlocks) > 0 {
+		blocks := make([]map[string]any, 0, len(a.UnknownBlocks))
+		for _, block := range a.UnknownBlocks {
+			blocks = append(blocks, map[string]any{"Name": block.Name, "Size": len(block.Data)})
+		}
+		header["UnknownBlocks"] = blocks
+	}
 	output = append(output, header)
 
-	// Add renditions
-	for _, rend := range a.ImageDB {
+	// Add selected renditions; CatalogStats retains the complete inventory count.
+	for i, rend := range a.ImageDB {
+		if !a.isSelected(i) {
+			continue
+		}
 		rendition := map[string]any{
-			"Name": rend.RenditionName,
-			"Type": rend.Type,
+			"Name":        rend.RenditionName,
+			"Type":        rend.Type,
+			"Selected":    a.isSelected(i),
+			"Deferred":    rend.Deferred,
+			"PixelWidth":  rend.Width,
+			"PixelHeight": rend.Height,
+		}
+		if format := strings.Trim(rend.PixelFormat, "\x00 "); format != "" {
+			rendition["PixelFormat"] = format
+		}
+		if rend.Compression != "" {
+			rendition["Compression"] = rend.Compression
+		}
+		if rend.Colorspace != "" {
+			rendition["ColorSpace"] = rend.Colorspace
+		}
+		if rend.Scale != 0 {
+			rendition["ScaleFactor"] = rend.Scale
+		}
+		if rend.Orientation != 0 {
+			rendition["Orientation"] = rend.Orientation
+		}
+		if len(rend.Warnings) > 0 {
+			rendition["Warnings"] = rend.Warnings
+		}
+		if len(rend.Resources) > 0 {
+			resources := make([]map[string]any, 0, len(rend.Resources))
+			for _, resource := range rend.Resources {
+				resources = append(resources, map[string]any{"ID": uint32(resource.ID), "Name": resource.ID.String(), "Length": len(resource.Data)})
+			}
+			rendition["Resources"] = resources
+		}
+
+		if len(rend.Key) > 0 {
+			rendition["RenditionKey"] = rend.Key
+		}
+		if rend.DecodeError != nil {
+			rendition["DecodeError"] = rend.DecodeError.Error()
+		}
+		if rend.ResolveError != nil {
+			rendition["ResolveError"] = rend.ResolveError.Error()
+		}
+		if rend.ExportError != nil {
+			rendition["ExportError"] = rend.ExportError.Error()
+		}
+		if rend.ExportPath != "" {
+			rendition["ExportPath"] = rend.ExportPath
+		}
+		if img, ok := rend.Asset.(image.Image); ok {
+			rendition["PixelWidth"] = img.Bounds().Dx()
+			rendition["PixelHeight"] = img.Bounds().Dy()
 		}
 
 		// Add attributes

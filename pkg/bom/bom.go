@@ -175,6 +175,7 @@ func (b *BOM) BlockNames() []string {
 }
 
 func (b *BOM) ReadTree(name string) (*Tree, error) {
+	seen := make(map[uint32]bool)
 	br, err := b.ReadBlock(name)
 	if err != nil {
 		return nil, err
@@ -185,7 +186,7 @@ func (b *BOM) ReadTree(name string) (*Tree, error) {
 		return nil, err
 	}
 
-	tree, err := b.readTree(thead.Child)
+	tree, err := b.readTreeOnce(thead.Child, seen)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +200,7 @@ func (b *BOM) ReadTree(name string) (*Tree, error) {
 			return nil, err
 		}
 
-		tree, err = b.readTree(ti.Value)
+		tree, err = b.readTreeOnce(ti.Value, seen)
 		if err != nil {
 			return nil, err
 		}
@@ -238,6 +239,7 @@ func (b *BOM) ReadTree(name string) (*Tree, error) {
 func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
 	var trees []*Tree
 
+	seen := make(map[uint32]bool)
 	br, err := b.ReadBlock(name)
 	if err != nil {
 		return nil, err
@@ -248,7 +250,7 @@ func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
 		return nil, err
 	}
 
-	tree, err := b.readTree(thead.Child)
+	tree, err := b.readTreeOnce(thead.Child, seen)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +264,7 @@ func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
 			return nil, err
 		}
 
-		tree, err = b.readTree(ti.Value)
+		tree, err = b.readTreeOnce(ti.Value, seen)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +303,7 @@ func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
 		if tree.Forward == 0 {
 			break
 		} else {
-			tree, err = b.readTree(tree.Forward)
+			tree, err = b.readTreeOnce(tree.Forward, seen)
 			if err != nil {
 				return nil, err
 			}
@@ -329,6 +331,16 @@ func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
 	}
 
 	return trees, nil
+}
+
+// A traversal can visit at most one node per block. Share the visited set
+// across the initial descent and forward chain so both kinds of cycle fail.
+func (b *BOM) readTreeOnce(index uint32, seen map[uint32]bool) (*Tree, error) {
+	if seen[index] {
+		return nil, fmt.Errorf("%w: tree cycle at block %d", ErrInvalidFormat, index)
+	}
+	seen[index] = true
+	return b.readTree(index)
 }
 
 func (b *BOM) readTree(index uint32) (*Tree, error) {

@@ -23,6 +23,7 @@ Download and Parse IPSWs (and SO much more)
 ### SEE ALSO
 
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
+* [ipsw car](/docs/cli/ipsw/car)	 - Inspect and extract compiled asset catalogs
 * [ipsw class-dump](/docs/cli/ipsw/class-dump)	 - ObjC class-dump a dylib from a DSC or MachO
 * [ipsw comp](/docs/cli/ipsw/comp)	 - Compress files using libcompression
 * [ipsw decomp](/docs/cli/ipsw/decomp)	 - Decompress files using libcompression

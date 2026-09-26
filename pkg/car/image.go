@@ -1,24 +1,16 @@
 package car
 
 import (
-	"bytes"
-	"compress/flate"
-	"compress/gzip"
-	"compress/zlib"
-	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"io"
-	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/apex/log"
-	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/magic"
-	"github.com/blacktop/ipsw/pkg/comp"
-	"github.com/blacktop/lzfse-cgo"
+	"github.com/blacktop/ipsw/pkg/car/deepmap2"
+	"github.com/blacktop/ipsw/pkg/car/internal/compression"
+	"github.com/blacktop/ipsw/pkg/car/internal/pixel"
+	"github.com/blacktop/ipsw/pkg/car/texture"
 )
 
 const (
@@ -54,10 +46,10 @@ const (
 type csiBitmapFlags uint32
 
 func (f csiBitmapFlags) ChunksFollow() bool {
-	return types.ExtractBits(uint64(f), 0, 1) == 1
+	return f&1 != 0
 }
 func (f csiBitmapFlags) IsOpaque() bool {
-	return types.ExtractBits(uint64(f), 1, 1) == 1
+	return f&2 != 0
 }
 func (f csiBitmapFlags) String() string {
 	return fmt.Sprintf("chunks_follow: %t, is_opaque: %t", f.ChunksFollow(), f.IsOpaque())
@@ -78,45 +70,6 @@ type csiBitmapChunk struct {
 	Rows      uint32
 	Length    uint32
 	// Data      []byte
-}
-
-type csiRawData struct {
-	Signature [4]byte // 'RAWD'
-	Flags     uint32
-	Length    uint32
-	// Data      []byte
-}
-
-type csiJpegLZFSEData struct {
-	Version           uint32
-	ChucksFollowing   uint32
-	LzfseAlphaSize    uint32
-	LzfseDataRowBytes uint32
-	JpegDataSize      uint32
-}
-
-type csiASTCData struct {
-	Version      uint32 // 0 == raw ATSC Data; 1 == lzfse compressed ATSC Data
-	DataSize     uint32
-	AstcDataSize uint32
-	// Data      []byte
-}
-
-type csiHEVCData struct {
-	Version      uint32
-	HevcDataSize uint32
-}
-
-type csiDeepmapData struct {
-	Version         uint32
-	PixelFormat     uint32
-	CompressedBytes uint64
-}
-
-type csiDeepmap2Data struct {
-	Version  uint32
-	Encoding compressionType
-	Length   uint64
 }
 
 type deepmapPixelFormat uint8
@@ -142,26 +95,6 @@ const (
 	ImageDeepmapCompressionPalette  deepmapCompressionMethod = 4
 )
 
-type deepmap struct {
-	Signature         [4]byte // 'dmap'
-	CompressionMethod deepmapCompressionMethod
-	Scale             uint8
-	Unknown           uint8 // 10 ?
-	PixelFormat       deepmapPixelFormat
-	CompressedBlock   uint32
-}
-
-type deepmap2 struct {
-	Signature         [4]byte // 'dmp2'
-	Scale             uint8
-	BlobVersion       uint8 // 1
-	PixelFormat       deepmapPixelFormat
-	CompressionMethod deepmapCompressionMethod
-	Width             uint16
-	Height            uint16
-	CompressedBlock   uint32
-}
-
 // BGRA to RGBA
 type BGRA struct {
 	image.RGBA
@@ -170,6 +103,11 @@ type BGRA struct {
 func (p *BGRA) RGBAAt(x, y int) color.RGBA {
 	c := p.RGBA.RGBAAt(x, y)
 	return color.RGBA{R: c.B, G: c.G, B: c.R, A: c.A}
+}
+
+func (p *BGRA) RGBA64At(x, y int) color.RGBA64 {
+	c := p.RGBA.RGBA64At(x, y)
+	return color.RGBA64{R: c.B, G: c.G, B: c.R, A: c.A}
 }
 
 func (p *BGRA) At(x, y int) color.Color {
@@ -211,859 +149,146 @@ func (p *GA8) PixOffset(x, y int) int {
 	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*2
 }
 
-func unsupportedJPEGCompression() error {
-	return fmt.Errorf("unsupported JPEGLZFSE decode: JPEG color data with optional LZFSE alpha is not implemented")
-}
-
+// decodeImage dispatches CoreUI bitmap compression after validating its framing.
 func decodeImage(r io.Reader, ci csiHeader, conf *Config, rowBytesOverride int) (image.Image, error) {
-	var out bytes.Buffer
-	// Track Deepmap2 origin and pixel format so we can render without BGRA swap
-	fromDeepmap2 := false
-	var deepmap2PixFmt deepmapPixelFormat
-
-	var elem csiBitmap
-	if err := binary.Read(r, binary.LittleEndian, &elem); err != nil {
-		return nil, fmt.Errorf("failed to read CSIBitmap: %s", err)
+	width, height := int(ci.Width), int(ci.Height)
+	if _, _, err := pixel.Layout(width, height, 4, 0); err != nil {
+		return nil, err
 	}
-
-	// log.WithFields(log.Fields{
-	// 	"signature": string(elem.Signature[:]),
-	// 	"flags":     elem.Flags.String(),
-	// 	"encoding":  elem.Encoding,
-	// 	"length":    elem.Length,
-	// }).Info("Reading CSIElement")
-
-	if elem.Flags.ChunksFollow() {
-		for i := uint32(0); i < elem.Length; i++ {
-			var chunk csiBitmapChunk
-			if err := binary.Read(r, binary.LittleEndian, &chunk); err != nil {
-				return nil, err
-			}
-			if chunk.Signature != [4]byte{'K', 'C', 'B', 'C'} {
-				return nil, fmt.Errorf("invalid chunk signature: %s", chunk.Signature)
-			}
-			data := make([]byte, chunk.Length)
-			if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
-				return nil, err
-			}
+	data, err := compression.ReadLimited(r, pixel.MaxBytes)
+	if err != nil {
+		return nil, err
+	}
+	elem, chunks, err := readCSIBitmap(data)
+	if err != nil {
+		return nil, err
+	}
+	format, opaque := string(ci.PixelFormat[:]), elem.Flags.IsOpaque()
+	space := ci.ColorSpace.ColorSpaceID()
+	switch elem.Encoding {
+	case Deepmap2, DeepmapLZFSE, PaletteImage, ASTCImage, DXTC:
+		return assembleBitmapChunks(chunks, width, height, func(data []byte, rows int) (image.Image, error) {
 			switch elem.Encoding {
-			case Uncompressed:
-				out.Write(data)
-			case RLE:
-				out.Write(decodeRLE(data))
-			case ZIP:
-				// Try gzip first
-				gr, err := gzip.NewReader(bytes.NewReader(data))
-				if err == nil {
-					if _, err := io.Copy(&out, gr); err != nil {
-						return nil, fmt.Errorf("failed to decompress gzip: %v", err)
-					}
-				} else {
-					// Try zlib
-					zr, err := zlib.NewReader(bytes.NewReader(data))
-					if err == nil {
-						if _, err := io.Copy(&out, zr); err != nil {
-							return nil, fmt.Errorf("failed to decompress zlib: %v", err)
-						}
-						zr.Close()
-					} else {
-						// Try raw deflate
-						fr := flate.NewReader(bytes.NewReader(data))
-						if _, err := io.Copy(&out, fr); err != nil {
-							// Last resort - assume uncompressed
-							out.Write(data)
-						}
-						fr.Close()
-					}
-				}
-			case LZVN:
-				dec := make([]byte, len(data)*4)
-				if n := lzfse.DecodeLZVNBuffer(data, dec); n == 0 {
-					return nil, fmt.Errorf("failed to decompress lzvn data")
-				} else {
-					out.Write(dec[:n])
-				}
-			case LZFSE:
-				decompressed, err := comp.Decompress(data, comp.LZFSE)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
-				}
-				out.Write(decompressed)
-			case JPEGLZFSE:
-				return nil, unsupportedJPEGCompression()
-			case HEVC:
-				// HEVC/H.265 video data
-				var hevcInfo csiHEVCData
-				r := bytes.NewReader(data)
-				if err := binary.Read(r, binary.LittleEndian, &hevcInfo); err != nil {
-					return nil, fmt.Errorf("failed to read HEVC header: %v", err)
-				}
-				// Read the HEVC data
-				hevcData := make([]byte, hevcInfo.HevcDataSize)
-				if err := binary.Read(r, binary.LittleEndian, &hevcData); err != nil {
-					return nil, fmt.Errorf("failed to read HEVC data: %v", err)
-				}
-				// Output raw HEVC data (would need HEVC decoder for actual image)
-				out.Write(hevcData)
-			case PaletteImage:
-				// Magic byte detection for compression format
-				if len(data) >= 4 {
-					magic := data[0:4]
-					if string(magic) == "lzvn" || (len(data) >= 4 && magic[0] == 0x68 && magic[1] == 0x01 && magic[2] == 0x00 && magic[3] == 0xf0) {
-						// LZVN compressed palette image
-						dec := make([]byte, len(data)*4)
-						if n := lzfse.DecodeLZVNBuffer(data, dec); n == 0 {
-							return nil, fmt.Errorf("failed to decompress PaletteImage LZVN data")
-						} else {
-							out.Write(dec[:n])
-						}
-					} else {
-						// Raw palette image data
-						out.Write(data)
-					}
-				} else {
-					out.Write(data)
-				}
-			case ASTCImage:
-				// ASTC texture compression
-				var astcInfo csiASTCData
-				r := bytes.NewReader(data)
-				if err := binary.Read(r, binary.LittleEndian, &astcInfo); err != nil {
-					return nil, fmt.Errorf("failed to read ASTC header: %v", err)
-				}
-				// Read the ASTC data
-				astcData := make([]byte, astcInfo.AstcDataSize)
-				if err := binary.Read(r, binary.LittleEndian, &astcData); err != nil {
-					return nil, fmt.Errorf("failed to read ASTC data: %v", err)
-				}
-				if astcInfo.Version == 1 {
-					// LZFSE compressed ASTC data
-					decompressed, err := comp.Decompress(astcData, comp.LZFSE)
-					if err != nil {
-						return nil, fmt.Errorf("failed to decompress ASTC data: %v", err)
-					}
-					out.Write(decompressed)
-				} else {
-					// Raw ASTC data
-					out.Write(astcData)
-				}
-			case DeepmapLZFSE:
-				// Deepmap with LZFSE compression
-				var deepmapInfo csiDeepmapData
-				r := bytes.NewReader(data)
-				if err := binary.Read(r, binary.LittleEndian, &deepmapInfo); err != nil {
-					return nil, fmt.Errorf("failed to read Deepmap header: %v", err)
-				}
-				log.WithFields(log.Fields{
-					"version":          deepmapInfo.Version,
-					"pixel_format":     deepmapInfo.PixelFormat,
-					"compressed_bytes": deepmapInfo.CompressedBytes,
-				}).Debug("Reading Deepmap")
-				// Read the deepmap structure header
-				var dm deepmap
-				if err := binary.Read(r, binary.LittleEndian, &dm); err != nil {
-					return nil, fmt.Errorf("failed to read deepmap structure: %v", err)
-				}
-				if dm.Signature != [4]byte{'d', 'm', 'a', 'p'} {
-					return nil, fmt.Errorf("invalid deepmap signature: %s", dm.Signature)
-				}
-				// Read the compressed data
-				compressedData := make([]byte, dm.CompressedBlock)
-				if err := binary.Read(r, binary.LittleEndian, &compressedData); err != nil {
-					return nil, fmt.Errorf("failed to read Deepmap compressed data: %v", err)
-				}
-				log.WithFields(log.Fields{
-					"signature":          string(dm.Signature[:]),
-					"compression_method": dm.CompressionMethod,
-					"scale":              dm.Scale,
-					"pixel_format":       dm.PixelFormat,
-					"compressed_block":   dm.CompressedBlock,
-				}).Debug("Reading Deepmap")
-				if isLZFSE, _ := magic.IsLZFSE(compressedData); isLZFSE {
-					// Decompress the data
-					decompressed, err := comp.Decompress(compressedData, comp.LZFSE)
-					if err != nil {
-						return nil, fmt.Errorf("failed to decompress DeepmapLZFSE data: %v", err)
-					}
-					out.Write(decompressed)
-				} else {
-					out.Write(compressedData)
-				}
-				// switch dm.CompressionMethod {
-				// case ImageDeepmapCompressionDefault:
-				// 	// Decompress the data
-				// 	decompressed, err := comp.Decompress(compressedData, comp.LZFSE)
-				// 	if err != nil {
-				// 		return nil, fmt.Errorf("failed to decompress DeepmapLZFSE data: %v", err)
-				// 	}
-				// 	out.Write(decompressed)
-				// case ImageDeepmapCompressionNone:
-				// 	out.Write(compressedData)
-				// default:
-				// 	out.Write(compressedData)
-				// 	// return nil, fmt.Errorf("unsupported deepmap compression method: %d", dm.CompressionMethod)
-				// }
 			case Deepmap2:
-				// Handle Deepmap2 inside chunk stream
-				rdm := bytes.NewReader(data)
-				var cdm2 csiDeepmap2Data
-				if err := binary.Read(rdm, binary.LittleEndian, &cdm2); err != nil {
-					return nil, err
+				return deepmap2.Decode(data, width, rows, format, space == ExtendedSRGB || space == ExtendedLinear, opaque)
+			case DeepmapLZFSE:
+				return deepmap2.DecodeLegacy(data, width, rows, format, space == ExtendedSRGB || space == ExtendedLinear, opaque)
+			case PaletteImage:
+				return decodePaletteImage(data, width, rows, format, space, opaque)
+			case ASTCImage:
+				decoder := ""
+				if conf != nil {
+					decoder = conf.ASTCDecoder
 				}
-				var dm2 deepmap2
-				if err := binary.Read(rdm, binary.LittleEndian, &dm2); err != nil {
-					return nil, err
-				}
-				if dm2.Signature != [4]byte{'d', 'm', 'p', '2'} {
-					return nil, fmt.Errorf("invalid deepmap2 signature: %s", dm2.Signature)
-				}
-				// Override dimensions; keep CSI pixel format (authoritative for GA8 masks)
-				ci.Width = uint32(dm2.Width)
-				ci.Height = uint32(dm2.Height)
-				fromDeepmap2 = true
-				deepmap2PixFmt = dm2.PixelFormat
-				// Gather compressed payload which may span multiple KCBC chunks
-				need := int(dm2.CompressedBlock)
-				compressed := make([]byte, need)
-				readSoFar := 0
-				if rdm.Len() > 0 {
-					frag := make([]byte, rdm.Len())
-					if _, err := io.ReadFull(rdm, frag); err == nil {
-						toCopy := min(len(frag), need)
-						copy(compressed[0:toCopy], frag[:toCopy])
-						readSoFar += toCopy
-					}
-				}
-				// If not enough, consume following KCBC chunks from the outer reader 'r'.
-				// Cap to remaining chunks in the element to avoid reading past the end.
-				extraChunks := uint32(0)
-				maxExtra := elem.Length - 1 - i
-				for readSoFar < int(dm2.CompressedBlock) && extraChunks < maxExtra {
-					var next csiBitmapChunk
-					if err := binary.Read(r, binary.LittleEndian, &next); err != nil {
-						break
-					}
-					if next.Signature != [4]byte{'K', 'C', 'B', 'C'} {
-						break
-					}
-					buf := make([]byte, next.Length)
-					if err := binary.Read(r, binary.LittleEndian, &buf); err != nil {
-						break
-					}
-					remain := int(dm2.CompressedBlock) - readSoFar
-					toCopy := min(len(buf), remain)
-					copy(compressed[readSoFar:readSoFar+toCopy], buf[:toCopy])
-					readSoFar += toCopy
-					extraChunks++
-				}
-				// Skip accounting for consumed chunks in the outer loop
-				i += extraChunks
-				compressed = compressed[:readSoFar]
-				// Palette compression carries a palette before an LZFSE block; decode directly to image
-				if dm2.CompressionMethod == ImageDeepmapCompressionPalette {
-					magic := []byte("bvx2")
-					pos := bytes.Index(compressed, magic)
-					if pos > 0 {
-						palette := compressed[:pos]
-						indicesCompressed := compressed[pos:]
-						decomp, err := comp.Decompress(indicesCompressed, comp.LZFSE)
-						if err == nil {
-							// Compose [palette][indices] and decode
-							combo := append([]byte{}, append(palette, decomp...)...)
-							if palImg, err := decodePalettedImage(combo, int(ci.Width), int(ci.Height)); err == nil {
-								return palImg, nil
-							}
-						}
-					}
-				}
-				switch cdm2.Encoding {
-				case LZFSE:
-					if isLZFSE, _ := magic.IsLZFSE(compressed); isLZFSE {
-						decompressed, err := comp.Decompress(compressed, comp.LZFSE)
-						if err != nil {
-							return nil, fmt.Errorf("failed to decompress Deepmap2 LZFSE data: %v", err)
-						}
-						out.Write(decompressed)
-					} else {
-						// Some payloads are raw when marked LZFSE
-						out.Write(compressed)
-					}
-				case ZIP:
-					if isLZFSE, _ := magic.IsLZFSE(compressed); isLZFSE {
-						decompressed, err := comp.Decompress(compressed, comp.LZFSE)
-						if err != nil {
-							return nil, fmt.Errorf("failed to decompress Deepmap2 LZFSE-as-ZIP data: %v", err)
-						}
-						out.Write(decompressed)
-						break
-					}
-					if gr, err := gzip.NewReader(bytes.NewReader(compressed)); err == nil {
-						if _, err := io.Copy(&out, gr); err != nil {
-							return nil, fmt.Errorf("failed to decompress gzip data: %v", err)
-						}
-					} else if zr, err := zlib.NewReader(bytes.NewReader(compressed)); err == nil {
-						if _, err := io.Copy(&out, zr); err != nil {
-							return nil, fmt.Errorf("failed to decompress zlib data: %v", err)
-						}
-						zr.Close()
-					} else {
-						fr := flate.NewReader(bytes.NewReader(compressed))
-						if _, err := io.Copy(&out, fr); err != nil {
-							// Assume raw on failure
-							out.Write(compressed)
-						}
-						fr.Close()
-					}
-				case Deepmap2:
-					// Nested Deepmap2 often uses LZFSE after a small header
-					if len(data) > 16 {
-						decompressed, err := comp.Decompress(data[16:], comp.LZFSE)
-						if err != nil {
-							return nil, fmt.Errorf("failed to decompress nested Deepmap2: %v", err)
-						}
-						out.Write(decompressed)
-					} else {
-						out.Write(compressed)
-					}
-				default:
-					return nil, fmt.Errorf("unsupported deepmap2 encoding: %s", cdm2.Encoding)
-				}
+				return texture.DecodeASTC(data, width, rows, decoder, space == ExtendedLinear, opaque)
 			default:
-				return nil, fmt.Errorf("unknown encoding: %s (value: %d)", elem.Encoding, elem.Encoding)
+				return texture.DecodeDXTC(data, width, rows, opaque)
 			}
+		})
+	case JPEGLZFSE:
+		if format != PixFmtARGB {
+			return nil, fmt.Errorf("%w: JPEG+LZFSE pixel format %q", errUnsupportedRendition, format)
 		}
-	} else {
-		data := make([]byte, elem.Length)
-		if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
+		return decodeJPEGLZFSE(chunks, width, height, opaque)
+	case HEVC, BlurredImage:
+		return nil, fmt.Errorf("%w: pixel decoding %s", errUnsupportedRendition, elem.Encoding)
+	}
+	bpp, err := pixelSize(format)
+	if err != nil {
+		return nil, err
+	}
+	stride, _, err := pixel.Layout(width, height, bpp, rowBytesOverride)
+	if err != nil {
+		return nil, err
+	}
+	limit := stride * height
+	var out []byte
+	rleRows := 0
+	for _, chunk := range chunks {
+		var part []byte
+		if elem.Encoding == RLE {
+			rows := int(chunk.rows)
+			if rows == 0 && len(chunks) == 1 {
+				rows = height
+			}
+			if rows <= 0 || rows > height-rleRows {
+				return nil, fmt.Errorf("invalid RLE chunk height: %d", rows)
+			}
+			part, err = decodeRLERows(chunk.data, width, rows, stride, format)
+			rleRows += rows
+		} else {
+			chunkLimit := limit - len(out)
+			if elem.Encoding == LZVN && len(chunks) > 1 {
+				if chunk.rows == 0 || uint64(chunk.rows)*uint64(stride) > uint64(chunkLimit) {
+					return nil, fmt.Errorf("invalid LZVN chunk height")
+				}
+				chunkLimit = int(chunk.rows) * stride
+			}
+			part, err = decodeBitmapBytes(chunk.data, elem.Encoding, chunkLimit)
+		}
+		if err != nil {
 			return nil, err
 		}
-		switch elem.Encoding {
-		case Uncompressed:
-			out.Write(data)
-		case RLE:
-			out.Write(decodeRLE(data))
-		case ZIP:
-			// Try gzip first
-			gr, err := gzip.NewReader(bytes.NewReader(data))
-			if err == nil {
-				if _, err := io.Copy(&out, gr); err != nil {
-					return nil, fmt.Errorf("failed to decompress gzip: %v", err)
-				}
-			} else {
-				// Try zlib
-				zr, err := zlib.NewReader(bytes.NewReader(data))
-				if err == nil {
-					if _, err := io.Copy(&out, zr); err != nil {
-						return nil, fmt.Errorf("failed to decompress zlib: %v", err)
-					}
-					zr.Close()
-				} else {
-					// Try raw deflate
-					fr := flate.NewReader(bytes.NewReader(data))
-					if _, err := io.Copy(&out, fr); err != nil {
-						// Last resort - assume uncompressed
-						out.Write(data)
-					}
-					fr.Close()
-				}
-			}
-		case LZVN:
-			dec := make([]byte, len(data)*4)
-			if n := lzfse.DecodeLZVNBuffer(data, dec); n == 0 {
-				return nil, fmt.Errorf("failed to decompress lzvn data")
-			} else {
-				out.Write(dec[:n])
-			}
-		case LZFSE:
-			decompressed, err := comp.Decompress(data, comp.LZFSE)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
-			}
-			out.Write(decompressed)
-		case JPEGLZFSE:
-			return nil, unsupportedJPEGCompression()
-		case HEVC:
-			// HEVC/H.265 video data
-			var hevcInfo csiHEVCData
-			r := bytes.NewReader(data)
-			if err := binary.Read(r, binary.LittleEndian, &hevcInfo); err != nil {
-				return nil, fmt.Errorf("failed to read HEVC header: %v", err)
-			}
-			// Read the HEVC data
-			hevcData := make([]byte, hevcInfo.HevcDataSize)
-			if err := binary.Read(r, binary.LittleEndian, &hevcData); err != nil {
-				return nil, fmt.Errorf("failed to read HEVC data: %v", err)
-			}
-			// Output raw HEVC data (would need HEVC decoder for actual image)
-			out.Write(hevcData)
-		case ASTCImage:
-			// ASTC texture compression
-			var astcInfo csiASTCData
-			r := bytes.NewReader(data)
-			if err := binary.Read(r, binary.LittleEndian, &astcInfo); err != nil {
-				return nil, fmt.Errorf("failed to read ASTC header: %v", err)
-			}
-			// Read the ASTC data
-			astcData := make([]byte, astcInfo.AstcDataSize)
-			if err := binary.Read(r, binary.LittleEndian, &astcData); err != nil {
-				return nil, fmt.Errorf("failed to read ASTC data: %v", err)
-			}
-			if astcInfo.Version == 1 {
-				// LZFSE compressed ASTC data
-				decompressed, err := comp.Decompress(astcData, comp.LZFSE)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decompress ASTC data: %v", err)
-				}
-				out.Write(decompressed)
-			} else {
-				// Raw ASTC data
-				out.Write(astcData)
-			}
-		case PaletteImage:
-			if isLZFSE, _ := magic.IsLZFSE(data); isLZFSE {
-				// Decompress the data
-				decompressed, err := comp.Decompress(data, comp.LZFSE)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decompress DeepmapLZFSE data: %v", err)
-				}
-				out.Write(decompressed)
-			} else {
-				// Raw palette image data
-				out.Write(data)
-			}
-			// After decompression, the data should contain palette indices
-			// We'll handle this in the pixel format switch below
-		case DeepmapLZFSE:
-			// Deepmap with LZFSE compression
-			var deepmapInfo csiDeepmapData
-			r := bytes.NewReader(data)
-			if err := binary.Read(r, binary.LittleEndian, &deepmapInfo); err != nil {
-				return nil, fmt.Errorf("failed to read Deepmap header: %v", err)
-			}
-			var dm deepmap
-			if err := binary.Read(r, binary.LittleEndian, &dm); err != nil {
-				return nil, err
-			}
-			if dm.Signature != [4]byte{'d', 'm', 'a', 'p'} {
-				return nil, fmt.Errorf("invalid deepmap signature: %s", dm.Signature)
-			}
-			// Read the compressed data
-			compressedData := make([]byte, dm.CompressedBlock)
-			if err := binary.Read(r, binary.LittleEndian, &compressedData); err != nil {
-				return nil, fmt.Errorf("failed to read Deepmap compressed data: %v", err)
-			}
-			switch dm.CompressionMethod {
-			case ImageDeepmapCompressionLossless:
-				if isLZFSE, _ := magic.IsLZFSE(compressedData); isLZFSE {
-					// Decompress the data
-					decompressed, err := comp.Decompress(compressedData, comp.LZFSE)
-					if err != nil {
-						return nil, fmt.Errorf("failed to decompress DeepmapLZFSE data: %v", err)
-					}
-					out.Write(decompressed)
-				} else {
-					return nil, fmt.Errorf("lzfse magic bytes not found in DeepmapLZFSE data")
-				}
-			case ImageDeepmapCompressionDefault:
-				out.Write(decodeRLE(compressedData))
-			case ImageDeepmapCompressionNone:
-				out.Write(compressedData)
-			case ImageDeepmapCompressionPalette:
-				return nil, fmt.Errorf("deepmap palette compression not implemented")
-			}
-		case Deepmap2:
-			dmr := bytes.NewReader(data)
-			var cdm2 csiDeepmap2Data
-			if err := binary.Read(dmr, binary.LittleEndian, &cdm2); err != nil {
-				return nil, err
-			}
-			if conf != nil && conf.Verbose {
-				log.WithFields(log.Fields{
-					"version":  cdm2.Version,
-					"encoding": cdm2.Encoding,
-					"length":   cdm2.Length,
-				}).Info("Reading Deepmap2 Data")
-			}
-			var dm2 deepmap2
-			if err := binary.Read(dmr, binary.LittleEndian, &dm2); err != nil {
-				return nil, err
-			}
-			if dm2.Signature != [4]byte{'d', 'm', 'p', '2'} {
-				return nil, fmt.Errorf("invalid deepmap2 signature: %s", dm2.Signature)
-			}
-			if conf != nil && conf.Verbose {
-				log.WithFields(log.Fields{
-					"signature":          string(dm2.Signature[:]),
-					"blob_version":       dm2.BlobVersion,
-					"pixel_format":       dm2.PixelFormat,
-					"compression_method": dm2.CompressionMethod,
-					"width":              dm2.Width,
-					"height":             dm2.Height,
-					"scale":              dm2.Scale,
-					"compressed_block":   dm2.CompressedBlock,
-				}).Warn("Reading Deepmap2")
-			}
-			if dm2.BlobVersion != 1 {
-				return nil, fmt.Errorf("unsupported deepmap2 blob version: %d", dm2.BlobVersion)
-			}
-
-			// Override dimensions; keep CSI pixel format (authoritative for GA8 masks)
-			ci.Width = uint32(dm2.Width)
-			ci.Height = uint32(dm2.Height)
-			fromDeepmap2 = true
-			deepmap2PixFmt = dm2.PixelFormat
-			switch cdm2.Encoding {
-			case LZFSE, ZIP:
-				// Gather the full Deepmap2 compressed block, which may follow in KCBC chunks
-				need := int(dm2.CompressedBlock)
-				compressed := make([]byte, need)
-				readSoFar := 0
-				if dmr.Len() > 0 {
-					frag := make([]byte, dmr.Len())
-					if _, err := io.ReadFull(dmr, frag); err == nil {
-						toCopy := min(len(frag), need)
-						copy(compressed[0:], frag[:toCopy])
-						readSoFar += toCopy
-					}
-				}
-				// In the non-chunked path, the blob may be smaller than
-				// CompressedBlock claims — proceed with what we have.
-				compressed = compressed[:readSoFar]
-
-				// If palette compression, split palette and indices and decode paletted directly
-				if dm2.CompressionMethod == ImageDeepmapCompressionPalette {
-					// Look for LZFSE block header magic commonly seen as 'bvx2'
-					pos := bytes.Index(compressed, []byte("bvx2"))
-					if pos > 0 {
-						palette := compressed[:pos]
-						indicesCompressed := compressed[pos:]
-						// Some files mark ZIP but actually contain LZFSE
-						decomp, err := comp.Decompress(indicesCompressed, comp.LZFSE)
-						if err == nil {
-							combo := append([]byte{}, append(palette, decomp...)...)
-							if palImg, err := decodePalettedImage(combo, int(ci.Width), int(ci.Height)); err == nil {
-								return palImg, nil
-							}
-						}
-					}
-				}
-
-				// Otherwise, decompress the full block
-				if cdm2.Encoding == ZIP {
-					if isLZFSE, _ := magic.IsLZFSE(compressed); isLZFSE {
-						decompressed, err := comp.Decompress(compressed, comp.LZFSE)
-						if err != nil {
-							return nil, fmt.Errorf("failed to decompress Deepmap2 LZFSE data: %v", err)
-						}
-						out.Write(decompressed)
-					} else if gr, err := gzip.NewReader(bytes.NewReader(compressed)); err == nil {
-						if _, err := io.Copy(&out, gr); err != nil {
-							return nil, fmt.Errorf("failed to decompress gzip data: %v", err)
-						}
-					} else if zr, err := zlib.NewReader(bytes.NewReader(compressed)); err == nil {
-						if _, err := io.Copy(&out, zr); err != nil {
-							return nil, fmt.Errorf("failed to decompress zlib data: %v", err)
-						}
-						zr.Close()
-					} else {
-						fr := flate.NewReader(bytes.NewReader(compressed))
-						if _, err := io.Copy(&out, fr); err != nil {
-							out.Write(compressed)
-						}
-						fr.Close()
-					}
-				} else {
-					if isLZFSE, _ := magic.IsLZFSE(compressed); isLZFSE {
-						decompressed, err := comp.Decompress(compressed, comp.LZFSE)
-						if err != nil {
-							return nil, fmt.Errorf("failed to decompress LZFSE data: %v", err)
-						}
-						out.Write(decompressed)
-					} else {
-						out.Write(compressed)
-					}
-				}
-			case Deepmap2:
-				// Handle nested Deepmap2 encoding
-				if dmr.Len() > 16 {
-					payload := make([]byte, dmr.Len())
-					if _, err := io.ReadFull(dmr, payload); err == nil {
-						decompressed, err := comp.Decompress(payload[16:], comp.LZFSE)
-						if err != nil {
-							return nil, fmt.Errorf("failed to decompress nested Deepmap2: %v", err)
-						}
-						out.Write(decompressed)
-					}
-				}
-			default:
-				return nil, fmt.Errorf("unsupported deepmap2 encoding: %s", cdm2.Encoding)
-			}
-		default:
-			return nil, fmt.Errorf("unknown encoding: %s (value: %d)", elem.Encoding, elem.Encoding)
-		}
+		out = append(out, part...)
 	}
-
-	// Check for invalid image dimensions
-	if ci.Width == 0 || ci.Height == 0 {
-		return nil, fmt.Errorf("invalid image dimensions: %dx%d", ci.Width, ci.Height)
+	if elem.Encoding == RLE && rleRows != height {
+		return nil, fmt.Errorf("RLE chunks contain %d rows, expected %d", rleRows, height)
 	}
-
-	// Check if this was a PaletteImage compression type
-	// If so, decode as a paletted image regardless of pixel format
-	if elem.Encoding == PaletteImage {
-		// Try to decode as a paletted image
-		if palImg, err := decodePalettedImage(out.Bytes(), int(ci.Width), int(ci.Height)); err == nil {
-			return palImg, nil
-		} else {
-			// If palette decoding fails, log and try normal pixel format handling as fallback
-			log.Debugf("Failed to decode as PaletteImage for %s: %v, falling back to pixel format", string(bytes.Trim(ci.Metadata.Name[:], "\x00")), err)
-		}
+	if format == PixFmtARGB16 && (space == ExtendedSRGB || space == ExtendedLinear) {
+		return pixel.DecodeHalfFloatRGBA(out, width, height, rowBytesOverride, opaque)
 	}
-
-	format := string(ci.PixelFormat[:])
-	switch format {
-	case PixFmtARGB, PixFmtARGB16:
-		// Special handling for IconImage layout which often uses channel-separated ARGB format (AAAA RRRR GGGG BBBB)
-		if ci.Metadata.Layout == IconImage {
-			pixelCount := int(ci.Width * ci.Height)
-			// Prefer exact-sized channel data, but allow >= to tolerate minor padding
-			if out.Len() >= pixelCount*4 {
-				if img, err := decodeAppIconARGB(out.Bytes(), int(ci.Width), int(ci.Height)); err == nil {
-					return img, nil
-				}
-			}
-		}
-
-		var offset int
-		bytesPerPixel := 4 // Default for ARGB (8-bit per channel)
-		if format == PixFmtARGB16 {
-			if !fromDeepmap2 {
-				return nil, fmt.Errorf("unsupported pixel format: %s outside Deepmap2", format)
-			}
-			bytesPerPixel = 8 // 16-bit per channel (2 bytes per channel × 4 channels)
-		}
-
-		expectedSize := int(ci.Width * ci.Height * uint32(bytesPerPixel))
-		actualSize := out.Len()
-
-		if actualSize < expectedSize {
-			// Dump raw bytes for debugging when verbose
-			if conf != nil && conf.Verbose && conf.Export && conf.Output != "" {
-				name := strings.Trim(string(bytes.Trim(ci.Metadata.Name[:], "\x00")), " ")
-				if name == "" {
-					name = fmt.Sprintf("asset_%dx%d_%s", ci.Width, ci.Height, format)
-				}
-				errPath := filepath.Join(conf.Output, fmt.Sprintf("%s.error", name))
-				_ = os.WriteFile(errPath, out.Bytes(), 0644)
-			}
-			return nil, fmt.Errorf("insufficient image data: got %d bytes, expected %d bytes for %dx%d %s", actualSize, expectedSize, ci.Width, ci.Height, format)
-		}
-
-		if v := actualSize - expectedSize; v != 0 {
-			offset = v / int(ci.Height*uint32(bytesPerPixel))
-		}
-		rect := image.Rectangle{
-			Min: image.Point{0, 0},
-			Max: image.Point{
-				X: int(ci.Width),
-				Y: int(ci.Height),
-			},
-		}
-		// rgba := image.NewRGBA(rect)
-		// rgba.Pix = out.Bytes()
-		// rgba.Stride = (rect.Dx() + offset) * 4
-		// return rgba, nil
-		// Deepmap2 emits RGBA ordering; do not apply BGRA swap, and downconvert 16-bit to 8-bit
-		if fromDeepmap2 {
-			if format == PixFmtARGB16 || deepmap2PixFmt == ImageDeepmapPixelFormatRGBA16 {
-				// downconvert RGBA16 (LE) to RGBA8
-				in := out.Bytes()
-				px := rect.Dx() * rect.Dy()
-				dst := make([]byte, px*4)
-				for i := range px {
-					j := i * 8
-					// take high byte of each 16-bit LE component
-					r := in[j+1]
-					g := in[j+3]
-					b := in[j+5]
-					a := in[j+7]
-					k := i * 4
-					dst[k+0] = r
-					dst[k+1] = g
-					dst[k+2] = b
-					dst[k+3] = a
-				}
-				stride := rect.Dx() * 4
-				img := &image.RGBA{Pix: dst, Stride: stride, Rect: rect}
-				return img, nil
-			}
-			// RGBA8
-			stride := rect.Dx() * 4
-			if rowBytesOverride > 0 {
-				stride = rowBytesOverride
-			}
-			img := &image.RGBA{Pix: out.Bytes(), Stride: stride, Rect: rect}
-			return img, nil
-		}
-
-		// Default path: treat as BGRA in memory and swap when reading
-		stride := (rect.Dx() + offset) * bytesPerPixel
-		if rowBytesOverride > 0 {
-			stride = rowBytesOverride
-		}
-		bgra := &BGRA{image.RGBA{
-			Pix:    out.Bytes(),
-			Stride: stride,
-			Rect:   rect,
-		}}
-		return bgra, nil
-	case PixFmtGray, PixFmtGray16:
-		if format == PixFmtGray16 {
-			return nil, fmt.Errorf("unsupported pixel format: %s", format)
-		}
-		var offset int
-		bytesPerPixel := 2 // GA8: gray + alpha (1 byte each)
-
-		expectedSize := int(ci.Width * ci.Height * uint32(bytesPerPixel))
-		actualSize := out.Len()
-
-		if actualSize < expectedSize {
-			// Not enough data for the image
-			return nil, fmt.Errorf("insufficient image data: got %d bytes, expected %d bytes for %dx%d %s", actualSize, expectedSize, ci.Width, ci.Height, format)
-		}
-
-		if v := actualSize - expectedSize; v != 0 {
-			offset = v / int(ci.Height*uint32(bytesPerPixel))
-		}
-
-		rect := image.Rectangle{
-			Min: image.Point{0, 0},
-			Max: image.Point{
-				X: int(ci.Width),
-				Y: int(ci.Height),
-			},
-		}
-		stride := (rect.Dx() + offset) * bytesPerPixel
-		if rowBytesOverride > 0 {
-			stride = rowBytesOverride
-		}
-		bgra := &GA8{
-			Pix:    out.Bytes(),
-			Stride: stride,
-			Rect:   rect,
-		}
-		return bgra, nil
-	default:
-		return nil, fmt.Errorf("unknown pixel format: %s", format)
-	}
+	return decodePixels(out, width, height, format, rowBytesOverride, opaque)
 }
 
-// decodePalettedImage creates a paletted image from palette data and indices
-// The format is typically: [palette colors (256 * 4 bytes RGBA)][pixel indices]
-// cafef00dMagic identifies CoreUI palette rendition data.
-const cafef00dMagic = 0xcafef00d
-
-func decodePalettedImage(data []byte, width, height int) (image.Image, error) {
-	pixelCount := width * height
-
-	// CoreUI palette format: [uint32 magic 0xcafef00d][uint32 version]
-	// [uint16 palette_count][count*4 RGBA entries][width*height indices]
-	if len(data) >= 10 {
-		magic := binary.LittleEndian.Uint32(data[0:4])
-		if magic == cafef00dMagic {
-			count := int(binary.LittleEndian.Uint16(data[8:10]))
-			hdr := 10
-			palBytes := count * 4
-			if len(data) < hdr+palBytes+pixelCount {
-				return nil, fmt.Errorf("cafef00d palette data too short: got %d, need %d (hdr=%d palette=%d indices=%d)",
-					len(data), hdr+palBytes+pixelCount, hdr, palBytes, pixelCount)
-			}
-			palette := make(color.Palette, count)
-			for i := range count {
-				off := hdr + i*4
-				palette[i] = color.RGBA{
-					R: data[off],
-					G: data[off+1],
-					B: data[off+2],
-					A: data[off+3],
-				}
-			}
-			indices := data[hdr+palBytes:]
-			rect := image.Rect(0, 0, width, height)
-			img := image.NewPaletted(rect, palette)
-			copy(img.Pix, indices[:pixelCount])
+// assembleBitmapChunks keeps the decoder's sample precision, including 16-bit
+// straight alpha. A single chunk needs no extra image allocation.
+func assembleBitmapChunks(chunks []bitmapChunk, width, height int, decode func([]byte, int) (image.Image, error)) (image.Image, error) {
+	var dst draw.Image
+	y := 0
+	for _, chunk := range chunks {
+		rows := int(chunk.rows)
+		if rows == 0 && len(chunks) == 1 {
+			rows = height
+		}
+		if rows <= 0 || rows > height-y {
+			return nil, fmt.Errorf("invalid bitmap chunk height: %d", rows)
+		}
+		img, err := decode(chunk.data, rows)
+		if err != nil {
+			return nil, err
+		}
+		if img.Bounds().Dx() != width || img.Bounds().Dy() != rows {
+			return nil, fmt.Errorf("decoded chunk dimensions do not match CSI")
+		}
+		if len(chunks) == 1 && rows == height {
 			return img, nil
 		}
-	}
-
-	// Fallback: fixed 256-entry palette + indices
-	const fixedPaletteSize = 256
-	fixedPalBytes := fixedPaletteSize * 4
-	if len(data) >= fixedPalBytes+pixelCount {
-		palette := make(color.Palette, fixedPaletteSize)
-		for i := range fixedPaletteSize {
-			off := i * 4
-			palette[i] = color.RGBA{
-				R: data[off],
-				G: data[off+1],
-				B: data[off+2],
-				A: data[off+3],
+		wide := img.ColorModel() == color.RGBA64Model || img.ColorModel() == color.NRGBA64Model || img.ColorModel() == color.Gray16Model
+		if dst == nil || (wide && dst.ColorModel() != color.NRGBA64Model && dst.ColorModel() != color.RGBA64Model) {
+			bpp := 4
+			if wide {
+				bpp = 8
+			}
+			if _, _, err := pixel.Layout(width, height, bpp, 0); err != nil {
+				return nil, err
+			}
+			previous := dst
+			if wide && img.ColorModel() == color.RGBA64Model {
+				dst = image.NewRGBA64(image.Rect(0, 0, width, height))
+			} else if wide {
+				dst = image.NewNRGBA64(image.Rect(0, 0, width, height))
+			} else {
+				dst = image.NewRGBA(image.Rect(0, 0, width, height))
+			}
+			if previous != nil {
+				draw.Draw(dst, image.Rect(0, 0, width, y), previous, image.Point{}, draw.Src)
 			}
 		}
-		rect := image.Rect(0, 0, width, height)
-		img := image.NewPaletted(rect, palette)
-		copy(img.Pix, data[fixedPalBytes:fixedPalBytes+pixelCount])
-		return img, nil
+		draw.Draw(dst, image.Rect(0, y, width, y+rows), img, img.Bounds().Min, draw.Src)
+		y += rows
 	}
-
-	// Fallback: indices only (grayscale palette)
-	if len(data) >= pixelCount {
-		palette := make(color.Palette, 256)
-		for i := range 256 {
-			palette[i] = color.RGBA{uint8(i), uint8(i), uint8(i), 255}
-		}
-		rect := image.Rect(0, 0, width, height)
-		img := image.NewPaletted(rect, palette)
-		copy(img.Pix, data[:pixelCount])
-		return img, nil
+	if y != height {
+		return nil, fmt.Errorf("bitmap chunks contain %d rows, expected %d", y, height)
 	}
-
-	return nil, fmt.Errorf("insufficient data for paletted image: got %d bytes, need %d (width=%d height=%d)",
-		len(data), pixelCount, width, height)
-}
-
-// decodeAppIconARGB decodes AppIcon ARGB format where channels are separated
-// Instead of interleaved ARGBARGBARGB, the data is stored as AAARRRGGGBBB
-func decodeAppIconARGB(data []byte, width, height int) (image.Image, error) {
-	pixelCount := width * height
-	expectedSize := pixelCount * 4 // 4 bytes per pixel (ARGB)
-
-	if len(data) < expectedSize {
-		return nil, fmt.Errorf("insufficient data for AppIcon ARGB: got %d bytes, expected %d", len(data), expectedSize)
-	}
-
-	rect := image.Rectangle{
-		Min: image.Point{0, 0},
-		Max: image.Point{X: width, Y: height},
-	}
-
-	img := image.NewRGBA(rect)
-
-	// Extract the separate channels
-	// The format is: all alpha values, then all red, then all green, then all blue
-	alphaChannel := data[0:pixelCount]
-	redChannel := data[pixelCount : pixelCount*2]
-	greenChannel := data[pixelCount*2 : pixelCount*3]
-	blueChannel := data[pixelCount*3 : pixelCount*4]
-
-	// Reconstruct interleaved RGBA pixels
-	for i := range pixelCount {
-		pixelIndex := i * 4
-		img.Pix[pixelIndex+0] = redChannel[i]   // R
-		img.Pix[pixelIndex+1] = greenChannel[i] // G
-		img.Pix[pixelIndex+2] = blueChannel[i]  // B
-		img.Pix[pixelIndex+3] = alphaChannel[i] // A
-	}
-
-	return img, nil
+	return dst, nil
 }
