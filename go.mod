@@ -24,7 +24,7 @@ require (
 	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-download v0.2.8
 	github.com/blacktop/go-dwarf v1.0.14
-	github.com/blacktop/go-macho v1.1.290
+	github.com/blacktop/go-macho v1.1.291
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.26
 	github.com/blacktop/lzfse-cgo v1.2.0
@@ -58,7 +58,7 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.14.0
-	github.com/klauspost/compress v1.20.0
+	github.com/klauspost/compress v1.20.1
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-mastodon v0.0.13
 	github.com/mitchellh/mapstructure v1.5.0
@@ -76,10 +76,11 @@ require (
 	github.com/ulikunitz/xz v0.5.17
 	github.com/unicorn-engine/unicorn v0.0.0-20260217064959-7c5db94191de
 	github.com/vbauerster/cupwriter v0.0.5
-	github.com/vbauerster/mpb/v8 v8.16.1
+	github.com/vbauerster/mpb/v8 v8.16.2
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.57.0
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba
+	golang.org/x/image v0.46.0
 	golang.org/x/net v0.59.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
@@ -189,7 +190,7 @@ require (
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/makeworld-the-better-one/dither/v2 v2.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-runewidth v0.0.28 // indirect
+	github.com/mattn/go-runewidth v0.0.30 // indirect
 	github.com/mattn/go-sixel v0.0.8 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
@@ -251,7 +252,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/arch v0.24.0 // indirect
-	golang.org/x/image v0.36.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
