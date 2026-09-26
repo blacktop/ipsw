@@ -24,7 +24,7 @@ require (
 	github.com/blacktop/go-apfs v1.0.27
 	github.com/blacktop/go-download v0.2.8
 	github.com/blacktop/go-dwarf v1.0.14
-	github.com/blacktop/go-macho v1.1.288
+	github.com/blacktop/go-macho v1.1.289
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.26
 	github.com/blacktop/lzfse-cgo v1.2.0

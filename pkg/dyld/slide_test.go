@@ -83,7 +83,7 @@ func TestSlideMetadataSharedAcrossConcurrentWalks(t *testing.T) {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			f, mapping, tracker, wantBytes := slideCacheFixture(t, version)
 			var wg sync.WaitGroup
-			for n := 0; n < 16; n++ {
+			for range 16 {
 				wg.Go(func() {
 					rs, err := f.GetRebaseInfoForPages(f.UUID, mapping, 1, 2)
 					if err != nil {

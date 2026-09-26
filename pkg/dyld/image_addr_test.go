@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"slices"
 	"sort"
 	"sync"
 	"testing"
@@ -49,8 +50,8 @@ func BenchmarkGetImageContainingVMAddr(b *testing.B) {
 	var addresses [64]uint64
 	found := false
 	// Use a late image so the benchmark exercises a substantial linear scan.
-	for i := len(f.Images) - 1; i >= 0; i-- {
-		m, err := f.Images[i].GetPartialMacho()
+	for _, v := range slices.Backward(f.Images) {
+		m, err := v.GetPartialMacho()
 		if err != nil {
 			b.Fatal(err)
 		}

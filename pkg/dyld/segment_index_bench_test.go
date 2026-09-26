@@ -36,7 +36,7 @@ func TestW17Index(t *testing.T) {
 	}
 	runtime.ReadMemStats(&first)
 	start = time.Now()
-	for n := 0; n < 100; n++ {
+	for range 100 {
 		next, err := f.GetDylibIndex(name)
 		if err != nil {
 			t.Fatal(err)
@@ -98,7 +98,7 @@ func TestW17SegmentIndex(t *testing.T) {
 	}
 	runtime.ReadMemStats(&first)
 	start = time.Now()
-	for n := 0; n < 100; n++ {
+	for range 100 {
 		again, err := f.GetImageContainingVMAddr(addr)
 		if err != nil {
 			t.Fatal(err)

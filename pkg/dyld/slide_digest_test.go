@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"testing"
 )
@@ -47,7 +48,7 @@ func TestSlideDigest(t *testing.T) {
 		for addr := range img.sinfo {
 			keys = append(keys, addr)
 		}
-		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		slices.Sort(keys)
 		h := sha256.New()
 		var entry [16]byte
 		for _, addr := range keys {
