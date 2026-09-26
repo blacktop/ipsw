@@ -496,6 +496,7 @@ type namedStubCache struct {
 	owner   *File
 	changes uint64
 	count   int
+	skipped int
 	names   map[uint64]string
 }
 
@@ -509,15 +510,22 @@ func (f *File) GetStubIslands() (map[uint64]string, error) {
 		}
 	}
 	if cached := table.stubNames; cached != nil && cached.owner == f && cached.changes == table.changes && cached.count == len(f.islandStubs) {
+		log.Debugf("Skipped %d stub islands with zero targets", cached.skipped)
 		return maps.Clone(cached.names), nil
 	}
 	stubs := make(map[uint64]string)
+	skipped := 0
 	for stub, target := range f.islandStubs {
+		if target == 0 {
+			skipped++
+			continue
+		}
 		if symName, ok := f.AddressToSymbol.Get(target); ok {
 			stubs[stub] = symName
 		}
 	}
-	table.stubNames = &namedStubCache{owner: f, changes: table.changes, count: len(f.islandStubs), names: stubs}
+	log.Debugf("Skipped %d stub islands with zero targets", skipped)
+	table.stubNames = &namedStubCache{owner: f, changes: table.changes, count: len(f.islandStubs), skipped: skipped, names: stubs}
 	return maps.Clone(stubs), nil
 }
 

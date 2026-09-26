@@ -1265,9 +1265,9 @@ func shouldPublishTrieAddress(sym trie.TrieExport) bool {
 	return !sym.Flags.ReExport()
 }
 
-// Undefined values and indirect string-table offsets are not symbol addresses.
+// Undefined values, absolute constants, and indirect string-table offsets are not symbol addresses.
 func shouldPublishSymtabAddress(sym macho.Symbol) bool {
-	return !sym.Type.IsUndefinedSym() && !sym.Type.IsIndirectSym()
+	return !sym.Type.IsUndefinedSym() && !sym.Type.IsIndirectSym() && !sym.Type.IsAbsoluteSym()
 }
 
 // ParsePublicSymbols parses and caches, with the option to dump, all the exports, symtab and dyld_info symbols in the image/dylib

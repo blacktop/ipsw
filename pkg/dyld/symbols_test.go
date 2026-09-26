@@ -38,6 +38,8 @@ func TestPublicSymbolAddressPublication(t *testing.T) {
 		}{
 			{"defined symbol", macho.Symbol{Name: "_defined", Type: types.N_SECT | types.N_EXT, Sect: 1, Value: 0x180001000}, true},
 			{"undefined symbol", macho.Symbol{Name: "_undefined", Type: types.N_UNDF | types.N_EXT}, false},
+			{"absolute zero symbol", macho.Symbol{Name: "__swift_retainRelease_slowpath_mask_v1", Type: types.N_ABS | types.N_EXT}, false},
+			{"absolute nonzero symbol", macho.Symbol{Name: "_constant", Type: types.N_ABS | types.N_EXT, Value: 42}, false},
 			{"indirect symbol", macho.Symbol{Name: "_alias", Type: types.N_INDR | types.N_EXT, Value: 42}, false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -49,11 +51,30 @@ func TestPublicSymbolAddressPublication(t *testing.T) {
 	})
 }
 
-// Keep the pre-reuse naming loop as an independent reference for the real-cache
+func TestStubIslandsSkipZeroTargets(t *testing.T) {
+	table := NewA2STable(0)
+	table.Set(0, "_not_a_destination")
+	table.Set(1, "_named_target")
+	f := &File{AddressToSymbol: table, islandStubs: map[uint64]uint64{10: 0, 20: 1}}
+	for range 2 { // Exercise both cache construction and reuse.
+		got, err := f.GetStubIslands()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := map[uint64]string{20: "_named_target"}; !maps.Equal(got, want) {
+			t.Fatalf("names = %v, want %v", got, want)
+		}
+	}
+}
+
+// Keep an uncached naming loop as an independent reference for the real-cache
 // replay as well as the synthetic invalidation tests.
 func uncachedStubNames(f *File) map[uint64]string {
 	names := make(map[uint64]string)
 	for stub, target := range f.islandStubs {
+		if target == 0 {
+			continue
+		}
 		if name, ok := f.AddressToSymbol.Get(target); ok {
 			names[stub] = name
 		}
