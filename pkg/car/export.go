@@ -95,85 +95,25 @@ type ExportEntry struct {
 // PlanExport computes deterministic destinations without decoding or writing.
 // It includes every selected rendition, including failed and unknown formats.
 func (a *Asset) PlanExport(output string) []ExportEntry {
+	return a.planExport(output, a.indexRenditions())
+}
+
+func (a *Asset) planExport(output string, index renditionIndex) []ExportEntry {
 	order := make([]int, 0, len(a.ImageDB))
-	byKey := make(map[string]int, len(a.ImageDB))
 	for i := range a.ImageDB {
-		byKey[renditionKey(a.ImageDB[i].Key)] = i
 		if a.isSelected(i) {
 			order = append(order, i)
 		}
 	}
 	sort.SliceStable(order, func(i, j int) bool {
-		return renditionKey(a.ImageDB[order[i]].Key) < renditionKey(a.ImageDB[order[j]].Key)
+		return index.keys[order[i]] < index.keys[order[j]]
 	})
 	entries := make([]ExportEntry, 0, len(order))
 	used := make(map[string]bool)
+	var names map[uint16]string
 	for _, i := range order {
 		rend := &a.ImageDB[i]
-		entry := ExportEntry{index: i, Key: append([]uint16(nil), rend.Key...), Name: rend.RenditionName,
-			Compression: rend.Compression, Width: rend.Width, Height: rend.Height, Deferred: rend.Deferred,
-			ColorSpace: rend.Colorspace, Orientation: rend.Orientation,
-			Status: "planned", Warnings: append([]string(nil), rend.Warnings...)}
-		raw := a.conf != nil && a.conf.Raw
-		failures := []error{rend.ExportError}
-		if !raw {
-			for _, err := range []error{rend.DecodeError, rend.ResolveError} {
-				if errors.Is(err, errUnsupportedRendition) {
-					entry.Status, entry.Error = "unsupported", err.Error()
-				} else {
-					failures = append(failures, err)
-				}
-			}
-		}
-		for _, err := range failures {
-			if err != nil {
-				entry.Status, entry.Error = "failed", err.Error()
-				break
-			}
-		}
-		ext := exportExtension(rend)
-		if a.conf != nil && a.conf.Raw {
-			ext = ".csi"
-		} else {
-			format, known := plannedSourceFormat(rend)
-			if a.conf != nil && a.conf.Render {
-				if isRenderableFormat(format) {
-					ext = ".png"
-					entry.ColorSpace = SRGB.String()
-				} else if !known && rend.Deferred {
-					entry.ColorSpace = ""
-					entry.Warnings = append(entry.Warnings, "Rendering may change the destination to PNG after the DATA payload is decoded")
-				}
-			}
-			if rend.link != nil {
-				ext = ".png"
-				if rend.isRawLink() {
-					ext = ".raw"
-				}
-			}
-			if err := a.planReference(i, byKey, &entry); err != nil && entry.Error == "" {
-				entry.Status, entry.Error = "failed", err.Error()
-				if errors.Is(err, errUnsupportedRendition) {
-					entry.Status = "unsupported"
-				}
-			}
-		}
-		if img, ok := rend.Asset.(image.Image); ok {
-			entry.Width, entry.Height = uint32(img.Bounds().Dx()), uint32(img.Bounds().Dy())
-		}
-		if a.conf != nil && a.conf.ApplyOrientation && ext == ".png" {
-			for _, resource := range rend.Resources {
-				if resource.ID == MetaDataEXIFOrientationID && len(resource.Data) != 4 {
-					entry.Status, entry.Error = "failed", "EXIF orientation resource must contain four bytes"
-				}
-			}
-			if rend.Orientation > 8 {
-				entry.Status, entry.Error = "failed", fmt.Sprintf("invalid EXIF orientation: %d", rend.Orientation)
-			}
-			if rend.Orientation >= 5 && rend.Orientation <= 8 {
-				entry.Width, entry.Height = entry.Height, entry.Width
-			}
-		}
+		entry, ext := a.planExportEntry(i, index)
 		if ext == "" {
 			if entry.Error == "" {
 				entry.Status, entry.Error = "unsupported", "no export format for this rendition"
@@ -181,29 +121,17 @@ func (a *Asset) PlanExport(output string) []ExportEntry {
 		} else {
 			base := rend.RenditionName
 			if rend.PixelFormat == PixFmtRawData || rend.isRawLink() {
-				if name := a.GetName(rend.ID()); name != "" {
+				if names == nil {
+					names = a.exportNames()
+				}
+				if name := names[rend.ID()]; name != "" {
 					base = strings.TrimRight(name, "\x00")
 				}
 			}
-			base = safeExportStem(base)
-			if ext == ".raw" {
-				if originalExt := filepath.Ext(base); len(originalExt) > 1 && len(originalExt) <= 16 {
-					ext = originalExt
-				}
-			}
-			if strings.HasSuffix(strings.ToLower(base), strings.ToLower(ext)) {
-				base = base[:len(base)-len(ext)]
-			}
-			digest := sha256.Sum256([]byte(renditionKey(rend.Key)))
-			name := fmt.Sprintf("%s-%x%s", base, digest[:8], ext)
-			for suffix := 1; used[strings.ToLower(name)]; suffix++ {
-				name = fmt.Sprintf("%s-%x-%d%s", base, digest[:8], suffix, ext)
-			}
-			used[strings.ToLower(name)] = true
-			entry.Path, entry.Format = filepath.Join(output, name), strings.TrimPrefix(ext, ".")
+			name, format := exportName(base, index.keys[i], ext, used)
+			entry.Path, entry.Format = filepath.Join(output, name), format
 			if rend.ExportPath != "" {
-				entry.Status = "exported"
-				entry.Path = rend.ExportPath
+				entry.Status, entry.Path = "exported", rend.ExportPath
 			}
 		}
 		entries = append(entries, entry)
@@ -211,7 +139,130 @@ func (a *Asset) PlanExport(output string) []ExportEntry {
 	return entries
 }
 
-func (a *Asset) planReference(index int, byKey map[string]int, entry *ExportEntry) error {
+func (a *Asset) planExportEntry(i int, index renditionIndex) (ExportEntry, string) {
+	rend := &a.ImageDB[i]
+	entry := ExportEntry{
+		index: i, Key: append([]uint16(nil), rend.Key...), Name: rend.RenditionName,
+		Compression: rend.Compression, Deferred: rend.Deferred,
+		Width: rend.Width, Height: rend.Height,
+		ColorSpace: rend.Colorspace, Orientation: rend.Orientation,
+		Warnings: append([]string(nil), rend.Warnings...),
+	}
+	raw := a.conf != nil && a.conf.Raw
+	entry.Status, entry.Error = exportStatus(rend, raw)
+	ext := a.planExportFormat(rend, &entry)
+	if !raw {
+		if err := a.planReference(i, index, &entry); err != nil && entry.Error == "" {
+			entry.Status, entry.Error = "failed", err.Error()
+			if errors.Is(err, errUnsupportedRendition) {
+				entry.Status = "unsupported"
+			}
+		}
+	}
+	if img, ok := rend.Asset.(image.Image); ok {
+		entry.Width, entry.Height = uint32(img.Bounds().Dx()), uint32(img.Bounds().Dy())
+	}
+	if a.conf != nil && a.conf.ApplyOrientation && ext == ".png" {
+		planOrientation(rend, &entry)
+	}
+	return entry, ext
+}
+
+func exportStatus(rend *Rendition, raw bool) (status, message string) {
+	status = "planned"
+	failures := []error{rend.ExportError}
+	if !raw {
+		for _, err := range []error{rend.DecodeError, rend.ResolveError} {
+			if errors.Is(err, errUnsupportedRendition) {
+				status, message = "unsupported", err.Error()
+			} else {
+				failures = append(failures, err)
+			}
+		}
+	}
+	for _, err := range failures {
+		if err != nil {
+			return "failed", err.Error()
+		}
+	}
+	return status, message
+}
+
+func (a *Asset) planExportFormat(rend *Rendition, entry *ExportEntry) string {
+	if a.conf != nil && a.conf.Raw {
+		return ".csi"
+	}
+	ext := exportExtension(rend)
+	format, known := plannedSourceFormat(rend)
+	if a.conf != nil && a.conf.Render {
+		if isRenderableFormat(format) {
+			ext, entry.ColorSpace = ".png", SRGB.String()
+		} else if !known && rend.Deferred {
+			entry.ColorSpace = ""
+			entry.Warnings = append(entry.Warnings,
+				"Rendering may change the destination to PNG after the DATA payload is decoded")
+		}
+	}
+	if rend.isRawLink() {
+		return ".raw"
+	}
+	if rend.link != nil {
+		return ".png"
+	}
+	return ext
+}
+
+func planOrientation(rend *Rendition, entry *ExportEntry) {
+	for _, resource := range rend.Resources {
+		if resource.ID == MetaDataEXIFOrientationID && len(resource.Data) != 4 {
+			entry.Status = "failed"
+			entry.Error = "EXIF orientation resource must contain four bytes"
+		}
+	}
+	if rend.Orientation > 8 {
+		entry.Status = "failed"
+		entry.Error = fmt.Sprintf("invalid EXIF orientation: %d", rend.Orientation)
+	}
+	if rend.Orientation >= 5 && rend.Orientation <= 8 {
+		entry.Width, entry.Height = entry.Height, entry.Width
+	}
+}
+
+// Match GetName's lexicographically first alias without rescanning FACETKEYS
+// for each DATA rendition. Build this map only when a plan needs logical names.
+func (a *Asset) exportNames() map[uint16]string {
+	names := make(map[uint16]string)
+	for name, facet := range a.FacetKeyDB {
+		for _, attr := range facet.Attributes {
+			if attr.Name == uint16(Identifier) &&
+				(names[attr.Value] == "" || name < names[attr.Value]) {
+				names[attr.Value] = name
+			}
+		}
+	}
+	return names
+}
+
+func exportName(base, key, ext string, used map[string]bool) (string, string) {
+	base = safeExportStem(base)
+	if ext == ".raw" {
+		if originalExt := filepath.Ext(base); len(originalExt) > 1 && len(originalExt) <= 16 {
+			ext = originalExt
+		}
+	}
+	if strings.HasSuffix(strings.ToLower(base), strings.ToLower(ext)) {
+		base = base[:len(base)-len(ext)]
+	}
+	digest := sha256.Sum256([]byte(key))
+	name := fmt.Sprintf("%s-%x%s", base, digest[:8], ext)
+	for suffix := 1; used[strings.ToLower(name)]; suffix++ {
+		name = fmt.Sprintf("%s-%x-%d%s", base, digest[:8], suffix, ext)
+	}
+	used[strings.ToLower(name)] = true
+	return name, strings.TrimPrefix(ext, ".")
+}
+
+func (a *Asset) planReference(index int, lookup renditionIndex, entry *ExportEntry) error {
 	seen := make(map[int]bool)
 	raw := a.ImageDB[index].isRawLink()
 	for depth := 0; ; depth++ {
@@ -225,14 +276,16 @@ func (a *Asset) planReference(index int, byKey map[string]int, entry *ExportEntr
 						entry.ColorSpace = rend.header.ColorSpace.ColorSpaceID().String()
 					}
 					if rend.PixelFormat != PixFmtRawData {
-						return fmt.Errorf("%w: raw link target is %q", errUnsupportedRendition, rend.PixelFormat)
+						return fmt.Errorf("%w: raw link target is %q",
+							errUnsupportedRendition, rend.PixelFormat)
 					}
 				} else if _, decoded := rend.Asset.(image.Image); !decoded {
 					if format, known := plannedSourceFormat(rend); isRenderableFormat(format) {
 						entry.ColorSpace = SRGB.String()
 					} else if !known {
 						entry.ColorSpace = ""
-						entry.Warnings = append(entry.Warnings, "Reference output color space depends on the deferred DATA source format")
+						entry.Warnings = append(entry.Warnings,
+							"Reference output color space depends on the deferred DATA source format")
 					}
 				}
 				for _, warning := range rend.Warnings {
@@ -257,11 +310,11 @@ func (a *Asset) planReference(index int, byKey map[string]int, entry *ExportEntr
 				entry.Width, entry.Height = frame.Width, frame.Height
 			}
 		}
-		key, err := referenceKey(rend.link, a.KeyFormat)
+		key, err := lookup.referenceKey(rend.link)
 		if err != nil {
 			return err
 		}
-		next, ok := byKey[key]
+		next, ok := lookup.byKey[key]
 		if !ok {
 			return fmt.Errorf("reference target not found for key %x", key)
 		}
@@ -340,7 +393,7 @@ func safeExportStem(name string) string {
 	return cleaned
 }
 
-func (a *Asset) exportRenditions() {
+func (a *Asset) exportRenditions(index renditionIndex) {
 	if a.conf == nil || !a.conf.Export || a.conf.Output == "" || a.conf.MetadataOnly {
 		return
 	}
@@ -350,7 +403,7 @@ func (a *Asset) exportRenditions() {
 			a.ImageDB[i].ExportPath = ""
 		}
 	}
-	plan := a.PlanExport(a.conf.Output)
+	plan := a.planExport(a.conf.Output, index)
 	if len(plan) == 0 {
 		return
 	}

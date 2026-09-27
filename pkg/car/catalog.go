@@ -121,7 +121,7 @@ func (q *VariantQuery) matches(r *Rendition, logicalName string) bool {
 	return true
 }
 
-func (a *Asset) selectRenditions() error {
+func (a *Asset) selectRenditions(index renditionIndex) error {
 	var query *VariantQuery
 	if a.conf != nil {
 		query = a.conf.Query
@@ -133,10 +133,8 @@ func (a *Asset) selectRenditions() error {
 			}
 		}
 	}
-	if len(a.ImageDB) > 0 {
-		if err := validateKeyFormat(a.KeyFormat); err != nil {
-			return err
-		}
+	if err := index.validate(a); err != nil {
+		return err
 	}
 	logicalNames := make(map[uint16][]string)
 	if query != nil && len(query.Names) > 0 {
@@ -148,17 +146,8 @@ func (a *Asset) selectRenditions() error {
 			}
 		}
 	}
-	seen := make(map[string]bool, len(a.ImageDB))
 	for i := range a.ImageDB {
 		r := &a.ImageDB[i]
-		if len(r.Key) < len(a.KeyFormat) {
-			return fmt.Errorf("invalid key length for rendition %q", r.RenditionName)
-		}
-		key := renditionKey(r.Key)
-		if seen[key] {
-			return fmt.Errorf("duplicate rendition key for %q", r.RenditionName)
-		}
-		seen[key] = true
 		r.Selected = query.matches(r, "")
 		if !r.Selected {
 			for _, name := range logicalNames[r.ID()] {

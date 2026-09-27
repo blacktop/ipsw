@@ -13,6 +13,15 @@ import (
 	"testing"
 )
 
+func resolveTestReferences(a *Asset) error {
+	index := a.indexRenditions()
+	if err := index.validate(a); err != nil {
+		return err
+	}
+	a.resolveReferences(index)
+	return nil
+}
+
 func TestReferenceCacheRetainsLeafImageAndFailure(t *testing.T) {
 	var data bytes.Buffer
 	if err := jpeg.Encode(&data, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {
@@ -25,7 +34,8 @@ func TestReferenceCacheRetainsLeafImageAndFailure(t *testing.T) {
 		}
 		a := Asset{ImageDB: []Rendition{{Asset: source, PixelFormat: PixFmtJPEG, ColorSpace: DisplayP3}}}
 		cache := make(map[referenceCacheKey]referenceValue)
-		first, space, firstErr := a.resolveReference(0, nil, cache, make(map[int]bool), 0, false)
+		first, space, firstErr := a.resolveReference(
+			0, a.indexRenditions(), cache, make(map[int]bool), 0, false)
 		if (firstErr != nil) != invalid || !invalid && space != DisplayP3 {
 			t.Fatalf("unexpected first decode: %v, %v", space, firstErr)
 		}
@@ -35,7 +45,8 @@ func TestReferenceCacheRetainsLeafImageAndFailure(t *testing.T) {
 		if !invalid {
 			a.ImageDB[0].Asset = []byte("changed source")
 		}
-		second, _, secondErr := a.resolveReference(0, nil, cache, make(map[int]bool), 0, false)
+		second, _, secondErr := a.resolveReference(
+			0, a.indexRenditions(), cache, make(map[int]bool), 0, false)
 		if first != second || firstErr != secondErr {
 			t.Fatal("shared target was decoded again")
 		}
@@ -61,7 +72,7 @@ func TestResolveReferencesUsesExactKeysAndNestedCrops(t *testing.T) {
 		{RenditionName: "synthetic", Key: []uint16{3, 100}, Asset: image.NewNRGBA(image.Rect(0, 0, 1, 1))},
 		{RenditionName: "hidden atlas", Key: []uint16{3, 200}, Asset: atlas},
 	}}
-	if err := a.resolveReferences(); err != nil {
+	if err := resolveTestReferences(&a); err != nil {
 		t.Fatal(err)
 	}
 	for _, index := range []int{0, 1} {
@@ -107,7 +118,7 @@ func TestResolveReferencesErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := Asset{KeyFormat: []renditionAttributeType{Identifier, Scale}, ImageDB: []Rendition{referenceRendition(1, 2, linkRect{0, 0, 1, 1}), {RenditionName: "synthetic", Key: []uint16{2, 0}, Asset: image.NewNRGBA(image.Rect(0, 0, 2, 2))}}}
 			tc.mutate(&a)
-			if err := a.resolveReferences(); err != nil {
+			if err := resolveTestReferences(&a); err != nil {
 				t.Fatal(err)
 			}
 			if err := a.ImageDB[0].ResolveError; err == nil || !strings.Contains(err.Error(), tc.want) {
@@ -123,7 +134,7 @@ func TestResolveReferencesDepthAndDuplicateKeys(t *testing.T) {
 		a.ImageDB = append(a.ImageDB, referenceRendition(id, id+1, linkRect{0, 0, 1, 1}))
 	}
 	a.ImageDB = append(a.ImageDB, Rendition{Key: []uint16{maxReferenceDepth + 2, 0}, Asset: image.NewNRGBA(image.Rect(0, 0, 1, 1))})
-	if err := a.resolveReferences(); err != nil {
+	if err := resolveTestReferences(&a); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.ImageDB[0].ResolveError; err == nil || !strings.Contains(err.Error(), "depth") {
@@ -133,7 +144,8 @@ func TestResolveReferencesDepthAndDuplicateKeys(t *testing.T) {
 		t.Fatalf("16 links should resolve: %v", err)
 	}
 	a.ImageDB = append(a.ImageDB, a.ImageDB[0])
-	if err := a.resolveReferences(); err == nil || !strings.Contains(err.Error(), "duplicate rendition key") {
+	err := resolveTestReferences(&a)
+	if err == nil || !strings.Contains(err.Error(), "duplicate rendition key") {
 		t.Fatalf("duplicate error = %v", err)
 	}
 }
@@ -234,7 +246,7 @@ func TestRawReferenceFailures(t *testing.T) {
 			a := Asset{KeyFormat: []renditionAttributeType{Identifier, Scale}, selectionReady: true,
 				ImageDB: []Rendition{r, {Key: []uint16{2, 0}, PixelFormat: PixFmtRawData, Asset: []byte("data")}}}
 			tc.mutate(&a)
-			if err := a.resolveReferences(); err != nil {
+			if err := resolveTestReferences(&a); err != nil {
 				t.Fatal(err)
 			}
 			if got := a.PlanExport("output")[0]; got.Status != tc.want {

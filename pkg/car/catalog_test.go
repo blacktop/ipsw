@@ -111,7 +111,7 @@ func TestVariantQueryMatchesExactAttributesAndLogicalNames(t *testing.T) {
 		}
 		a.ImageDB = append(a.ImageDB, Rendition{Key: key, Attributes: attributes, RenditionName: "stored-file.png", Deferred: true})
 	}
-	if err := a.selectRenditions(); err != nil {
+	if err := a.selectRenditions(a.indexRenditions()); err != nil {
 		t.Fatal(err)
 	}
 	if a.Stats().Selected != 1 || !a.ImageDB[0].Selected {
@@ -122,7 +122,7 @@ func TestVariantQueryMatchesExactAttributesAndLogicalNames(t *testing.T) {
 		t.Fatal("missing idiom matched explicit zero")
 	}
 	a.conf.Query.Names = []string{"["}
-	if err := a.selectRenditions(); err == nil {
+	if err := a.selectRenditions(a.indexRenditions()); err == nil {
 		t.Fatal("invalid glob was accepted")
 	}
 }

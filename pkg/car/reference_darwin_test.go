@@ -22,7 +22,7 @@ func TestRenderedReferencesPreserveOriginalMetadata(t *testing.T) {
 			referenceRendition(4, 2, linkRect{0, 0, 1, 1}),
 		},
 	}
-	if err := a.resolveReferences(); err != nil {
+	if err := resolveTestReferences(&a); err != nil {
 		t.Fatal(err)
 	}
 	original := &a.ImageDB[0]
@@ -37,7 +37,7 @@ func TestRenderedReferencesPreserveOriginalMetadata(t *testing.T) {
 			t.Fatalf("reference was not rendered: %T", rend.Asset)
 		}
 	}
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	data, err := os.ReadFile(original.ExportPath)
 	if err != nil || !bytes.Equal(data, svg) {
 		t.Fatalf("original export changed: %v", err)

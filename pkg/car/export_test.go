@@ -61,14 +61,14 @@ func TestExportOrientAfterCropPreservesDepthAndProfile(t *testing.T) {
 		conf:    &Config{Export: true, Output: t.TempDir(), ApplyOrientation: true},
 		ImageDB: []Rendition{link, {Key: []uint16{2, 0}, Asset: atlas, ColorSpace: DisplayP3, Width: 3, Height: 3}},
 	}
-	if err := a.resolveReferences(); err != nil || a.ImageDB[0].ResolveError != nil {
+	if err := resolveTestReferences(&a); err != nil || a.ImageDB[0].ResolveError != nil {
 		t.Fatalf("resolve: %v, %v", err, a.ImageDB[0].ResolveError)
 	}
 	plan := a.PlanExport(a.conf.Output)
 	if len(plan) != 1 || plan[0].Width != 1 || plan[0].Height != 2 || len(plan[0].Crops) != 1 || len(plan[0].SourceKey) != 2 {
 		t.Fatalf("oriented crop plan = %+v", plan)
 	}
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	data, err := os.ReadFile(a.ImageDB[0].ExportPath)
 	if err != nil {
 		t.Fatal(err)
@@ -108,6 +108,69 @@ func TestExportPlanIncludesFailuresAndHEVCOriginal(t *testing.T) {
 	a.ImageDB[0].Resources = []csiResource{{ID: MetaDataEXIFOrientationID, Data: []byte{6}}}
 	if got := a.PlanExport("output")[0]; got.Status != "failed" || !strings.Contains(got.Error, "orientation resource") {
 		t.Fatalf("malformed orientation silently ignored: %+v", got)
+	}
+}
+
+func TestExportPlanReflectsCallerMutations(t *testing.T) {
+	link := referenceRendition(1, 2, linkRect{0, 0, 1, 1})
+	link.link.Layout = uint16(RawData)
+	link.Attributes = map[string]uint16{Identifier.String(): 1}
+	a := Asset{
+		KeyFormat: []renditionAttributeType{Identifier, Scale},
+		FacetKeyDB: map[string]renditionKeyToken{
+			"z.caar": {Attributes: []renditionAttribute{{Name: uint16(Identifier), Value: 1}}},
+			"a.caar": {Attributes: []renditionAttribute{{Name: uint16(Identifier), Value: 1}}},
+		},
+		ImageDB: []Rendition{link, {Key: []uint16{2, 0}, PixelFormat: PixFmtRawData}},
+	}
+	first := a.PlanExport("first")[0]
+	if first.Status != "planned" || !strings.HasPrefix(filepath.Base(first.Path), "a-") ||
+		len(first.SourceKey) != 2 || first.SourceKey[0] != 2 {
+		t.Fatalf("initial plan = %+v", first)
+	}
+	// Public keys, formats and facets may all change between plans.
+	a.KeyFormat = []renditionAttributeType{Scale, Identifier}
+	a.ImageDB[0].Key = []uint16{0, 1}
+	a.ImageDB[1].Key = []uint16{0, 2}
+	delete(a.FacetKeyDB, "a.caar")
+	a.ImageDB[0].ExportError = fmt.Errorf("synthetic write failure")
+	second := a.PlanExport("second")[0]
+	if second.Status != "failed" || second.Error != "synthetic write failure" ||
+		!strings.HasPrefix(filepath.Base(second.Path), "z-") || second.SourceKey[1] != 2 ||
+		filepath.Base(first.Path) == filepath.Base(second.Path) {
+		t.Fatalf("plan reused stale state: %+v", second)
+	}
+	a.ImageDB[0].ExportError = nil
+	a.ImageDB[0].ExportPath = filepath.Join("completed", "link.caar")
+	var manifest bytes.Buffer
+	if err := a.WriteManifest(&manifest, "third"); err != nil {
+		t.Fatal(err)
+	}
+	var report struct{ Entries []ExportEntry }
+	if err := json.Unmarshal(manifest.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if entry := report.Entries[0]; entry.Status != "exported" ||
+		entry.Path != a.ImageDB[0].ExportPath || first.Status != "planned" || first.Key[0] != 1 {
+		t.Fatalf("manifest or earlier snapshot changed: %+v; %+v", entry, first)
+	}
+}
+
+func TestExportPlanKeepsManualDuplicateKeyBehavior(t *testing.T) {
+	a := Asset{
+		KeyFormat: []renditionAttributeType{Identifier, Scale},
+		ImageDB: []Rendition{
+			referenceRendition(1, 2, linkRect{0, 0, 1, 1}),
+			{Key: []uint16{2, 0}, RenditionName: "atlas",
+				PixelFormat: PixFmtARGB, ColorSpace: SRGB},
+			{Key: []uint16{2, 0}, RenditionName: "atlas",
+				PixelFormat: PixFmtARGB, ColorSpace: DisplayP3},
+		},
+	}
+	plan := a.PlanExport("output")
+	if len(plan) != 3 || plan[0].ColorSpace != DisplayP3.String() || plan[0].Error != "" ||
+		plan[1].Path == plan[2].Path || !strings.HasSuffix(plan[2].Path, "-1.png") {
+		t.Fatalf("manual duplicate keys lost last-target lookup or unique filenames: %+v", plan)
 	}
 }
 
@@ -177,7 +240,7 @@ func TestExportPlanKeepsRenderedReferenceColorSpace(t *testing.T) {
 			Asset: image.NewRGBA(image.Rect(0, 0, 1, 1)), payload: []byte("bvx2compressed source"),
 		}},
 	}
-	if err := a.resolveReferences(); err != nil || a.ImageDB[0].ResolveError != nil {
+	if err := resolveTestReferences(&a); err != nil || a.ImageDB[0].ResolveError != nil {
 		t.Fatalf("resolve: %v, %v", err, a.ImageDB[0].ResolveError)
 	}
 	plan := a.PlanExport("output")
@@ -208,7 +271,7 @@ func TestExportRenditionsSafeUniqueDeterministic(t *testing.T) {
 	for i, name := range names {
 		a.ImageDB = append(a.ImageDB, Rendition{RenditionName: name, Key: []uint16{uint16(i)}, PixelFormat: PixFmtRawData, Asset: []byte{byte(i)}})
 	}
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	paths := make(map[uint16]string)
 	for i, rend := range a.ImageDB {
 		if rend.ExportError != nil {
@@ -234,7 +297,7 @@ func TestExportRenditionsSafeUniqueDeterministic(t *testing.T) {
 	for i, j := 0, len(a.ImageDB)-1; i < j; i, j = i+1, j-1 {
 		a.ImageDB[i], a.ImageDB[j] = a.ImageDB[j], a.ImageDB[i]
 	}
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	for _, rend := range a.ImageDB {
 		if filepath.Base(rend.ExportPath) != paths[rend.Key[0]] {
 			t.Fatal("filename depends on rendition order")
@@ -245,7 +308,7 @@ func TestExportRenditionsSafeUniqueDeterministic(t *testing.T) {
 func TestExportReplacesSymlinkWithoutFollowingIt(t *testing.T) {
 	output := t.TempDir()
 	a := Asset{conf: &Config{Export: true, Output: output}, ImageDB: []Rendition{{RenditionName: "test", Key: []uint16{1}, PixelFormat: PixFmtRawData, Asset: []byte("first")}}}
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	path := a.ImageDB[0].ExportPath
 	if path == "" {
 		t.Fatal(a.ImageDB[0].ExportError)
@@ -262,7 +325,7 @@ func TestExportReplacesSymlinkWithoutFollowingIt(t *testing.T) {
 	}
 	a.ImageDB[0].ExportPath = ""
 	a.ImageDB = append(a.ImageDB, Rendition{RenditionName: "test", Key: []uint16{2}, PixelFormat: PixFmtRawData, Asset: []byte("second")})
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	if a.ImageDB[0].ExportError != nil || a.ImageDB[0].ExportPath == "" {
 		t.Fatal("existing symlink was not replaced")
 	}
@@ -280,7 +343,7 @@ func TestExportStructuredMetadataTwice(t *testing.T) {
 		{RenditionName: "color", Key: []uint16{1}, Asset: csiColor{NumberOfComponents: 2, Components: []float64{0.5, 1}}},
 		{RenditionName: "sizes", Key: []uint16{2}, Asset: csiMultisizeImageSet{NImageSizes: 1, ImageSizes: []csiMultiImgSetImageSize{{Width: 32, Height: 64}}}},
 	}}
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	for i := range a.ImageDB {
 		rend := &a.ImageDB[i]
 		data, err := os.ReadFile(rend.ExportPath)
@@ -289,7 +352,7 @@ func TestExportStructuredMetadataTwice(t *testing.T) {
 		}
 		rend.ExportPath = ""
 	}
-	a.exportRenditions()
+	a.exportRenditions(a.indexRenditions())
 	for _, rend := range a.ImageDB {
 		if rend.ExportError != nil || rend.ExportPath == "" {
 			t.Fatal("repeat export failed")
@@ -410,7 +473,7 @@ func TestSystemCatalogExport(t *testing.T) {
 				t.Fatal("catalog exported no files")
 			}
 			t.Logf("%d renditions, %d files, unsupported: %v", len(plan), len(hashes), unsupported)
-			a.exportRenditions()
+			a.exportRenditions(a.indexRenditions())
 			for _, entry := range a.PlanExport(conf.Output) {
 				if hash, ok := hashes[entry.Path]; ok {
 					data, err := os.ReadFile(entry.Path)

@@ -56,12 +56,51 @@ func renditionKey(values []uint16) string {
 	return string(data)
 }
 
-func referenceKey(link *csiInternalLinkData, format []renditionAttributeType) (string, error) {
-	indices := make(map[uint16]int, len(format))
-	for i, token := range format {
-		indices[uint16(token)] = i
+// renditionIndex belongs to one parse or export plan. Never retain it on Asset:
+// callers can mutate the public keys and key format between operations.
+type renditionIndex struct {
+	keys      []string
+	byKey     map[string]int
+	tokens    map[uint16]int
+	keyLength int
+}
+
+func (a *Asset) indexRenditions() renditionIndex {
+	index := renditionIndex{
+		keys: make([]string, len(a.ImageDB)), byKey: make(map[string]int, len(a.ImageDB)),
+		tokens: make(map[uint16]int, len(a.KeyFormat)), keyLength: len(a.KeyFormat),
 	}
-	values := make([]uint16, len(format))
+	for i, token := range a.KeyFormat {
+		index.tokens[uint16(token)] = i
+	}
+	for i := range a.ImageDB {
+		index.keys[i] = renditionKey(a.ImageDB[i].Key)
+		index.byKey[index.keys[i]] = i
+	}
+	return index
+}
+
+func (index renditionIndex) validate(a *Asset) error {
+	if len(a.ImageDB) == 0 {
+		return nil
+	}
+	if err := validateKeyFormat(a.KeyFormat); err != nil {
+		return err
+	}
+	for i, key := range index.keys {
+		rend := &a.ImageDB[i]
+		if len(rend.Key) < index.keyLength {
+			return fmt.Errorf("invalid key length for rendition %q", rend.RenditionName)
+		}
+		if index.byKey[key] != i {
+			return fmt.Errorf("duplicate rendition key for %q", rend.RenditionName)
+		}
+	}
+	return nil
+}
+
+func (index renditionIndex) referenceKey(link *csiInternalLinkData) (string, error) {
+	values := make([]uint16, index.keyLength)
 	seen := make(map[uint16]bool)
 	terminated := false
 	for _, token := range link.Reference {
@@ -72,7 +111,7 @@ func referenceKey(link *csiInternalLinkData, format []renditionAttributeType) (s
 		if terminated {
 			return "", fmt.Errorf("nonzero reference token after terminator")
 		}
-		index, ok := indices[token.Name]
+		position, ok := index.tokens[token.Name]
 		if !ok {
 			return "", fmt.Errorf("unknown reference attribute: %d", token.Name)
 		}
@@ -80,7 +119,7 @@ func referenceKey(link *csiInternalLinkData, format []renditionAttributeType) (s
 			return "", fmt.Errorf("duplicate reference attribute: %d", token.Name)
 		}
 		seen[token.Name] = true
-		values[index] = token.Value
+		values[position] = token.Value
 	}
 	return renditionKey(values), nil
 }
@@ -89,34 +128,16 @@ func (r *Rendition) isRawLink() bool {
 	return r.link != nil && renditionLayoutType(r.link.Layout) == RawData
 }
 
-// resolveReferences indexes every rendition, including those absent from FACETKEYS.
-// A name never substitutes for the exact full key of the referenced variant.
-func (a *Asset) resolveReferences() error {
-	if len(a.ImageDB) == 0 {
-		return nil
-	}
-	if err := validateKeyFormat(a.KeyFormat); err != nil {
-		return err
-	}
-	byKey := make(map[string]int, len(a.ImageDB))
-	for i := range a.ImageDB {
-		rend := &a.ImageDB[i]
-		if len(rend.Key) < len(a.KeyFormat) {
-			return fmt.Errorf("invalid key length for rendition %q", rend.RenditionName)
-		}
-		key := renditionKey(rend.Key)
-		if _, exists := byKey[key]; exists {
-			return fmt.Errorf("duplicate rendition key for %q", rend.RenditionName)
-		}
-		byKey[key] = i
-	}
+// resolveReferences uses the validated full-key index, including hidden atlases.
+func (a *Asset) resolveReferences(index renditionIndex) {
 	cache := make(map[referenceCacheKey]referenceValue)
 	for i := range a.ImageDB {
 		rend := &a.ImageDB[i]
 		if !a.isSelected(i) || rend.link == nil || rend.DecodeError != nil {
 			continue
 		}
-		value, _, err := a.resolveReference(i, byKey, cache, make(map[int]bool), 0, rend.isRawLink())
+		value, _, err := a.resolveReference(
+			i, index, cache, make(map[int]bool), 0, rend.isRawLink())
 		rend.ResolveError = err
 		if errors.Is(err, errUnsupportedRendition) {
 			log.WithField("rendition", rend.RenditionName).Warn(err.Error())
@@ -127,10 +148,10 @@ func (a *Asset) resolveReferences() error {
 			rend.Asset = value
 		}
 	}
-	return nil
 }
 
-func (a *Asset) resolveReference(index int, byKey map[string]int, cache map[referenceCacheKey]referenceValue,
+func (a *Asset) resolveReference(
+	index int, lookup renditionIndex, cache map[referenceCacheKey]referenceValue,
 	visited map[int]bool, depth int, raw bool,
 ) (any, colorSpaceID, error) {
 	if visited[index] {
@@ -158,20 +179,21 @@ func (a *Asset) resolveReference(index int, byKey map[string]int, cache map[refe
 		return nil, 0, fmt.Errorf("reference target %q: %w", rend.RenditionName, err)
 	}
 	if raw != rend.isRawLink() {
-		return nil, 0, fmt.Errorf("%w: mixed raw and image reference chain", errUnsupportedRendition)
+		return nil, 0, fmt.Errorf("%w: mixed raw and image reference chain",
+			errUnsupportedRendition)
 	}
 	if depth >= maxReferenceDepth {
 		return nil, 0, fmt.Errorf("internal reference depth exceeds %d", maxReferenceDepth)
 	}
-	key, err := referenceKey(rend.link, a.KeyFormat)
+	key, err := lookup.referenceKey(rend.link)
 	if err != nil {
 		return nil, 0, err
 	}
-	target, ok := byKey[key]
+	target, ok := lookup.byKey[key]
 	if !ok {
 		return nil, 0, fmt.Errorf("internal reference target not found for key %x", key)
 	}
-	source, space, err := a.resolveReference(target, byKey, cache, visited, depth+1, raw)
+	source, space, err := a.resolveReference(target, lookup, cache, visited, depth+1, raw)
 	if err != nil {
 		return nil, 0, err
 	}

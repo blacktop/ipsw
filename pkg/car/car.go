@@ -544,7 +544,8 @@ func Parse(name string, conf *Config) (*Asset, error) {
 	if a.RenditionCount > 0 && !hasRenditions {
 		return nil, fmt.Errorf("missing RENDITIONS tree for %d declared renditions", a.RenditionCount)
 	}
-	if err := a.selectRenditions(); err != nil {
+	index := a.indexRenditions()
+	if err := a.selectRenditions(index); err != nil {
 		return nil, err
 	}
 	if !a.conf.MetadataOnly && !a.conf.Raw {
@@ -553,11 +554,9 @@ func Parse(name string, conf *Config) (*Asset, error) {
 				_ = a.ensureDecoded(i)
 			}
 		}
-		if err := a.resolveReferences(); err != nil {
-			return nil, err
-		}
+		a.resolveReferences(index)
 	}
-	a.exportRenditions()
+	a.exportRenditions(index)
 	return &a, nil
 }
 

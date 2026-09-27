@@ -287,7 +287,7 @@ func TestParsePreservesLongKeys(t *testing.T) {
 		link.Key = []uint16{8}
 		link.Selected = true
 		a.ImageDB = append(a.ImageDB, link)
-		if err := a.resolveReferences(); err != nil {
+		if err := resolveTestReferences(a); err != nil {
 			t.Fatal(err)
 		}
 		if err := a.ImageDB[2].ResolveError; err == nil || !strings.Contains(err.Error(), "not found") {
