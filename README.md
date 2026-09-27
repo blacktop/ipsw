@@ -14,305 +14,165 @@
 </p>
 <br>
 
-## What is `ipsw` 🤔
+**ipsw** is a command-line toolkit for Apple firmware research and reverse engineering. Download and unpack IPSWs and OTAs, inspect Mach-O binaries and dyld shared caches, analyze kernelcaches, and work with connected iOS devices.
 
-**ipsw** is a comprehensive command-line research framework for iOS and macOS. It provides an extensive toolkit for security researchers, reverse engineers, jailbreak developers, and iOS enthusiasts to download, parse, and analyze Apple firmware and interact with iOS devices.
+[Agent skill](https://github.com/blacktop/ipsw-skill) · [Install](#install) · [CLI examples](#cli-examples) · [Documentation](https://blacktop.github.io/ipsw)
 
-### Core Capabilities
+## Use ipsw with an AI agent
 
-- 📱 **IPSW/OTA Analysis** - Download, extract, and analyze iOS firmware files
-- 🔍 **Binary Analysis** - Advanced Mach-O parsing with ARM disassembly and AI assistance  
-- 🧠 **dyld_shared_cache** - Complete shared cache analysis with ObjC/Swift class dumping
-- 🔧 **Kernel Analysis** - Kernelcache parsing, syscall extraction, and symbolication
-- 📲 **Device Interaction** - Comprehensive iOS device management and debugging
-- 🔐 **Firmware Research** - IMG4, iBoot, SEP, and co-processor firmware analysis
-- 🏪 **App Store Connect** - Full API integration for app and certificate management
-- 🛠️ **Developer Tools** - SSH, Frida, debugging, and reverse engineering utilities
+Start with **[ipsw-skill](https://github.com/blacktop/ipsw-skill)** if you're working in Claude Code, Codex, Gemini CLI, or another agent that supports skills. It gives the agent command references and workflows for firmware extraction, binary analysis, and Apple platform research.
 
-## Quick Start
+[Install the ipsw CLI](#install), then add the skill:
 
-### Installation
-
-#### macOS
-Using blacktop tap (includes extras)
-```bash
-brew install blacktop/tap/ipsw
-```
-Using official Homebrew formula
-```bash
-brew install ipsw
-```
-
-#### Linux
-```bash
-sudo snap install ipsw
-```
-
-#### Windows
-```bash
-scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git 
-scoop install blacktop/ipsw
-```
-
-### Basic Usage
-
-```bash
-# Download latest iOS IPSW
-ipsw download ipsw --device iPhone16,1 --latest
-
-# Extract kernelcache
-ipsw extract --kernel iPhone16,1_18.2_22C150_Restore.ipsw
-
-# Analyze dyld_shared_cache
-ipsw dyld info /path/to/dyld_shared_cache_arm64
-
-# Get device information
-ipsw idev list
-```
-
-## Major Features
-
-### 📱 IPSW & OTA Management
-- **Download Sources**: Apple, AppleDB, Developer Portal, RSS feeds, GitHub, iTunes, Wikipedia
-- **File Types**: IPSW, OTA, macOS installers, Xcode, KDKs, PCC files
-- **Operations**: Extract, diff, mount, analyze metadata
-
-```bash
-ipsw download ipsw --device iPhone16,1 --latest
-ipsw extract --kernel iPhone16,1_18.2_22C150_Restore.ipsw
-ipsw diff iPhone16,1_18.1_22B83_Restore.ipsw iPhone16,1_18.2_22C150_Restore.ipsw
-```
-
-### 🔍 Binary Analysis & Reverse Engineering
-- **Mach-O Parsing**: Complete binary analysis with symbol extraction
-- **ARM Disassembly**: ARM v9-a disassembler with AI-powered analysis
-- **Code Signing**: Verify signatures, analyze entitlements
-- **Binary Patching**: Add, modify, or remove patches
-
-```bash
-ipsw macho info /path/to/binary
-ipsw macho disass /path/to/binary --symbol _main
-ipsw macho search /path/to/binary --string "password"
-```
-
-### 🧠 dyld_shared_cache Analysis
-- **Cache Parsing**: Extract and analyze the complete shared cache structure
-- **ObjC Analysis**: Class dumps, method analysis, protocol parsing
-- **Swift Support**: Swift class dumping and analysis (experimental)
-- **Symbol Management**: Symbol extraction and address resolution
-
-```bash
-ipsw dyld info /path/to/dyld_shared_cache
-ipsw dyld extract /path/to/dyld_shared_cache --dylib Foundation
-ipsw dyld objc class /path/to/dyld_shared_cache --class NSString
-```
-
-### 📲 iOS Device Interaction (`idev`)
-- **File System**: Browse and transfer files via AFC
-- **App Management**: Install, uninstall, and analyze applications
-- **Backup & Restore**: Complete device backup operations
-- **Development**: Mount developer images, capture logs, packet capture
-- **Diagnostics**: Battery info, crash logs, system diagnostics
-
-```bash
-ipsw idev list
-ipsw idev afc ls /
-ipsw idev apps ls
-ipsw idev backup create
-ipsw idev syslog
-```
-
-### 🔐 Firmware & Security Analysis
-- **IMG4**: Parse and decrypt Image4 format files
-- **iBoot**: Bootloader analysis and research
-- **SEP**: Secure Enclave Processor firmware analysis
-- **AEA**: Apple Encrypted Archives decryption
-- **Co-processors**: AOP, DCP, GPU, Camera firmware analysis
-
-```bash
-ipsw img4 dec iBoot.img4
-ipsw fw sep iPhone16,1_18.2_22C150_Restore.ipsw
-ipsw fw iboot iPhone16,1_18.2_22C150_Restore.ipsw
-```
-
-### 🏪 App Store Connect Integration
-- **Certificate Management**: iOS/macOS certificates and profiles
-- **Device Registration**: Manage development devices
-- **App Management**: Bundle IDs, capabilities, and reviews
-- **Provisioning**: Complete provisioning profile lifecycle
-
-```bash
-ipsw appstore cert ls
-ipsw appstore device reg --name "My Device" --udid 1234567890
-ipsw appstore profile create --name "Development Profile"
-```
-
-### 🛠️ Advanced Research Tools
-- **Symbolication**: Crash log analysis and symbol resolution
-- **Class Dumping**: ObjC and Swift class extraction
-- **SSH Access**: Jailbroken device SSH with debugserver
-- **Frida Integration**: Dynamic instrumentation capabilities
-- **AI Powered Decompiler**: Integration with Claude, OpenAI, Gemini, Ollama and OpenRouter
-
-```bash
-ipsw symbolicate crash.ips --dsym /path/to/symbols
-ipsw class-dump /path/to/binary
-ipsw ssh debugserver
-```
-
-## Architecture
-
-**ipsw** consists of two main components:
-
-- **`ipsw`** - Main CLI tool with complete analysis capabilities
-- **`ipswd`** - REST API daemon for remote operations and automation
-
-## Configuration
-
-ipsw supports YAML configuration files and environment variables:
-
-```bash
-# Create config directory
-mkdir -p ~/.config/ipsw
-
-# Copy example config
-cp config.example.yml ~/.config/ipsw/config.yaml
-```
-
-### Database Support
-- **SQLite** (default) - Local storage
-- **PostgreSQL** - Production deployments
-
-### AI Decompiler
-> https://blacktop.github.io/ipsw/docs/guides/decompiler
-```bash
-❱ ipsw macho disass /System/Library/PrivateFrameworks/ApplePushService.framework/apsd --entry \
-             --dec --dec-model "Claude 3.7 Sonnet"
-   • Loading symbol cache file...
-   • Decompiling... 🕒
-```
-```objc
-int main(int argc, char *argv[]) {
-    @autoreleasepool {
-        __set_user_dir_suffix(@"com.apple.apsd");
-
-        @autoreleasepool {
-            APSDaemon *daemon = [[APSDaemon alloc] init];
-
-            if (daemon) {
-                NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
-                [runLoop run];
-                [runLoop release];
-            }
-
-            [daemon release];
-        }
-
-        return 0;
-    }
-
-    @catch (NSException *exception) {
-        if ([exception reason] == 1) {
-            id exceptionObj = [exception retain];
-            id logger = [APSLog daemon];
-
-            if (_os_log_type_enabled(logger, 0x11)) {
-                [exceptionObj logWithLogger:logger];
-            }
-
-            [logger release];
-            [exceptionObj release];
-        }
-    }
-}
-```
-
-## Use Cases
-
-### Security Research
-- Vulnerability analysis and exploit development
-- Firmware security assessment
-- Binary reverse engineering
-
-### Jailbreak Development  
-- Bootchain analysis and exploitation
-- Kernel extension research
-- System modification and patching
-
-### iOS Development
-- App debugging and analysis
-- Certificate and provisioning management
-- Device testing and automation
-
-### Digital Forensics
-- Device data extraction and analysis
-- Timeline reconstruction
-- Artifact analysis
-
-## Requirements
-
-- **Go**: 1.26+ (for building from source)
-- **Platform**: macOS, Linux, Windows
-- **USB**: libusb for device interaction
-- **Optional**: AI API keys for enhanced analysis
-
-## Documentation
-
-- **Website**: [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw)
-- **API Docs**: REST API documentation available at `/docs` when running `ipswd`
-- **Examples**: Comprehensive usage examples in the documentation
-
-### SKILL.md
-
-Super charge your AI agents with `ipsw` super powers
-
-```bash
+```sh
 npx skills add https://github.com/blacktop/ipsw-skill --skill ipsw
 ```
 
-### 🆕 AI-Powered Wiki
+You can then ask for a task in plain language. For example:
 
-Ask questions about the repository using AI:
-- [DeepWiki for IPSW](https://deepwiki.com/blacktop/ipsw)
+> Download the latest IPSW for iPhone 15 Pro and extract its kernelcache.
 
-> [!WARNING]
-> AI responses may contain hallucinations - verify important information.
+> Dump the Objective-C headers for SpringBoardServices from this dyld shared cache.
 
-## Community Resources
+> Compare the KEXTs in these two kernelcaches.
 
-### 📊 IPSW Diffs
-Pre-computed firmware differences: [ipsw-diffs](https://github.com/blacktop/ipsw-diffs)
+The [skill README](https://github.com/blacktop/ipsw-skill#installation) has setup instructions for individual agents, including the Claude Code plugin and Gemini CLI extension.
 
-### 💬 Community
+## Install
 
-[![GitHub Discussions](https://img.shields.io/badge/GITHUB_DISCUSSION-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/blacktop/ipsw/discussions)
+### macOS
 
-## Contributing
+The maintainer's Homebrew tap includes the extras build:
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+```sh
+brew install blacktop/tap/ipsw
+```
 
-### Development
-```bash
+The Homebrew core formula is also available: `brew install ipsw`.
+
+### Linux
+
+```sh
+sudo snap install ipsw
+```
+
+### Windows
+
+```powershell
+scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git
+scoop install blacktop/ipsw
+```
+
+You can also download binaries from [GitHub Releases](https://github.com/blacktop/ipsw/releases/latest). See the [installation guide](https://blacktop.github.io/ipsw/docs/getting-started/installation) for other packages and optional dependencies. Some commands depend on the host OS or build variant; Frida support, for example, has a separate build.
+
+## What you can do
+
+| Area | Tools |
+| --- | --- |
+| Firmware | Download IPSWs, OTAs, macOS installers, Xcode, and KDKs; extract components and compare builds |
+| Mach-O | Inspect load commands, symbols, signatures, and entitlements; disassemble ARM64 code |
+| dyld shared caches | Find symbols and cross-references, extract dylibs, dump Objective-C headers, and inspect Swift metadata |
+| Kernel | Extract KEXTs, inspect syscalls and symbols, and compare kernelcaches |
+| Firmware components | Parse IMG4, decrypt AEA archives, and inspect iBoot and coprocessor firmware |
+| Devices | List devices and apps, transfer files with AFC, capture logs, and mount developer images |
+| App Store Connect | Manage certificates, bundle IDs, devices, and provisioning profiles |
+| Research | Symbolicate crash logs, debug over SSH, trace with Frida, and decompile with an LLM |
+
+## CLI examples
+
+Replace the example file paths with your own. Run `ipsw --help` or add `--help` to any subcommand for its options.
+
+### Download and extract firmware
+
+```sh
+# Download the latest IPSW for iPhone 15 Pro
+ipsw download ipsw --device iPhone16,1 --latest
+
+# Inspect a local IPSW and extract its kernelcache
+ipsw info /path/to/firmware.ipsw
+ipsw extract --kernel /path/to/firmware.ipsw
+
+# Compare two firmware builds
+ipsw diff /path/to/old.ipsw /path/to/new.ipsw
+```
+
+### Explore a dyld shared cache
+
+```sh
+ipsw dyld info /path/to/dyld_shared_cache_arm64e
+
+# Extract Foundation for use in other tools
+ipsw dyld extract /path/to/dyld_shared_cache_arm64e Foundation
+
+# Dump headers directly from the cache
+ipsw class-dump /path/to/dyld_shared_cache_arm64e SpringBoardServices --headers -o headers
+```
+
+Use the cache directly for Objective-C analysis: extracted dylibs can still reference metadata stored elsewhere in the cache.
+
+### Inspect binaries and kernelcaches
+
+```sh
+# Select an architecture explicitly for universal binaries
+ipsw macho info /path/to/binary --arch arm64e
+ipsw macho disass /path/to/binary --arch arm64e --symbol _main
+
+# Search a directory of binaries for an imported symbol
+ipsw macho search /path/to/binaries --import 'CCCrypt'
+
+# List KEXTs, then extract one by its full bundle ID
+ipsw kernel kexts /path/to/kernelcache
+ipsw kernel extract /path/to/kernelcache com.apple.driver.ASIOKit -o kexts
+```
+
+### Work with a connected device
+
+```sh
+ipsw idev list
+ipsw idev apps ls
+ipsw idev afc ls /
+ipsw idev syslog
+```
+
+### Decompile with an LLM
+
+The `macho disass` and `dyld disass` commands can send disassembly to a configured LLM provider with `--dec`. See the [decompiler guide](https://blacktop.github.io/ipsw/docs/guides/decompiler) for provider setup, model selection, and examples.
+
+## Configuration and automation
+
+The CLI reads YAML configuration from `~/.config/ipsw/config.yaml`; use `--config` to select another file. See [config.example.yml](config.example.yml) and the [configuration guide](https://blacktop.github.io/ipsw/docs/getting-started/configuration) for settings and environment variables.
+
+For scripts, select an architecture with `--arch` when opening universal binaries and use a full dylib path when a short name is ambiguous. Commands that support `--json` document it in their help.
+
+The separate `ipswd` daemon exposes a REST API for automation. See the [API reference](https://blacktop.github.io/ipsw/api/).
+
+## Documentation and community
+
+- [Agent skill and setup](https://github.com/blacktop/ipsw-skill)
+- [Guides and command reference](https://blacktop.github.io/ipsw)
+- [Precomputed firmware diffs](https://github.com/blacktop/ipsw-diffs)
+- [GitHub Discussions](https://github.com/blacktop/ipsw/discussions)
+- [Issue tracker](https://github.com/blacktop/ipsw/issues)
+- [DeepWiki](https://deepwiki.com/blacktop/ipsw), an AI-generated guide to the codebase
+
+When reporting a bug, include `ipsw version`, the command you ran, and the relevant firmware build or file type. Redact personal information from logs and crash reports.
+
+## Build and contribute
+
+Building from source requires Go 1.26 or later and a C toolchain for CGO:
+
+```sh
 git clone https://github.com/blacktop/ipsw.git
 cd ipsw
 make build
 ```
 
-## Known Issues
-
-- **macOS IPSW Support**: Some macOS firmware operations may have compatibility issues
-- **Testing**: Comprehensive testing is challenging due to the variety of firmware versions and device types
-- **Resource Intensive**: Some operations require significant memory and processing power
-
-> Create an [issue](https://github.com/blacktop/ipsw/issues) if you encounter problems - fixes are prioritized! A comprehensive test suite is planned for future releases.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and contribution guidelines.
 
 ## Credits
 
-Huge thanks to:
-- **Jonathan Levin** for his legendary tools and comprehensive iOS internals documentation
-- **The iOS research community** for continuous innovation and knowledge sharing
-- All contributors who help make this project better
+Thanks to Jonathan Levin for his tools and iOS internals documentation, the Apple security research community, and everyone who contributes code, bug reports, and research.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+[MIT](LICENSE).
