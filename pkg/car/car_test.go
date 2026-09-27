@@ -303,7 +303,9 @@ func TestParseMetadataTreesAcrossLeaves(t *testing.T) {
 		}
 		key1, key2 := []byte("first"), []byte("second")
 		if name == "BITMAPKEYS" {
-			key1, key2 = []byte{1, 0, 0, 0}, []byte{2, 0, 0, 0}
+			// Bitmap identifiers are inline, even when they name a valid BOM block.
+			binary.BigEndian.PutUint32(first.Bytes()[16:20], 1)
+			binary.BigEndian.PutUint32(second.Bytes()[16:20], 0x10203040)
 		}
 		blocks = append(blocks, OpaqueBlock{Name: name, Data: tree.Bytes()})
 		for i, data := range [][]byte{first.Bytes(), second.Bytes(), key1, {1, 0}, key2, {2, 0}} {
@@ -318,7 +320,8 @@ func TestParseMetadataTreesAcrossLeaves(t *testing.T) {
 		}
 		if len(a.AppearanceDB) != 2 || a.AppearanceDB["second"] != 2 ||
 			len(a.Localizations) != 2 || a.Localizations["second"] != 2 ||
-			len(a.BitmapKeyDB) != 2 || !bytes.Equal(a.BitmapKeyDB[uint32(2)], []byte{2, 0}) {
+			len(a.BitmapKeyDB) != 2 || !bytes.Equal(a.BitmapKeyDB[uint32(1)], []byte{1, 0}) ||
+			!bytes.Equal(a.BitmapKeyDB[uint32(0x10203040)], []byte{2, 0}) {
 			t.Fatalf("verbose=%t: incomplete trees: %v, %v, %v",
 				verbose, a.AppearanceDB, a.Localizations, a.BitmapKeyDB)
 		}
@@ -350,8 +353,8 @@ func TestParsePayloadSharesCSIWithoutMutatingIt(t *testing.T) {
 	}
 }
 
-// BITMAPKEYS uses its own key types and may precede the rendition key format.
-func TestParseBitmapKeysBeforeKeyFormat(t *testing.T) {
+// BITMAPKEYS uses inline identifiers and may precede the rendition key format.
+func TestParseBitmapKeysUseInlineIDsBeforeKeyFormat(t *testing.T) {
 	data := syntheticCatalog(t, []syntheticRendition{{key: []uint16{42, 0}, data: []byte("bitmap payload")}}, []renditionAttributeType{Identifier})
 	// The equal-length name replacement reuses the fixture's independent BOM tree.
 	data = bytes.Replace(data, []byte("RENDITIONS"), []byte("BITMAPKEYS"), 1)
@@ -362,16 +365,18 @@ func TestParseBitmapKeysBeforeKeyFormat(t *testing.T) {
 	}
 	headerOffset := bm.BlockTable.BlockPointers[0].Address
 	binary.LittleEndian.PutUint32(data[headerOffset+16:], 0)
-	path := filepath.Join(t.TempDir(), "synthetic.car")
-	if err := os.WriteFile(path, data, 0600); err != nil {
-		t.Fatal(err)
-	}
-	a, err := Parse(path, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := string(a.BitmapKeyDB[uint32(42)]); got != "bitmap payload" {
-		t.Fatalf("bitmap key disappeared: %q", got)
+	// Block 4 contains the four-byte key value 42; block 5 contains a longer
+	// payload. Neither block's contents may replace a small inline identifier.
+	leafOffset := bm.BlockTable.BlockPointers[3].Address
+	for _, key := range []uint32{0, 4, 5, 0x10203040} {
+		binary.BigEndian.PutUint32(data[leafOffset+16:], key)
+		a, err := Parse(writeCatalog(t, data), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := string(a.BitmapKeyDB[key]); len(a.BitmapKeyDB) != 1 || got != "bitmap payload" {
+			t.Fatalf("inline bitmap key %d: got %q, map=%v", key, got, a.BitmapKeyDB)
+		}
 	}
 }
 

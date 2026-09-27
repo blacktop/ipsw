@@ -50,7 +50,7 @@ type Asset struct {
 	// GlyphDB       map[string]Glyph
 	// BezelDB       map[string]Bezel
 	FacetKeyDB    map[string]renditionKeyToken
-	BitmapKeyDB   map[any][]byte
+	BitmapKeyDB   map[any][]byte // Keys are inline uint32 bitmap identifiers.
 	AppearanceDB  map[string]uint16
 	Globals       []byte // bplist data
 	Localizations map[string]uint32
@@ -424,7 +424,6 @@ func Parse(name string, conf *Config) (*Asset, error) {
 				}
 			}
 		case "BITMAPKEYS":
-			// NOTE: /System/Library/PrivateFrameworks/ChatKit.framework/Assets.car is SUPER weird (keys are many different types)
 			trees, err := bm.ReadTrees("BITMAPKEYS")
 			if err != nil {
 				return nil, fmt.Errorf("failed to read BITMAPKEYS tree: %v", err)
@@ -435,29 +434,16 @@ func Parse(name string, conf *Config) (*Asset, error) {
 					if err != nil {
 						return nil, fmt.Errorf("failed to read BITMAPKEYS value: %v", err)
 					}
-					// TODO: I think if I understand the struct of the value data it might tell me what the key TYPE is
-					keyData, err := io.ReadAll(item.KeyReader)
-					if err != nil {
-						return nil, fmt.Errorf("failed to read BITMAPKEYS key data: %v", err)
-					}
 					if a.conf.Verbose {
-						item.KeyReader, item.ValueReader = bytes.NewReader(keyData), bytes.NewReader(value)
+						// Show the inline identifier, not bytes from an unrelated block.
+						item.KeyReader = bytes.NewReader(binary.BigEndian.AppendUint32(nil, item.Key))
+						item.ValueReader = bytes.NewReader(value)
 						if err := dumpTreeIndice("BITMAPKEYS", item); err != nil {
 							return nil, fmt.Errorf("failed to dump BITMAPKEYS tree indice: %v", err)
 						}
 					}
-					switch {
-					case len(keyData) == 0:
-						a.BitmapKeyDB[nil] = value
-					case len(keyData) == 4:
-						var key uint32
-						if err := binary.Read(bytes.NewReader(keyData), binary.LittleEndian, &key); err != nil {
-							return nil, fmt.Errorf("failed to read BITMAPKEYS key: %v", err)
-						}
-						a.BitmapKeyDB[key] = value
-					case len(keyData) > 4:
-						// a.BitmapKeyDB[keyData] = value FIXME: this is an array of bytes (what does it represent?)
-					}
+					// BITMAPKEYS stores IDs directly, including IDs below the BOM block count.
+					a.BitmapKeyDB[item.Key] = value
 				}
 			}
 		case "COLORS":
