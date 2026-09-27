@@ -1,13 +1,15 @@
 package macho
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"golang.org/x/term"
 )
 
 // MachO holds the result of opening a MachO file, handling both fat and regular files
@@ -95,6 +97,9 @@ func OpenMachONonInteractive(machoPath string, arch string, interactive bool) (*
 		// If there's only one architecture, select it automatically
 		selectedIndex = 0
 	} else {
+		if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+			return nil, errors.Join(fmt.Errorf("universal binary: pass --arch (%s) when no interactive terminal is available", strings.Join(shortArches, ", ")), fat.Close())
+		}
 		// Prompt user to select
 		choice := 0
 		prompt := &survey.Select{
@@ -105,11 +110,7 @@ func OpenMachONonInteractive(machoPath string, arch string, interactive bool) (*
 			if closeErr := fat.Close(); closeErr != nil {
 				return nil, fmt.Errorf("failed to close fat file: %v (original error: %v)", closeErr, err)
 			}
-			if err == terminal.InterruptErr {
-				fmt.Println("Exiting...")
-				return nil, nil
-			}
-			return nil, fmt.Errorf("failed to get user selection: %v", err)
+			return nil, fmt.Errorf("failed to get user selection: %w", err)
 		}
 		selectedIndex = choice
 	}

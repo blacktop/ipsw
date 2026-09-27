@@ -15,6 +15,46 @@ import (
 	mtypes "github.com/blacktop/go-macho/types"
 )
 
+func TestImageAmbiguityWithoutTerminal(t *testing.T) {
+	input, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer input.Close()
+	output, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	stdin, stdout := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = input, output
+	defer func() { os.Stdin, os.Stdout = stdin, stdout }()
+	f := &File{Images: cacheImages{
+		{Name: "/System/Library/Frameworks/Synthetic.framework/Synthetic"},
+		{Name: "/System/Library/AccessibilityBundles/Synthetic.axbundle/Synthetic"},
+	}}
+	_, err = f.Image("Synthetic")
+	if err == nil || !strings.Contains(err.Error(), "multiple images") || !strings.Contains(err.Error(), "full") {
+		t.Fatalf("expected actionable ambiguity error, got %v", err)
+	}
+	for _, image := range f.Images {
+		if !strings.Contains(err.Error(), image.Name) {
+			t.Fatalf("missing candidate %s: %v", image.Name, err)
+		}
+		got, err := f.Image(image.Name)
+		if err != nil || got != image {
+			t.Fatalf("exact lookup = %v, %v", got, err)
+		}
+	}
+	data, err := os.ReadFile(output.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 0 {
+		t.Fatalf("nonterminal lookup printed a prompt: %q", data)
+	}
+}
+
 func TestSlidePagesForRangeHelper(t *testing.T) {
 	for _, tt := range []struct {
 		name               string

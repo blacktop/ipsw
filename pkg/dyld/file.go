@@ -17,13 +17,13 @@ import (
 	"unsafe"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"golang.org/x/term"
 )
 
 // Known good magic
@@ -2018,16 +2018,25 @@ func (f *File) Image(name string) (*CacheImage, error) {
 		for _, m := range matches {
 			names = append(names, m.Name)
 		}
+		sort.Strings(names)
+		ambiguity := fmt.Errorf("multiple images found for %q; supply a full image path:\n\t- %s", name, strings.Join(names, "\n\t- "))
+		if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+			return nil, ambiguity
+		}
 		var choice string
 		prompt := &survey.Select{
 			Message: "Multiple images found for " + name + ", please select one:",
 			Options: names,
 		}
-		if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-			log.Warn("Exiting...")
-			return nil, fmt.Errorf("multiple images found for %s (please supply FULL path):\n\t- %s", name, strings.Join(names, "\n\t- "))
+		if err := survey.AskOne(prompt, &choice); err != nil {
+			return nil, fmt.Errorf("%w\nselection failed: %w", ambiguity, err)
 		}
-		return f.Image(choice)
+		for _, image := range matches {
+			if image.Name == choice {
+				return image, nil
+			}
+		}
+		return nil, ambiguity
 	}
 	return nil, &ImageNotFoundError{Name: name}
 }

@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -59,6 +61,54 @@ func resolveImports(kext *macho.File, kcSymMap map[string]macho.Symbol) []macho.
 		}
 	}
 	return resolved
+}
+
+func resolveKext(entries []*macho.FilesetEntry, name string) (*macho.FilesetEntry, error) {
+	for _, entry := range entries {
+		if strings.EqualFold(entry.EntryID, name) {
+			return entry, nil
+		}
+	}
+	var matches []*macho.FilesetEntry
+	if name != "" {
+		for _, entry := range entries {
+			if strings.HasSuffix(strings.ToLower(entry.EntryID), "."+strings.ToLower(name)) {
+				matches = append(matches, entry)
+			}
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("KEXT %q not found; use a full bundle ID from 'ipsw kernel kexts'", name)
+	}
+	names := make([]string, len(matches))
+	for i, entry := range matches {
+		names[i] = entry.EntryID
+	}
+	slices.Sort(names)
+	return nil, fmt.Errorf("multiple KEXTs match %q; supply a full bundle ID:\n\t- %s", name, strings.Join(names, "\n\t- "))
+}
+
+func openKext(m *macho.File, entry *macho.FilesetEntry) (*macho.File, error) {
+	first, selected := -1, -1
+	for i, load := range m.Loads {
+		if _, ok := load.(*macho.FilesetEntry); ok && first == -1 {
+			first = i
+		}
+		if load == entry {
+			selected = i
+		}
+	}
+	if selected == -1 {
+		return nil, fmt.Errorf("KEXT %q is not in this kernelcache", entry.EntryID)
+	}
+	// The pinned go-macho opener returns the first suffix match. This command
+	// owns m; put the selected entry first while opening it, then restore order.
+	m.Loads[first], m.Loads[selected] = m.Loads[selected], m.Loads[first]
+	defer func() { m.Loads[first], m.Loads[selected] = m.Loads[selected], m.Loads[first] }()
+	return m.GetFileSetFileByName(entry.EntryID)
 }
 
 func init() {
@@ -117,6 +167,13 @@ var kerExtractCmd = &cobra.Command{
 		if m.File.FileTOC.FileHeader.Type != types.MH_FILESET {
 			return fmt.Errorf("kernelcache type is not MH_FILESET (KEXT extraction not supported yet)")
 		}
+		var selected *macho.FilesetEntry
+		if !dumpAll {
+			selected, err = resolveKext(m.File.FileSets(), args[1])
+			if err != nil {
+				return err
+			}
+		}
 
 		var dcf *fixupchains.DyldChainedFixups
 		if m.File.HasFixups() {
@@ -135,7 +192,7 @@ var kerExtractCmd = &cobra.Command{
 			kcSymMap = make(map[string]macho.Symbol)
 			log.Info("Building kernelcache symbol map...")
 			for _, fse := range m.File.FileSets() {
-				mfse, err := m.File.GetFileSetFileByName(fse.EntryID)
+				mfse, err := openKext(m.File, fse)
 				if err != nil {
 					continue
 				}
@@ -160,7 +217,7 @@ var kerExtractCmd = &cobra.Command{
 				} else if err != nil && !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %s: %w", fname, err)
 				}
-				mfse, err := m.File.GetFileSetFileByName(fse.EntryID)
+				mfse, err := openKext(m.File, fse)
 				if err != nil {
 					return fmt.Errorf("failed to parse KEXT %s: %v", fse.EntryID, err)
 				}
@@ -171,20 +228,23 @@ var kerExtractCmd = &cobra.Command{
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fname))
 			}
 		} else {
-			fname := filepath.Join(folder, args[1])
+			fname, err := utils.SanitizeArchivePath(folder, selected.EntryID)
+			if err != nil {
+				return fmt.Errorf("invalid KEXT output path: %w", err)
+			}
 			if _, err := os.Stat(fname); err == nil && !forceExtract {
 				log.Warnf("KEXT already exists: %s (use --force to overwrite)", fname)
 				return nil
 			} else if err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("failed to stat %s: %w", fname, err)
 			}
-			mfse, err := m.File.GetFileSetFileByName(args[1])
+			mfse, err := openKext(m.File, selected)
 			if err != nil {
-				return fmt.Errorf("failed to parse KEXT %s: %v", args[1], err)
+				return fmt.Errorf("failed to parse KEXT %s: %v", selected.EntryID, err)
 			}
 			syms := resolveImports(mfse, kcSymMap)
 			if err := mfse.Export(fname, dcf, baseAddress, syms); err != nil {
-				return fmt.Errorf("failed to export KEXT %s: %v", args[1], err)
+				return fmt.Errorf("failed to export KEXT %s: %v", selected.EntryID, err)
 			}
 			log.Infof("Created %s", fname)
 		}

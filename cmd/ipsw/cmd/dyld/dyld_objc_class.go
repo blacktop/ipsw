@@ -102,6 +102,9 @@ var objcClassCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to get objc class references for image %s: %v", imageName, err)
 				}
+				if len(classes) == 0 {
+					cmd.PrintErrf("No class references in %s (use class-dump to list class definitions)\n", image.Name)
+				}
 				for _, class := range classes {
 					fmt.Printf("%s: %s\n", colorAddr("%#09x", class.ClassPtr), class.Name)
 				}
