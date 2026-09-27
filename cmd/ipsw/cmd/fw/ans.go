@@ -50,7 +50,5 @@ var ansCmd = &cobra.Command{
 		// output := viper.GetString("fw.ans.output")
 
 		panic("not implemented")
-
-		return nil
 	},
 }

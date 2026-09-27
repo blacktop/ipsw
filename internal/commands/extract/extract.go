@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
@@ -730,12 +729,12 @@ func remoteKernelcacheWithKeys(i *info.Info, zr *zip.Reader, destPath, device st
 
 	for _, kc := range selected {
 		if err := os.MkdirAll(filepath.Dir(kc.output), 0750); err != nil {
-			return nil, fmt.Errorf("failed to create output directory: %v", err)
+			return artifacts, fmt.Errorf("failed to create output directory: %v", err)
 		}
 
 		if kc.payload != nil {
 			if err := os.WriteFile(kc.output, kc.payload, 0660); err != nil {
-				return nil, fmt.Errorf("failed to write kernelcache %s: %v", kc.file.Name, err)
+				return artifacts, fmt.Errorf("failed to write kernelcache %s: %v", kc.file.Name, err)
 			}
 			artifacts[kc.output] = kc.devices
 			continue
@@ -743,13 +742,13 @@ func remoteKernelcacheWithKeys(i *info.Info, zr *zip.Reader, destPath, device st
 
 		extracted, err := utils.SearchZip([]*zip.File{kc.file}, regexp.MustCompile("^"+regexp.QuoteMeta(kc.file.Name)+"$"), tmpDIR, true, progress)
 		if err != nil {
-			return nil, fmt.Errorf("failed to extract kernelcache %s: %v", kc.file.Name, err)
+			return artifacts, fmt.Errorf("failed to extract kernelcache %s: %v", kc.file.Name, err)
 		}
 		if len(extracted) == 0 {
-			return nil, fmt.Errorf("failed to extract kernelcache %s", kc.file.Name)
+			return artifacts, fmt.Errorf("failed to extract kernelcache %s", kc.file.Name)
 		}
 		if err := img4.DecryptPayload(extracted[0], kc.output, kc.iv, kc.key); err != nil {
-			return nil, fmt.Errorf("failed to decrypt kernelcache %s: %v", kc.file.Name, err)
+			return artifacts, fmt.Errorf("failed to decrypt kernelcache %s: %v", kc.file.Name, err)
 		}
 		artifacts[kc.output] = kc.devices
 	}
@@ -899,27 +898,27 @@ func SPTM(c *Config) ([]string, error) {
 	for _, f := range tmpOut {
 		dat, err := os.ReadFile(f)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open '%s': %v", f, err)
+			return outfiles, fmt.Errorf("failed to open '%s': %v", f, err)
 		}
 
 		im4p, err := img4.ParsePayload(dat)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
+			return outfiles, fmt.Errorf("failed to parse '%s': %v", f, err)
 		}
 
 		folder := filepath.Join(filepath.Clean(c.Output), strings.TrimPrefix(filepath.Dir(f), tmpDIR))
 		if err := os.MkdirAll(folder, 0o750); err != nil {
-			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
+			return outfiles, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
 		}
 		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
 
 		data, err := im4p.GetData()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get data from '%s': %v", f, err)
+			return outfiles, fmt.Errorf("failed to get data from '%s': %v", f, err)
 		}
 
 		if err = os.WriteFile(fname, data, 0o644); err != nil {
-			return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
+			return outfiles, fmt.Errorf("failed to write '%s': %v", fname, err)
 		}
 
 		outfiles = append(outfiles, fname)
@@ -928,68 +927,89 @@ func SPTM(c *Config) ([]string, error) {
 	return outfiles, nil
 }
 
-func Exclave(c *Config) ([]string, error) {
-	var outfiles []string
-
-	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_exclave")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary directory to store Exlave im4p: %v", err)
+// selectExclaveBundles chooses archive members before their payloads are read.
+func selectExclaveBundles(files []*zip.File, prompt bool) ([]string, error) {
+	var names []string
+	for _, f := range files {
+		if !f.FileInfo().IsDir() && strings.Contains(f.Name, "exclavecore_bundle") && strings.HasSuffix(f.Name, "im4p") {
+			names = append(names, f.Name)
+		}
 	}
-	defer os.RemoveAll(tmpDIR)
-
-	c.Pattern = `.*exclavecore_bundle.*im4p$`
-	out, err := Search(c, tmpDIR)
-	if err != nil {
-		return nil, err
-	}
-	if len(out) == 0 {
+	if len(names) == 0 {
 		return nil, fmt.Errorf("no Exclave bundles found")
 	}
 
-	interactive := c.Prompt && len(out) > 1 &&
-		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-
-	var bundles []string
-	if interactive {
-		choices := make([]string, len(out))
-		var defaults []int
-		for i, f := range out {
-			choices[i] = filepath.Base(f)
-			if !strings.Contains(f, ".restore.") {
-				defaults = append(defaults, i)
-			}
+	var selected []int
+	for i, name := range names {
+		if !strings.Contains(name, ".restore.") {
+			selected = append(selected, i)
 		}
-		var selected []int
+	}
+	if prompt && len(names) > 1 && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
+		choices := make([]string, len(names))
+		for i, name := range names {
+			choices[i] = filepath.Base(name)
+		}
 		prompt := &survey.MultiSelect{
 			Message: "Select which Exclave bundle(s) to extract:",
 			Options: choices,
-			Default: defaults,
+			Default: selected,
 		}
+		selected = nil
 		if err := survey.AskOne(prompt, &selected); err != nil {
-			if errors.Is(err, terminal.InterruptErr) {
-				log.Warn("Exiting...")
-				os.RemoveAll(tmpDIR) // deferred cleanup doesn't run on os.Exit
-				os.Exit(0)
-			}
-			return nil, fmt.Errorf("failed to prompt for Exclave bundle selection: %v", err)
+			return nil, fmt.Errorf("failed to prompt for Exclave bundle selection: %w", err)
 		}
 		if len(selected) == 0 {
 			return nil, fmt.Errorf("no Exclave bundles selected")
 		}
-		for _, idx := range selected {
-			bundles = append(bundles, out[idx])
+	} else if len(selected) == 0 {
+		return nil, fmt.Errorf("no Exclave bundles to extract (all %d matches are restore bundles)", len(names))
+	}
+	bundles := make([]string, 0, len(selected))
+	for _, idx := range selected {
+		bundles = append(bundles, names[idx])
+	}
+	return bundles, nil
+}
+
+func Exclave(c *Config) (outfiles []string, retErr error) {
+	var files []*zip.File
+	if c.IPSW != "" {
+		zr, err := zip.OpenReader(c.IPSW)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open IPSW: %w", err)
 		}
+		files = zr.File
+		if err := zr.Close(); err != nil {
+			return nil, fmt.Errorf("failed to close IPSW: %w", err)
+		}
+	} else if isURL(c.URL) {
+		zr, err := c.remoteZipReader(0)
+		if err != nil {
+			return nil, fmt.Errorf("unable to download remote zip: %w", err)
+		}
+		files = zr.File
 	} else {
-		for _, f := range out {
-			if strings.Contains(f, ".restore.") {
-				log.Debugf("Skipping restore Exclave bundle %s", filepath.Base(f))
-				continue
-			}
-			bundles = append(bundles, f)
-		}
-		if len(bundles) == 0 {
-			return nil, fmt.Errorf("no Exclave bundles to extract (all %d matches are restore bundles)", len(out))
-		}
+		return nil, fmt.Errorf("an IPSW path or valid URL is required")
+	}
+	selected, err := selectExclaveBundles(files, c.Prompt)
+	if err != nil {
+		return nil, err
+	}
+	patterns := make([]string, len(selected))
+	for i, name := range selected {
+		patterns[i] = regexp.QuoteMeta(name)
+	}
+	c.Pattern = "^(?:" + strings.Join(patterns, "|") + ")$"
+
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_exclave")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store Exclave im4p: %w", err)
+	}
+	defer utils.RemoveTempDir(tmpDIR, &retErr)
+	bundles, err := Search(c, tmpDIR)
+	if err != nil {
+		return nil, err
 	}
 
 	outDir := filepath.Clean(c.Output)
@@ -997,11 +1017,11 @@ func Exclave(c *Config) ([]string, error) {
 	for _, f := range bundles {
 		im4p, err := img4.OpenPayload(f)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
+			return outfiles, fmt.Errorf("failed to parse '%s': %v", f, err)
 		}
 		excData, err := im4p.GetData()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get data from '%s': %v", f, err)
+			return outfiles, fmt.Errorf("failed to get data from '%s': %v", f, err)
 		}
 		if c.Info {
 			fwcmd.ShowExclaveCores(excData)
@@ -1014,17 +1034,17 @@ func Exclave(c *Config) ([]string, error) {
 			folder = filepath.Join(folder, baseName)
 		}
 		if err := os.MkdirAll(folder, 0o750); err != nil {
-			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
+			return outfiles, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
 		}
 		// save BUND file
 		excFile := filepath.Join(folder, baseName)
 		if err := os.WriteFile(excFile, excData, 0o644); err != nil {
-			return nil, fmt.Errorf("failed to write '%s': %v", excFile, err)
+			return outfiles, fmt.Errorf("failed to write '%s': %v", excFile, err)
 		}
 		outfiles = append(outfiles, excFile)
 		cores, err := fwcmd.ExtractExclaveCores(excData, folder)
 		if err != nil {
-			return nil, fmt.Errorf("failed to extract files from exclave bundle: %v", err)
+			return outfiles, fmt.Errorf("failed to extract files from exclave bundle: %v", err)
 		}
 		outfiles = append(outfiles, cores...)
 	}
@@ -1364,6 +1384,9 @@ func Keybags(c *Config) (fname string, err error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to parse im4p kbags: %v", err)
 		}
+		// STORE members seek over payload bytes, so only compressed members
+		// benefit from larger blocks for a sequential read.
+		matches = slices.DeleteFunc(matches, func(f *zip.File) bool { return f.Method == zip.Store })
 		zr, err = tuneRemoteZipReader(c, zr, matches)
 		if err != nil {
 			return "", err
@@ -1634,6 +1657,9 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		destPath := filepath.Join(filepath.Clean(c.Output), folder)
 		if c.Output == "" {
 			destPath = folder
+		}
+		if len(tempDirectory) > 0 {
+			destPath = tempDirectory[0]
 		}
 		zr, err = tuneRemoteZipReader(c, zr, matchingZipFiles(zr.File, re))
 		if err != nil {

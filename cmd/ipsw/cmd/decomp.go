@@ -52,7 +52,7 @@ func init() {
 
 // decompCmd represents the decomp command
 var decompCmd = &cobra.Command{
-	Use:           "decomp",
+	Use:           "decomp <FILE>",
 	Short:         "Decompress files using libcompression",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,

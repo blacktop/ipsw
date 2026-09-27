@@ -5,10 +5,55 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/blacktop/go-macho"
+	"github.com/spf13/viper"
 )
+
+func TestKernelSymbolicatePreparesOutputDirectory(t *testing.T) {
+	for _, mode := range []string{"json", "flat", "stdout", "blocked"} {
+		t.Run(mode, func(t *testing.T) {
+			for key, value := range map[string]any{
+				"json": mode == "json" || mode == "blocked", "flat": mode == "flat",
+				"test": false, "schema": false, "lookup": uint64(0),
+			} {
+				key := "kernel.symbolicate." + key
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			output := filepath.Join(t.TempDir(), "nested", "symbols")
+			if mode == "blocked" {
+				if err := os.WriteFile(filepath.Dir(output), []byte("file"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			previous := viper.Get("kernel.symbolicate.output")
+			viper.Set("kernel.symbolicate.output", output)
+			t.Cleanup(func() { viper.Set("kernel.symbolicate.output", previous) })
+			err := kernelSymbolicateCmd.RunE(kernelSymbolicateCmd, []string{filepath.Join(t.TempDir(), "missing-kernel")})
+			if err == nil {
+				t.Fatal("expected missing input error")
+			}
+			if mode == "blocked" {
+				if !strings.Contains(err.Error(), "failed to create output directory") {
+					t.Fatalf("wrong error: %v", err)
+				}
+				return
+			}
+			_, statErr := os.Stat(output)
+			if mode == "stdout" {
+				if !os.IsNotExist(statErr) {
+					t.Fatalf("stdout mode created output directory: %v", statErr)
+				}
+			} else if statErr != nil {
+				t.Fatalf("output directory missing: %v", statErr)
+			}
+		})
+	}
+}
 
 func TestWriteSymbolicatorSchemaDefaultsToStdout(t *testing.T) {
 	t.Parallel()

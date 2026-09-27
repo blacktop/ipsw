@@ -80,7 +80,7 @@ var dcpCmd = &cobra.Command{
 	Short:         "Dump MachOs",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (retErr error) {
 
 		// flags
 		showInfo := viper.GetBool("fw.dcp.info")
@@ -129,13 +129,22 @@ var dcpCmd = &cobra.Command{
 		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.dcp.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
 		} else if isZip || viper.GetBool("fw.dcp.remote") {
+			var staging []string
+			if showInfo {
+				tmpDir, err := os.MkdirTemp("", "ipsw_dcp_info")
+				if err != nil {
+					return fmt.Errorf("failed to create temporary firmware directory: %w", err)
+				}
+				defer utils.RemoveTempDir(tmpDir, &retErr)
+				staging = []string{tmpDir}
+			}
 			var out []string
 			if viper.GetBool("fw.dcp.remote") {
 				out, err = extract.Search(&extract.Config{
 					URL:     args[0],
 					Pattern: dcpFwPattern,
 					Output:  output,
-				})
+				}, staging...)
 				if err != nil {
 					return fmt.Errorf("failed to extract dcp from remote IPSW: %v", err)
 				}
@@ -144,7 +153,7 @@ var dcpCmd = &cobra.Command{
 					IPSW:    infile,
 					Pattern: dcpFwPattern,
 					Output:  output,
-				})
+				}, staging...)
 				if err != nil {
 					return fmt.Errorf("failed to extract dcp from IPSW: %v", err)
 				}

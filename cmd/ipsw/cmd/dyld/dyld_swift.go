@@ -49,9 +49,11 @@ func init() {
 
 // SwiftCmd represents the swift command
 var SwiftCmd = &cobra.Command{
-	Use:   "swift <DSC>",
-	Short: "Dump Swift Optimizations Info",
-	Args:  cobra.ExactArgs(1),
+	Use:     "swift <DSC>",
+	Short:   "Dump Swift Optimizations Info",
+	Long:    "Dump Swift optimizations. Specify at least one of --types, --metadata, or --foreign; these modes can be combined.",
+	Example: "  ipsw dyld swift --types dyld_shared_cache_arm64e\n  ipsw dyld swift --types --metadata --foreign dyld_shared_cache_arm64e",
+	Args:    cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},

@@ -711,3 +711,43 @@ func TestCopyOTAFileToPathMetadataContract(t *testing.T) {
 		}
 	})
 }
+
+type fakePatternPayloadSource struct {
+	post  []fs.FileInfo
+	calls int
+}
+
+func (s *fakePatternPayloadSource) PostFiles() []fs.FileInfo { return s.post }
+func (s *fakePatternPayloadSource) GetPayloadFiles(string, string, string) error {
+	s.calls++
+	return nil
+}
+
+func TestExtractPatternPayloadsNoninteractiveConsent(t *testing.T) {
+	input, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previousInput := os.Stdin
+	os.Stdin = input
+	t.Cleanup(func() { os.Stdin = previousInput; input.Close() })
+	name := filepath.Join(t.TempDir(), "synthetic.bin")
+	if err := os.WriteFile(name, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, confirm := range []bool{false, true} {
+		src := &fakePatternPayloadSource{post: []fs.FileInfo{info}}
+		err := extractPatternPayloads(src, otaExtractFlags{pattern: "synthetic", confirm: confirm}, regexp.MustCompile("synthetic"), t.TempDir())
+		if confirm {
+			if err != nil || src.calls != 1 {
+				t.Fatalf("confirmed extraction calls = %d, error = %v", src.calls, err)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), "--confirm") || strings.Contains(err.Error(), "--json") || src.calls != 0 {
+			t.Fatalf("unconfirmed extraction calls = %d, error = %v", src.calls, err)
+		}
+	}
+}

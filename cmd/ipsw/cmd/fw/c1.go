@@ -59,7 +59,7 @@ var c1Cmd = &cobra.Command{
 	Short:         "Dump C1 Baseband Firmware",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (retErr error) {
 
 		// flags
 		info := viper.GetBool("fw.c1.info")
@@ -114,13 +114,22 @@ var c1Cmd = &cobra.Command{
 		if isZip, err := magic.IsZip(infile); err != nil && !viper.GetBool("fw.c1.remote") {
 			return fmt.Errorf("failed to determine if file is a zip: %v", err)
 		} else if isZip || viper.GetBool("fw.c1.remote") {
+			var staging []string
+			if info {
+				tmpDir, err := os.MkdirTemp("", "ipsw_c1_info")
+				if err != nil {
+					return fmt.Errorf("failed to create temporary firmware directory: %w", err)
+				}
+				defer utils.RemoveTempDir(tmpDir, &retErr)
+				staging = []string{tmpDir}
+			}
 			var out []string
 			if viper.GetBool("fw.c1.remote") {
 				out, err = extract.Search(&extract.Config{
 					URL:     args[0],
 					Pattern: "c40.*\\/ftab.bin$",
 					Output:  output,
-				})
+				}, staging...)
 				if err != nil {
 					return fmt.Errorf("failed to search for ftab in remote IPSW: %v", err)
 				}
@@ -129,7 +138,7 @@ var c1Cmd = &cobra.Command{
 					IPSW:    infile,
 					Pattern: "c40.*\\/ftab.bin$",
 					Output:  output,
-				})
+				}, staging...)
 				if err != nil {
 					return fmt.Errorf("failed to search for ftab in local IPSW: %v", err)
 				}

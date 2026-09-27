@@ -108,7 +108,21 @@ func createGoDiff(src, dst string, conf *GitDiffConfig) (string, error) {
 		}
 	}
 
-	return dmp.DiffPrettyText(diffs), nil
+	if conf.Color {
+		return dmp.DiffPrettyText(diffs), nil
+	}
+	var out strings.Builder
+	for _, diff := range diffs {
+		switch diff.Type {
+		case diffmatchpatch.DiffDelete:
+			fmt.Fprintf(&out, "[-%s-]", diff.Text)
+		case diffmatchpatch.DiffInsert:
+			fmt.Fprintf(&out, "{+%s+}", diff.Text)
+		default:
+			out.WriteString(diff.Text)
+		}
+	}
+	return out.String(), nil
 }
 
 // createGitDiffPatch renders a unified diff by shelling out to the host git
@@ -134,7 +148,7 @@ func createGitDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
 
 	os.WriteFile(tmpDst.Name(), []byte(dst), 0644)
 
-	cmd := exec.Command("git", "diff", "--no-index", tmpSrc.Name(), tmpDst.Name())
+	cmd := exec.Command("git", "diff", "--no-color", "--no-index", tmpSrc.Name(), tmpDst.Name())
 
 	dat, _ := cmd.CombinedOutput()
 
@@ -159,6 +173,10 @@ func createGitDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
 }
 
 func createDeltaDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
+	if !conf.Color {
+		return createGoDiff(src, dst, conf)
+	}
+
 	tmpSrc, err := os.CreateTemp("", "src")
 	if err != nil {
 		return "", err

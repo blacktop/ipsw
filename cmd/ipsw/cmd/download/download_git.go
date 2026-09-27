@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
@@ -47,7 +48,7 @@ func init() {
 	downloadGitCmd.Flags().Bool("latest", false, "Get ONLY latest tag")
 	downloadGitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadGitCmd.MarkFlagDirname("output")
-	downloadGitCmd.Flags().StringP("api", "a", "", "Github API Token")
+	downloadGitCmd.Flags().StringP("api", "a", "", "GitHub token (falls back to GITHUB_TOKEN, then GITHUB_API_TOKEN)")
 	downloadGitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	downloadGitCmd.Flags().Bool("webkit", false, "Get WebKit tags")
 	// Bind persistent flags
@@ -67,6 +68,15 @@ var downloadGitCmd = &cobra.Command{
 	Use:     "git",
 	Aliases: []string{"g", "github"},
 	Short:   "Download github.com/orgs/apple-oss-distributions tarballs",
+	Long: "Download source tarballs using GitHub GraphQL, which requires authentication.\n" +
+		"Token precedence: --api (or configured API token), GITHUB_TOKEN, GITHUB_API_TOKEN.\n" +
+		"Select a repository with --product; positional arguments are not accepted.",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.NoArgs(cmd, args); err != nil {
+			return fmt.Errorf("%w; use --product to select a repository", err)
+		}
+		return nil
+	},
 	Example: heredoc.Doc(`
 		# Download latest dyld source tarballs
 		❯ ipsw download git --product dyld --latest
@@ -77,8 +87,8 @@ var downloadGitCmd = &cobra.Command{
 		# Download WebKit tags (not Apple OSS)
 		❯ ipsw download git --webkit --json
 
-		# Download specific product with API token
-		❯ ipsw download git --product xnu --api YOUR_TOKEN
+		# Download a specific product using the token already in GITHUB_TOKEN
+		❯ ipsw download git --product xnu
 	`),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -93,14 +103,9 @@ var downloadGitCmd = &cobra.Command{
 		apiToken := viper.GetString("download.git.api")
 		asJSON := viper.GetBool("download.git.json")
 
-		if len(apiToken) == 0 {
-			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
-				apiToken = val
-			} else {
-				if val, ok := os.LookupEnv("GITHUB_API_TOKEN"); ok {
-					apiToken = val
-				}
-			}
+		apiToken, err = resolveGitHubToken(apiToken, os.Getenv)
+		if err != nil {
+			return err
 		}
 
 		if viper.GetBool("download.git.webkit") { // only download WebKit tags JSON
@@ -217,4 +222,13 @@ var downloadGitCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func resolveGitHubToken(configured string, getenv func(string) string) (string, error) {
+	for _, token := range []string{configured, getenv("GITHUB_TOKEN"), getenv("GITHUB_API_TOKEN")} {
+		if token = strings.TrimSpace(token); token != "" {
+			return token, nil
+		}
+	}
+	return "", fmt.Errorf("GitHub GraphQL requires a token; set GITHUB_TOKEN or GITHUB_API_TOKEN, or use --api")
 }

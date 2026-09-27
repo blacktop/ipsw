@@ -50,7 +50,5 @@ var mtpCmd = &cobra.Command{
 		// output := viper.GetString("fw.mtp.output")
 
 		panic("not implemented")
-
-		return nil
 	},
 }

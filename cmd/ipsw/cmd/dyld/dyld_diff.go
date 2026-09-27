@@ -50,7 +50,5 @@ var dyldDiffCmd = &cobra.Command{
 
 		// FIXME: implement
 		panic("ipsw dyld diff - not implemented yet")
-
-		return nil
 	},
 }

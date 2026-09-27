@@ -34,7 +34,7 @@ import (
 
 func init() {
 	ObjcCmd.AddCommand(objcClassCmd)
-	objcClassCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	objcClassCmd.Flags().StringP("image", "i", "", "List class references from this dylib image")
 	viper.BindPFlag("dyld.objc.class.image", objcClassCmd.Flags().Lookup("image"))
 }
 
@@ -43,6 +43,7 @@ var objcClassCmd = &cobra.Command{
 	Use:     "class <DSC>",
 	Aliases: []string{"c"},
 	Short:   "Get ObjC optimization class info",
+	Long:    "Get ObjC optimization class info. With --image, list classes referenced by that image.",
 	Args:    cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
@@ -96,6 +97,7 @@ var objcClassCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to get macho for image %s: %v", imageName, err)
 				}
+				defer m.Close()
 				classes, err := m.GetObjCClassReferences()
 				if err != nil {
 					return fmt.Errorf("failed to get objc class references for image %s: %v", imageName, err)

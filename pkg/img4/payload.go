@@ -698,40 +698,26 @@ func GetKeybagsFromIPSW(files []*zip.File, meta KeybagMetaData, pattern string) 
 
 	rePattern := `.*im4p$`
 	if len(pattern) > 0 {
-		if _, err := regexp.Compile(pattern); err != nil {
-			return nil, fmt.Errorf("failed to compile --pattern regexp: %v", err)
-		}
 		rePattern = pattern
+	}
+	re, err := regexp.Compile(rePattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile --pattern regexp: %v", err)
 	}
 
 	for _, f := range files {
-		if regexp.MustCompile(rePattern).MatchString(f.Name) {
-			rc, err := f.Open()
+		if re.MatchString(f.Name) {
+			keybags, err := zippedPayloadKeybags(f)
 			if err != nil {
-				return nil, fmt.Errorf("error opening zipped file %s: %v", f.Name, err)
+				return nil, fmt.Errorf("failed to read im4p keybags %s: %w", f.Name, err)
 			}
-			data, err := io.ReadAll(rc)
-			if err != nil {
-				log.Errorf("failed to read zipped file %s: %v", f.Name, err)
-				if err := rc.Close(); err != nil {
-					log.Errorf("failed to close zipped file %s: %v", f.Name, err)
-				}
-				continue
-			}
-			im4p, err := ParsePayload(data)
-			if err != nil {
-				log.Errorf("failed to parse im4p %s: %v", f.Name, err)
-			}
-			if im4p.Keybags == nil { // kbags are optional
+			if len(keybags) == 0 { // kbags are optional
 				continue
 			}
 			kbags.Files = append(kbags.Files, Im4pKeybag{
 				Name:    filepath.Base(f.Name),
-				Keybags: im4p.Keybags,
+				Keybags: keybags,
 			})
-			if err := rc.Close(); err != nil {
-				log.Errorf("failed to close zipped file %s: %v", f.Name, err)
-			}
 		}
 	}
 

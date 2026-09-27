@@ -819,28 +819,36 @@ func hintedATLeafType(mutation []byte) (pcc.ATLogDataType, bool) {
 	return pcc.ATLogDataType(mutation[1]), true
 }
 
-func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) {
+type pccReleaseSkip uint8
+
+const (
+	pccReleaseNotSkipped pccReleaseSkip = iota
+	pccReleaseMissingMetadata
+	pccReleaseMalformedMetadata
+)
+
+func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, pccReleaseSkip, error) {
 	if leaf.GetNodeType() != pcc.NodeType_ATL_NODE {
-		return nil, nil
+		return nil, pccReleaseNotSkipped, nil
 	}
 
 	var clnode pcc.ChangeLogNodeV2
 	if err := proto.Unmarshal(leaf.GetNodeBytes(), &clnode); err != nil {
 		if typ, ok := hintedATLeafType(clnode.GetMutation()); ok && typ != pcc.ATLogDataType_RELEASE {
-			return nil, nil
+			return nil, pccReleaseNotSkipped, nil
 		}
-		return nil, fmt.Errorf("cannot unmarshal ChangeLogNodeV2: %v", err)
+		return nil, pccReleaseNotSkipped, fmt.Errorf("cannot unmarshal ChangeLogNodeV2: %v", err)
 	}
 
 	atLeaf, err := parseAtLeaf(bytes.NewReader(clnode.GetMutation()))
 	if err != nil {
 		if typ, ok := hintedATLeafType(clnode.GetMutation()); ok && typ != pcc.ATLogDataType_RELEASE {
-			return nil, nil
+			return nil, pccReleaseNotSkipped, nil
 		}
-		return nil, fmt.Errorf("cannot parse ATLeaf: %v", err)
+		return nil, pccReleaseNotSkipped, fmt.Errorf("cannot parse ATLeaf: %v", err)
 	}
 	if pcc.ATLogDataType(atLeaf.Type) != pcc.ATLogDataType_RELEASE {
-		return nil, nil
+		return nil, pccReleaseNotSkipped, nil
 	}
 
 	// A RELEASE leaf is only useful if it carries ReleaseMetadata — the assets,
@@ -848,8 +856,8 @@ func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) 
 	// Apple's append-only AT log also contains metadata-less RELEASE leaves
 	// (issue #1249 hit one), so skip them rather than abort the whole fetch.
 	if len(leaf.GetMetadata()) == 0 {
-		log.WithFields(leafLogFields(leaf, atLeaf)).Warn("Skipping PCC release leaf with no metadata")
-		return nil, nil
+		log.WithFields(leafLogFields(leaf, atLeaf)).Debug("Skipping PCC release leaf with no metadata")
+		return nil, pccReleaseMissingMetadata, nil
 	}
 
 	release := &PCCRelease{
@@ -858,8 +866,8 @@ func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) 
 	}
 
 	if err := proto.Unmarshal(leaf.GetMetadata(), &release.ReleaseMetadata); err != nil {
-		log.WithFields(leafLogFields(leaf, atLeaf)).Warnf("Skipping PCC release leaf with unparseable metadata: %v", err)
-		return nil, nil
+		log.WithFields(leafLogFields(leaf, atLeaf)).Debugf("Skipping PCC release leaf with unparseable metadata: %v", err)
+		return nil, pccReleaseMalformedMetadata, nil
 	}
 
 	// The ticket is auxiliary: download and --info asset listing read only
@@ -874,10 +882,10 @@ func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, error) 
 		release.Ticket = Ticket{Raw: asn1.RawContent(leaf.GetRawData())}
 	}
 
-	return release, nil
+	return release, pccReleaseNotSkipped, nil
 }
 
-// leafLogFields is the shared index+digest context for the warnings emitted
+// leafLogFields is the shared index+digest context for the diagnostics emitted
 // when a release leaf is skipped or has a degraded ticket.
 func leafLogFields(leaf *pcc.LogLeavesResponse_Leaf, atLeaf *ATLeaf) log.Fields {
 	return log.Fields{
@@ -895,6 +903,22 @@ func collectPCCReleases(startIdx, endIdx, batchSize uint64, progress func(done, 
 	}
 
 	var releases []*PCCRelease
+	var missingMetadata, malformedMetadata uint64
+	defer func() {
+		if missingMetadata+malformedMetadata == 0 {
+			return
+		}
+		summary := log.WithFields(log.Fields{
+			"missing_metadata":   missingMetadata,
+			"malformed_metadata": malformedMetadata,
+			"usable_releases":    len(releases),
+		})
+		if malformedMetadata > 0 {
+			summary.Warn("Skipped PCC release leaves with unusable metadata (details with --verbose)")
+		} else {
+			summary.Info("Skipped PCC release leaves with no metadata (details with --verbose)")
+		}
+	}()
 	total := endIdx - startIdx
 	var done uint64
 
@@ -905,9 +929,15 @@ func collectPCCReleases(startIdx, endIdx, batchSize uint64, progress func(done, 
 			return nil, err
 		}
 		for _, leaf := range leaves {
-			release, err := parsePCCReleaseLeaf(leaf)
+			release, skipped, err := parsePCCReleaseLeaf(leaf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse pcc log leaf %d: %w", leaf.GetIndex(), err)
+			}
+			switch skipped {
+			case pccReleaseMissingMetadata:
+				missingMetadata++
+			case pccReleaseMalformedMetadata:
+				malformedMetadata++
 			}
 			if release != nil {
 				releases = append(releases, release)
@@ -1030,6 +1060,10 @@ func GetPCCLogSnapshot(
 	newReleases, err := collectPCCReleases(cache.HeadIndex, logSize, pccLogLeavesBatchSize, progress, fetchLeaves)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(prior) == 0 && len(newReleases) == 0 {
+		return nil, fmt.Errorf("PCC log contains no usable releases")
 	}
 
 	for _, r := range newReleases {

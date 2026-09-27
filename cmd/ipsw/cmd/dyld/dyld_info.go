@@ -51,8 +51,8 @@ func init() {
 	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
 	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	dyldInfoCmd.Flags().Bool("diff", false, "Diff two DSC's images")
-	dyldInfoCmd.Flags().Bool("delta", false, "Delta two DSC's image's versions")
+	dyldInfoCmd.Flags().Bool("diff", false, "Diff two DSCs' images (requires --dylibs)")
+	dyldInfoCmd.Flags().Bool("delta", false, "Compare two DSCs' image versions (requires --dylibs)")
 	viper.BindPFlag("dyld.info.closures", dyldInfoCmd.Flags().Lookup("closures"))
 	viper.BindPFlag("dyld.info.dlopen", dyldInfoCmd.Flags().Lookup("dlopen"))
 	viper.BindPFlag("dyld.info.dylibs", dyldInfoCmd.Flags().Lookup("dylibs"))
@@ -64,28 +64,24 @@ func init() {
 
 // dyldInfoCmd represents the info command
 var dyldInfoCmd = &cobra.Command{
-	Use:     "info <DSC>",
+	Use:     "info <DSC> [DSC]",
 	Aliases: []string{"i"},
 	Short:   "Parse dyld_shared_cache",
-	Args: func(cmd *cobra.Command, args []string) error {
-		diff, _ := cmd.Flags().GetBool("diff")
-		delta, _ := cmd.Flags().GetBool("delta")
-		if diff || delta {
-			if len(args) != 2 {
-				return fmt.Errorf("accepts 2 arg(s) when using --diff or --delta, received %d", len(args))
-			}
-		} else {
-			if len(args) != 1 {
-				return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
-			}
-		}
-		return nil
-	},
+	Long: `Parse a dyld_shared_cache. Use --dylibs with either --diff or --delta and
+two caches to compare images from the first cache to the second. The comparison
+modes are mutually exclusive. With --json, either mode emits sorted added,
+removed, and changed image records with versions; an empty version means the
+image has no source-version load command.`,
+	Example: "  ipsw dyld info --dylibs --delta old/DSC new/DSC\n  ipsw dyld info --dylibs --diff --json old/DSC new/DSC",
+	Args:    dyldInfoArgs,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := dyldInfoArgs(cmd, args); err != nil {
+			return err
+		}
 
 		// flags
 		// showHeader := viper.GetBool("header")
@@ -96,12 +92,6 @@ var dyldInfoCmd = &cobra.Command{
 		outAsJSON := viper.GetBool("dyld.info.json")
 		diff := viper.GetBool("dyld.info.diff")
 		delta := viper.GetBool("dyld.info.delta")
-		// validate flags
-		if !showDylibs && (diff || delta) {
-			return errors.New("you must specify --dylibs to use --diff or --delta")
-		} else if outAsJSON && (diff || delta) {
-			return errors.New("you cannot use --json with --diff or --delta")
-		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -132,6 +122,28 @@ var dyldInfoCmd = &cobra.Command{
 			return err
 		}
 		defer f.Close()
+
+		var versions1, versions2 map[string]string
+		var comparison dylibComparison
+		if diff || delta {
+			f2, err := dyld.Open(filepath.Clean(args[1]))
+			if err != nil {
+				return err
+			}
+			defer f2.Close()
+			versions1, err = dylibVersions(f)
+			if err != nil {
+				return err
+			}
+			versions2, err = dylibVersions(f2)
+			if err != nil {
+				return err
+			}
+			comparison = compareDylibVersions(versions1, versions2)
+			if outAsJSON {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(comparison)
+			}
+		}
 
 		if outAsJSON {
 			dinfo, err := dscCmd.GetInfo(f)
@@ -244,66 +256,27 @@ var dyldInfoCmd = &cobra.Command{
 
 		if showDylibs {
 			if diff || delta {
-				if len(args) < 2 {
-					return fmt.Errorf("please provide two dyld_shared_cache files to diff")
-				}
-
-				dylib2ver1 := make(map[string]string)
-				for _, img := range f.Images {
-					m, err := img.GetPartialMacho()
-					if err != nil {
-						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-					}
-					dylib2ver1[img.Name] = m.SourceVersion().Version.String()
-				}
-
-				f2, err := dyld.Open(filepath.Clean(args[1]))
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-
 				if delta {
-					dylib2ver2 := make(map[string]string)
-					for _, img := range f2.Images {
-						m, err := img.GetPartialMacho()
-						if err != nil {
-							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-						}
-						dylib2ver2[img.Name] = m.SourceVersion().Version.String()
+					var new, gone []string
+					for _, image := range comparison.Added {
+						new = append(new, fmt.Sprintf("`%s`\t(%s)", image.Name, image.Version))
 					}
-
-					var new []string
-					var gone []string
-
-					for d1, v1 := range dylib2ver1 {
-						if _, ok := dylib2ver2[d1]; !ok {
-							gone = append(gone, fmt.Sprintf("`%s`\t(%s)", d1, v1))
-						}
+					for _, image := range comparison.Removed {
+						gone = append(gone, fmt.Sprintf("`%s`\t(%s)", image.Name, image.Version))
 					}
-
-					sort.Strings(gone)
-
 					var diffs []utils.MachoVersion
-					for d2, v2 := range dylib2ver2 {
-						if v1, ok := dylib2ver1[d2]; ok {
-							if v1 != v2 {
-								verdiff, err := utils.DiffVersion(v2, v1)
-								if err != nil {
-									return err
-								}
-								diffs = append(diffs, utils.MachoVersion{
-									Name:    d2,
-									Version: verdiff,
-								})
-								// fmt.Printf("%s\t(%s -> %s) %s\n", d2, v2, v1, verdiff)
-							}
+					for _, image := range comparison.Changed {
+						var verdiff string
+						if image.OldVersion == "" || image.NewVersion == "" {
+							verdiff = fmt.Sprintf("%q -> %q", image.OldVersion, image.NewVersion)
 						} else {
-							new = append(new, fmt.Sprintf("`%s`\t(%s)", d2, v2))
+							verdiff, err = utils.DiffVersion(image.NewVersion, image.OldVersion)
+							if err != nil {
+								return err
+							}
 						}
+						diffs = append(diffs, utils.MachoVersion{Name: image.Name, Version: verdiff})
 					}
-
-					sort.Strings(new)
 
 					buf := bytes.NewBufferString("### 🆕 dylibs\n\n")
 					for _, d := range new {
@@ -336,24 +309,14 @@ var dyldInfoCmd = &cobra.Command{
 				}
 
 				if diff {
-					var dout1 []string
-					for _, img := range f.Images {
-						m, err := img.GetPartialMacho()
-						if err != nil {
-							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-						}
-						dout1 = append(dout1, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
+					var dout1, dout2 []string
+					for name, version := range versions1 {
+						dout1 = append(dout1, fmt.Sprintf("%s\t(%s)", name, version))
+					}
+					for name, version := range versions2 {
+						dout2 = append(dout2, fmt.Sprintf("%s\t(%s)", name, version))
 					}
 					sort.Strings(dout1)
-
-					var dout2 []string
-					for _, img := range f2.Images {
-						m, err := img.GetPartialMacho()
-						if err != nil {
-							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-						}
-						dout2 = append(dout2, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
-					}
 					sort.Strings(dout2)
 
 					out, err := utils.GitDiff(
@@ -449,4 +412,78 @@ var dyldInfoCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func dyldInfoArgs(cmd *cobra.Command, args []string) error {
+	diff := viper.GetBool("dyld.info.diff")
+	delta := viper.GetBool("dyld.info.delta")
+	if diff && delta {
+		return errors.New("--diff and --delta are mutually exclusive")
+	}
+	if diff || delta {
+		if !viper.GetBool("dyld.info.dylibs") {
+			return errors.New("you must specify --dylibs to use --diff or --delta")
+		}
+		if len(args) != 2 {
+			return fmt.Errorf("accepts 2 arg(s) when using --diff or --delta, received %d", len(args))
+		}
+		return nil
+	}
+	return cobra.ExactArgs(1)(cmd, args)
+}
+
+type dylibVersion struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+type dylibVersionChange struct {
+	Name       string `json:"name"`
+	OldVersion string `json:"old_version"`
+	NewVersion string `json:"new_version"`
+}
+
+type dylibComparison struct {
+	Added   []dylibVersion       `json:"added"`
+	Removed []dylibVersion       `json:"removed"`
+	Changed []dylibVersionChange `json:"changed"`
+}
+
+func dylibVersions(f *dyld.File) (map[string]string, error) {
+	versions := make(map[string]string, len(f.Images))
+	for _, img := range f.Images {
+		m, err := img.GetPartialMacho()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create partial MachO for image %s: %w", img.Name, err)
+		}
+		version := ""
+		if source := m.SourceVersion(); source != nil {
+			version = source.Version.String()
+		}
+		versions[img.Name] = version
+		m.Close()
+	}
+	return versions, nil
+}
+
+func compareDylibVersions(before, after map[string]string) dylibComparison {
+	result := dylibComparison{
+		Added: []dylibVersion{}, Removed: []dylibVersion{}, Changed: []dylibVersionChange{},
+	}
+	for name, oldVersion := range before {
+		if newVersion, ok := after[name]; !ok {
+			result.Removed = append(result.Removed, dylibVersion{Name: name, Version: oldVersion})
+		} else if oldVersion != newVersion {
+			result.Changed = append(result.Changed, dylibVersionChange{Name: name, OldVersion: oldVersion, NewVersion: newVersion})
+		}
+	}
+	for name, version := range after {
+		if _, ok := before[name]; !ok {
+			result.Added = append(result.Added, dylibVersion{Name: name, Version: version})
+		}
+	}
+	sort.Slice(result.Added, func(i, j int) bool { return result.Added[i].Name < result.Added[j].Name })
+	sort.Slice(result.Removed, func(i, j int) bool { return result.Removed[i].Name < result.Removed[j].Name })
+	sort.Slice(result.Changed, func(i, j int) bool { return result.Changed[i].Name < result.Changed[j].Name })
+	return result
 }

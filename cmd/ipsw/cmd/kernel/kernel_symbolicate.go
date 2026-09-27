@@ -71,9 +71,10 @@ func init() {
 
 // kernelSymbolicateCmd represents the symbolicate command
 var kernelSymbolicateCmd = &cobra.Command{
-	Use:     "symbolicate",
+	Use:     "symbolicate <KERNELCACHE|SYMBOLS_JSON>",
 	Aliases: []string{"sym"},
 	Short:   "Symbolicate kernelcache",
+	Long:    "Symbolicate a kernelcache. With --lookup, input may also be a previously generated symbols JSON map.",
 	Example: heredoc.Doc(`
 		# Symbolicate a kernelcache using signatures and write the map to JSON
 		❯ ipsw kernel symbolicate --signatures /path/to/sigs --json kernelcache.release.iPhone18,1
@@ -81,7 +82,7 @@ var kernelSymbolicateCmd = &cobra.Command{
 		❯ ipsw kernel symbolicate --signatures /path/to/sigs --lookup 0xfffffe000aecb258 kernelcache.release.iPhone18,1
 		# Look up the nearest symbol using a previously generated symbol map
 		❯ ipsw kernel symbolicate --lookup 0xfffffe000aecb258 kernelcache.release.iPhone18,1.symbols.json`),
-	Args:          cobra.MinimumNArgs(1),
+	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
@@ -123,6 +124,13 @@ var kernelSymbolicateCmd = &cobra.Command{
 				return nil
 			}
 			return fmt.Errorf("no symbol found at or below address %#x", addr)
+		}
+
+		if !viper.GetBool("kernel.symbolicate.test") &&
+			(viper.GetBool("kernel.symbolicate.json") || viper.GetBool("kernel.symbolicate.flat")) {
+			if err := os.MkdirAll(output, 0o755); err != nil {
+				return fmt.Errorf("failed to create output directory: %w", err)
+			}
 		}
 
 		smap, err := buildSymbolMapFromKernelcache(args[0], selectedArch, sigDir, quiet)

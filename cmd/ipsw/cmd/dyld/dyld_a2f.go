@@ -29,6 +29,8 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -58,6 +60,54 @@ func stdinHasData() bool {
 		return false
 	}
 	return (stat.Mode() & os.ModeCharDevice) == 0
+}
+
+// lookupFunction resolves boundaries before optional symbol enrichment. Naming must
+// not require recursive image analysis or make a valid function lookup fail.
+func lookupFunction(m *macho.File, addr uint64, nameAt func(uint64) string) (types.Function, error) {
+	fn, err := m.GetFunctionForVMAddr(addr)
+	if err != nil {
+		return types.Function{}, err
+	}
+	if name := nameAt(fn.StartAddr); name != "" {
+		fn.Name = name
+	}
+	return fn, nil
+}
+
+// primeSymbolNames loads the cached per-image name sources that functionNameAt
+// reads through f.AddressToSymbol: the export trie and symtab (the only source
+// for stripped images whose names live in the cache exports), the local
+// symbols, and optionally ObjC method names. Every parser memoizes on the
+// image's analysis state, so this runs once per image. Failures only degrade
+// naming.
+func primeSymbolNames(img *dyld.CacheImage, objc bool) {
+	if err := img.ParsePublicSymbols(false); err != nil {
+		log.WithError(err).Debugf("public symbol names unavailable for %s", filepath.Base(img.Name))
+	}
+	if err := img.ParseLocalSymbols(false); err != nil {
+		log.WithError(err).Debugf("local symbol names unavailable for %s", filepath.Base(img.Name))
+	}
+	if !objc {
+		return
+	}
+	if err := img.ParseObjC(); err != nil {
+		log.WithError(err).Debugf("ObjC method names unavailable for %s", filepath.Base(img.Name))
+	}
+}
+
+func functionNameAt(f *dyld.File, m *macho.File, addr uint64) string {
+	if name, ok := f.AddressToSymbol.Get(addr); ok && name != "<redacted>" {
+		return name
+	}
+	if syms, err := m.FindAddressSymbols(addr); err == nil {
+		for _, sym := range syms {
+			if sym.Name != "" && sym.Name != "<redacted>" {
+				return sym.Name
+			}
+		}
+	}
+	return ""
 }
 
 // AddrToFuncCmd represents the a2f command
@@ -106,7 +156,7 @@ var AddrToFuncCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(ptrFile) > 0 || stdinHasData() {
+		if len(ptrFile) > 0 || (len(args) < 2 && stdinHasData()) {
 			var fs []dscFunc
 			var enc *json.Encoder
 			var scanner *bufio.Scanner
@@ -172,12 +222,12 @@ var AddrToFuncCmd = &cobra.Command{
 					return err
 				}
 				defer m.Close()
+				primeSymbolNames(img, false)
 
 				for _, ptr := range ptrs {
-					if fn, err := m.GetFunctionForVMAddr(ptr); err == nil {
-						if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
-							fn.Name = symName
-						}
+					if fn, err := lookupFunction(m, ptr, func(addr uint64) string {
+						return functionNameAt(f, m, addr)
+					}); err == nil {
 						fs = append(fs, dscFunc{
 							Addr:  ptr,
 							Start: fn.StartAddr,
@@ -217,17 +267,12 @@ var AddrToFuncCmd = &cobra.Command{
 				return err
 			}
 			defer m.Close()
+			primeSymbolNames(image, true)
 
-			// Load all symbols
-			if err := image.Analyze(); err != nil {
-				return err
-			}
-
-			if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
+			if fn, err := lookupFunction(m, unslidAddr, func(addr uint64) string {
+				return functionNameAt(f, m, addr)
+			}); err == nil {
 				if asJSON {
-					if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
-						fn.Name = symName
-					}
 					if err := json.NewEncoder(os.Stdout).Encode(dscFunc{
 						Addr:  addr,
 						Start: fn.StartAddr,
@@ -239,18 +284,18 @@ var AddrToFuncCmd = &cobra.Command{
 						return err
 					}
 				} else {
-					if symName, ok := f.AddressToSymbol.Get(fn.StartAddr); ok {
+					if fn.Name != "" {
 						if unslidAddr-fn.StartAddr == 0 {
-							fmt.Printf("\n%#x: %s (start: %#x, end: %#x)\n", addr, symName, fn.StartAddr, fn.EndAddr)
+							fmt.Printf("\n%#x: %s (start: %#x, end: %#x)\n", addr, fn.Name, fn.StartAddr, fn.EndAddr)
 						} else {
-							fmt.Printf("\n%#x: %s + %d (start: %#x, end: %#x)\n", addr, symName, unslidAddr-fn.StartAddr, fn.StartAddr, fn.EndAddr)
+							fmt.Printf("\n%#x: %s + %d (start: %#x, end: %#x)\n", addr, fn.Name, unslidAddr-fn.StartAddr, fn.StartAddr, fn.EndAddr)
 						}
 						return nil
 					}
 					fmt.Printf("\n%#x: func_%x (start: %#x, end: %#x)\n", addr, addr, fn.StartAddr, fn.EndAddr)
 				}
 			} else {
-				log.Errorf("%#x is not in any known function", unslidAddr)
+				return fmt.Errorf("failed to resolve function at %#x: %w", unslidAddr, err)
 			}
 		}
 

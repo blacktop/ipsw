@@ -214,14 +214,20 @@ func expandPath(path string) string {
 }
 
 // expandConfigPaths expands relative and tilde paths in all config values
-func expandConfigPaths() {
-	allSettings := viper.AllSettings()
-	expandSettings(allSettings, "", viper.GetBool("config-quiet"))
-
-	// Merge the expanded settings back into viper
-	for key, value := range allSettings {
-		viper.Set(key, value)
+func expandConfigPaths(config *viper.Viper) error {
+	// Expand only file values. AllSettings also includes flags and environment
+	// values; promoting those to overrides can hide nested command flags.
+	fileConfig := viper.New()
+	fileConfig.SetConfigFile(config.ConfigFileUsed())
+	if filepath.Ext(config.ConfigFileUsed()) == "" {
+		fileConfig.SetConfigType("yaml")
 	}
+	if err := fileConfig.ReadInConfig(); err != nil {
+		return err
+	}
+	settings := fileConfig.AllSettings()
+	expandSettings(settings, "", config.GetBool("config-quiet"))
+	return config.MergeConfigMap(settings)
 }
 
 // sensitiveConfigKeys are credentials, not paths: they are never expanded and
@@ -298,6 +304,6 @@ func initConfig() {
 		}
 
 		// Expand tilde paths in the loaded configuration
-		expandConfigPaths()
+		cobra.CheckErr(expandConfigPaths(viper.GetViper()))
 	}
 }

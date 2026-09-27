@@ -70,6 +70,10 @@ func TestDiffClassesNoChange(t *testing.T) {
 	if out := diffClasses(same, same); !strings.Contains(out, "@@ Classes: no changes @@") {
 		t.Errorf("expected 'no changes', got:\n%s", out)
 	}
+	relocated := map[string]*objc.Class{"A": {Name: "A", InstanceMethods: []objc.Method{{Name: "m", ImpVMAddr: 0x1000}}}}
+	if out := diffClasses(same, relocated); !strings.Contains(out, "@@ Classes: no changes @@") {
+		t.Errorf("implementation addresses must not affect structural diff:\n%s", out)
+	}
 }
 
 func TestAddedRemovedSortedAndDisjoint(t *testing.T) {
@@ -91,5 +95,64 @@ func TestMethodKeysInstanceVsClass(t *testing.T) {
 	}
 	if _, ok := keys["+cls"]; !ok {
 		t.Error("class method should key as '+cls'")
+	}
+}
+
+func TestObjCDiffProperties(t *testing.T) {
+	for _, surface := range []struct {
+		name string
+		diff func([]objc.Property, []objc.Property) string
+	}{
+		{"class", func(prev, next []objc.Property) string {
+			return diffClasses(map[string]*objc.Class{"A": {Name: "A", InstanceMethods: meths("value"), Props: prev}},
+				map[string]*objc.Class{"A": {Name: "A", InstanceMethods: meths("value"), Props: next}})
+		}},
+		{"category", func(prev, next []objc.Property) string {
+			return diffCategories(map[string]*objc.Category{"A": {Name: "A", InstanceMethods: meths("value"), Properties: prev}},
+				map[string]*objc.Category{"A": {Name: "A", InstanceMethods: meths("value"), Properties: next}})
+		}},
+		{"protocol", func(prev, next []objc.Property) string {
+			return diffProtocols(map[string]*objc.Protocol{"A": {Name: "A", InstanceMethods: meths("value"), InstanceProperties: prev}},
+				map[string]*objc.Protocol{"A": {Name: "A", InstanceMethods: meths("value"), InstanceProperties: next}})
+		}},
+		{"class protocol", func(prev, next []objc.Property) string {
+			return diffProtocols(map[string]*objc.Protocol{"A": {Name: "A", ClassMethods: meths("value"), ClassProperties: prev}},
+				map[string]*objc.Protocol{"A": {Name: "A", ClassMethods: meths("value"), ClassProperties: next}})
+		}},
+	} {
+		t.Run(surface.name, func(t *testing.T) {
+			for _, tt := range []struct{ name, prev, next string }{
+				{"type", "Ti,V_value", "Tq,V_value"},
+				{"readonly", "Ti,V_value", "Ti,R,V_value"},
+				{"backing ivar", "Ti,V_value", "Ti,V_other"},
+				{"ownership", "T@,&,V_value", "T@,C,V_value"},
+				{"getter", "Ti,Gvalue,V_value", "Ti,GcustomValue,V_value"},
+				{"setter", "Ti,SsetValue:,V_value", "Ti,SstoreValue:,V_value"},
+				{"quoted type", "T{Pair=\"left,right\"ii},V_value", "T{Pair=\"right,left\"ii},V_value"},
+			} {
+				t.Run(tt.name, func(t *testing.T) {
+					prev := []objc.Property{{Name: "value", EncodedAttributes: tt.prev}}
+					next := []objc.Property{{Name: "value", EncodedAttributes: tt.next}}
+					out := surface.diff(prev, next)
+					if !strings.Contains(out, "~1 changed") || !strings.Contains(out, "+   @property") || !strings.Contains(out, "-   @property") {
+						t.Fatalf("property-only change missing: %s", out)
+					}
+				})
+			}
+			props := []objc.Property{{Name: "value", EncodedAttributes: "Ti,R,V_value"}}
+			for _, change := range []struct {
+				prev, next []objc.Property
+				marker     string
+			}{{nil, props, "+   @property"}, {props, nil, "-   @property"}} {
+				if out := surface.diff(change.prev, change.next); !strings.Contains(out, change.marker) || !strings.Contains(out, "~1 changed") {
+					t.Fatalf("property addition/removal missing: %s", out)
+				}
+			}
+			prev := []objc.Property{{Name: "value", EncodedAttributes: "T{Pair=\"left,right\"ii},R,N,V_value"}}
+			next := []objc.Property{{Name: "value", EncodedAttributes: "V_value,N,T{Pair=\"left,right\"ii},R", PropertyT: objc.PropertyT{NameVMAddr: 0x1000}}}
+			if out := surface.diff(prev, next); !strings.Contains(out, "no changes") {
+				t.Fatalf("attribute reordering or address changed diff: %s", out)
+			}
+		})
 	}
 }

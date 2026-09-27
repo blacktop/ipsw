@@ -70,7 +70,7 @@ func init() {
 
 // aeaCmd represents the ane command
 var aeaCmd = &cobra.Command{
-	Use:           "aea",
+	Use:           "aea <AEA>",
 	Short:         "Parse AEA1 DMGs",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,

@@ -309,11 +309,13 @@ func reportPreExtractFailure(w io.Writer, f otaExtractFlags, phase ota.Phase, er
 
 // dscPrompt returns the payloadv2 consent prompt, or nil when the invocation
 // already carries consent and must never block on a terminal.
-func dscPrompt(f otaExtractFlags) func(string) bool {
+func dscPrompt(f otaExtractFlags) func(string) (bool, error) {
 	if f.json || f.confirm {
 		return nil
 	}
-	return confirmPayloadSearch
+	return func(question string) (bool, error) {
+		return utils.Confirm(question, false)
+	}
 }
 
 func runDyldExtract(f otaExtractFlags, o *ota.AA, output string, w io.Writer) error {
@@ -433,7 +435,12 @@ func extractPatternAssets(o *ota.AA, f otaExtractFlags, re *regexp.Regexp, outpu
 	return nil
 }
 
-func extractPatternPayloads(o *ota.AA, f otaExtractFlags, re *regexp.Regexp, output string) error {
+type patternPayloadSource interface {
+	PostFiles() []fs.FileInfo
+	GetPayloadFiles(pattern, payloadRange, output string) error
+}
+
+func extractPatternPayloads(o patternPayloadSource, f otaExtractFlags, re *regexp.Regexp, output string) error {
 	bomFound := false
 	for _, file := range o.PostFiles() { // search in OTA post.bom files
 		if file.IsDir() || !matchesPostBOMPattern(re, file.Name()) {
@@ -445,7 +452,11 @@ func extractPatternPayloads(o *ota.AA, f otaExtractFlags, re *regexp.Regexp, out
 	if !bomFound {
 		return nil
 	}
-	if !f.confirm && !confirmPayloadSearch(fmt.Sprintf("Search for '%s' in payloadv2 files?", re.String())) {
+	consent, err := utils.Confirm(fmt.Sprintf("Search for '%s' in payloadv2 files?", re.String()), f.confirm)
+	if err != nil {
+		return fmt.Errorf("payloadv2 search was not performed: %w", err)
+	}
+	if !consent {
 		return nil
 	}
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
@@ -582,6 +593,7 @@ var otaExtractCmd = &cobra.Command{
 	Use:     "extract <OTA> [FILENAME]",
 	Aliases: []string{"e"},
 	Short:   "Extract OTA payload files",
+	Long:    "Extract OTA payload files. Answering no skips the optional payloadv2 search. Prompt failures, including interruption, return an error. Use --confirm to search without a terminal.",
 	Example: heredoc.Doc(`
 		# Extract the dyld_shared_cache files from an OTA
 		❯ ipsw ota extract OTA.zip --dyld --output ./out

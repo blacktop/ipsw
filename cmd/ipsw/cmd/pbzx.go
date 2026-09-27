@@ -42,7 +42,7 @@ func init() {
 
 // pbzxCmd represents the pbzx command
 var pbzxCmd = &cobra.Command{
-	Use:           "pbzx",
+	Use:           "pbzx <PBZX>",
 	Short:         "Decompress pbzx files",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,

@@ -29,13 +29,13 @@ import (
 	"sort"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 func init() {
@@ -74,6 +74,8 @@ func init() {
 var downloadKdkCmd = &cobra.Command{
 	Use:   "kdk",
 	Short: "Download KDKs",
+	Long: "Download KDKs. Without a selector, choose a KDK interactively.\n" +
+		"Unattended use requires --host, --build, --latest, or --all.",
 	Example: heredoc.Doc(`
 		# Download KDK for current host OS
 		❯ ipsw download kdk --host
@@ -103,10 +105,17 @@ var downloadKdkCmd = &cobra.Command{
 		all := viper.GetBool("download.kdk.all")
 		install := viper.GetBool("download.kdk.install")
 		output := viper.GetString("download.kdk.output")
+		if !forHost && forBuild == "" && !latest && !all &&
+			(!term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd()))) {
+			return fmt.Errorf("KDK selection requires an interactive terminal; use --host, --build, --latest, or --all")
+		}
 
 		kdks, err := download.ListKDKs()
 		if err != nil {
 			return err
+		}
+		if len(kdks) == 0 {
+			return fmt.Errorf("no KDKs available")
 		}
 
 		var dlKDKs []download.KDK
@@ -157,9 +166,8 @@ var downloadKdkCmd = &cobra.Command{
 				Options:  choices,
 				PageSize: 10,
 			}
-			if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-				log.Warn("Exiting...")
-				return nil
+			if err := survey.AskOne(prompt, &choice); err != nil {
+				return fmt.Errorf("KDK selection failed (use --host, --build, --latest, or --all for unattended use): %w", err)
 			}
 
 			for _, kdk := range kdks {
@@ -168,6 +176,9 @@ var downloadKdkCmd = &cobra.Command{
 					break
 				}
 			}
+		}
+		if len(dlKDKs) == 0 {
+			return fmt.Errorf("no KDK selected")
 		}
 
 		if len(dlKDKs) > 1 && install {

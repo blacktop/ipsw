@@ -3,6 +3,7 @@ package macho
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/blacktop/go-macho"
@@ -95,11 +96,55 @@ func protocolKeys(protos []objc.Protocol) map[string]struct{} {
 	return keys
 }
 
+// propertyKeys preserves all encoded attributes, including backing ivars and
+// custom accessors that the display declarations omit. Only attribute order is
+// ignored; commas within quoted names or composite types remain part of a type.
+func propertyKeys(props []objc.Property, kind string) map[string]struct{} {
+	keys := make(map[string]struct{}, len(props))
+	for _, p := range props {
+		var attrs []string
+		start, depth := 0, 0
+		quoted, escaped := false, false
+		for i, ch := range p.EncodedAttributes {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if quoted && ch == '\\' {
+				escaped = true
+			} else if ch == '"' {
+				quoted = !quoted
+			} else if !quoted {
+				switch ch {
+				case '{', '(', '[':
+					depth++
+				case '}', ')', ']':
+					if depth > 0 {
+						depth--
+					}
+				case ',':
+					if depth == 0 {
+						attrs = append(attrs, p.EncodedAttributes[start:i])
+						start = i + 1
+					}
+				}
+			}
+		}
+		attrs = append(attrs, p.EncodedAttributes[start:])
+		slices.Sort(attrs)
+		keys[fmt.Sprintf("@property %s%s [%s]", kind, p.Name, strings.Join(attrs, ","))] = struct{}{}
+	}
+	return keys
+}
+
 func diffClasses(prev, next map[string]*objc.Class) string {
 	return diffSection("Classes", prev, next,
 		func(c *objc.Class) map[string]struct{} {
 			keys := methodKeys(c.InstanceMethods, c.ClassMethods)
 			for k := range protocolKeys(c.Protocols) {
+				keys[k] = struct{}{}
+			}
+			for k := range propertyKeys(c.Props, "-") {
 				keys[k] = struct{}{}
 			}
 			return keys
@@ -119,6 +164,12 @@ func diffProtocols(prev, next map[string]*objc.Protocol) string {
 			for _, m := range p.OptionalClassMethods {
 				keys["+"+m.Name] = struct{}{}
 			}
+			for k := range propertyKeys(p.InstanceProperties, "-") {
+				keys[k] = struct{}{}
+			}
+			for k := range propertyKeys(p.ClassProperties, "+") {
+				keys[k] = struct{}{}
+			}
 			return keys
 		},
 		func(p *objc.Protocol) string { return p.Name })
@@ -127,7 +178,11 @@ func diffProtocols(prev, next map[string]*objc.Protocol) string {
 func diffCategories(prev, next map[string]*objc.Category) string {
 	return diffSection("Categories", prev, next,
 		func(c *objc.Category) map[string]struct{} {
-			return methodKeys(c.InstanceMethods, c.ClassMethods)
+			keys := methodKeys(c.InstanceMethods, c.ClassMethods)
+			for k := range propertyKeys(c.Properties, "-") {
+				keys[k] = struct{}{}
+			}
+			return keys
 		},
 		func(c *objc.Category) string { return c.Name })
 }

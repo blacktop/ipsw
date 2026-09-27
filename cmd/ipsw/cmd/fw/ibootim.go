@@ -59,7 +59,8 @@ func init() {
 
 // ibootimCmd represents the ibootim command
 var ibootimCmd = &cobra.Command{
-	Use:           "ibootim",
+	Use:           "ibootim <IPSW|URL|IM4P|IBOOTIM>",
+	Long:          "Extract iBoot images from an IPSW, URL (with --remote), IM4P, or raw iBoot image.",
 	Aliases:       []string{"ibm"},
 	Short:         "Dump iBoot Images",
 	Args:          cobra.ExactArgs(1),

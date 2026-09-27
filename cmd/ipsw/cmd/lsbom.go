@@ -40,7 +40,7 @@ func init() {
 
 // lsbomCmd represents the lsbom command
 var lsbomCmd = &cobra.Command{
-	Use:           "lsbom",
+	Use:           "lsbom <BOM>",
 	Short:         "List contents of a BOM file",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,

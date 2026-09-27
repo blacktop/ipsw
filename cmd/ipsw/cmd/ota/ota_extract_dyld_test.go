@@ -708,9 +708,9 @@ func TestExtractDSCNeverPromptsWhenPromptIsNil(t *testing.T) {
 	}
 
 	interactive := &fakeDSCSource{}
-	opts.Prompt = func(string) bool {
+	opts.Prompt = func(string) (bool, error) {
 		t.Fatal("prompt asked despite an empty post.bom")
-		return true
+		return true, nil
 	}
 	extractDSC(interactive, opts)
 	if interactive.payloadCalls != 0 {
@@ -722,9 +722,9 @@ func TestExtractDSCPromptDeclineSkipsPayload(t *testing.T) {
 	src := &fakeDSCSource{postBOM: []string{"System/Library/dyld/dyld_shared_cache_arm64e"}}
 	opts := testOpts()
 	asked := 0
-	opts.Prompt = func(string) bool {
+	opts.Prompt = func(string) (bool, error) {
 		asked++
-		return false
+		return false, nil
 	}
 
 	rep := extractDSC(src, opts)
@@ -743,6 +743,34 @@ func TestExtractDSCPromptDeclineSkipsPayload(t *testing.T) {
 	}
 	if err := rep.fatalErr(); err != nil {
 		t.Errorf("fatalErr() = %v, want nil", err)
+	}
+}
+
+func TestExtractDSCPromptFailurePreservesPartialReport(t *testing.T) {
+	src := &fakeDSCSource{
+		assets:  []string{"System/Library/dyld/dyld_shared_cache_arm64e"},
+		postBOM: []string{"System/Library/dyld/dyld_shared_cache_x86_64"},
+	}
+	opts := testOpts()
+	opts.Arches = []string{"arm64e", "x86_64"}
+	wantErr := errors.New("confirmation requires a terminal; use --confirm")
+	opts.Prompt = func(string) (bool, error) { return false, wantErr }
+	rep := extractDSC(src, opts)
+	if rep.Complete || src.payloadCalls != 0 || len(rep.Files) != 1 {
+		t.Fatalf("report = %+v, payload calls = %d", rep, src.payloadCalls)
+	}
+	if !errors.Is(rep.fatalErr(), wantErr) {
+		t.Fatalf("fatalErr() = %v, want confirmation failure", rep.fatalErr())
+	}
+	if len(rep.Errors) != 2 || rep.Errors[0].Phase != ota.PhasePayloadExtract || rep.Errors[0].Source != sourcePayloadV2 {
+		t.Fatalf("report.Errors = %+v, want attributed prompt failure and missing architecture", rep.Errors)
+	}
+	var out bytes.Buffer
+	if err := writeDSCReport(&out, rep); err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid(out.Bytes()) || !strings.Contains(out.String(), wantErr.Error()) {
+		t.Fatalf("invalid or incomplete report: %s", out.String())
 	}
 }
 

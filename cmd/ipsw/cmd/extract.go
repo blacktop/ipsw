@@ -22,8 +22,12 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -52,7 +56,7 @@ func init() {
 	extractCmd.Flags().Bool("sptm", false, "Extract SPTM and TXM Firmwares")
 	extractCmd.Flags().BoolP("exclave", "x", false, "Extract Exclave Bundle")
 	extractCmd.Flags().Bool("kbag", false, "Extract Im4p Keybags")
-	extractCmd.Flags().Bool("fcs-key", false, "Extract AEA1 DMG fcs-key pem files")
+	extractCmd.Flags().Bool("fcs-key", false, "Extract AEA1 keys for SystemOS DMGs (legacy filesystem fallback)")
 	extractCmd.Flags().Bool("sys-ver", false, "Extract SystemVersion")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
@@ -61,6 +65,7 @@ func init() {
 	extractCmd.MarkFlagDirname("output")
 	extractCmd.Flags().Bool("flat", false, "Do NOT preserve directory structure when extracting")
 	extractCmd.Flags().BoolP("json", "j", false, "Output extracted paths as JSON")
+	extractCmd.Flags().String("json-format", "legacy", "JSON format: legacy (per component) or artifacts (one versioned report; requires --json)")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
 	extractCmd.RegisterFlagCompletionFunc("dyld-arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return dyld.DscArches, cobra.ShellCompDirectiveDefault
@@ -100,6 +105,7 @@ func init() {
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("extract.flat", extractCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("extract.json", extractCmd.Flags().Lookup("json"))
+	viper.BindPFlag("extract.json-format", extractCmd.Flags().Lookup("json-format"))
 	viper.BindPFlag("extract.dyld-arch", extractCmd.Flags().Lookup("dyld-arch"))
 	viper.BindPFlag("extract.driverkit", extractCmd.Flags().Lookup("driverkit"))
 	viper.BindPFlag("extract.device", extractCmd.Flags().Lookup("device"))
@@ -108,9 +114,14 @@ func init() {
 
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
-	Use:           "extract <IPSW/OTA | URL>",
-	Aliases:       []string{"e", "ex"},
-	Short:         "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA",
+	Use:     "extract <IPSW/OTA | URL>",
+	Aliases: []string{"e", "ex"},
+	Short:   "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA",
+	Long: `Extract components from an IPSW or OTA. --json keeps the legacy per-component
+output. Add --json-format artifacts for one schema-versioned document containing
+an artifacts array (kind, path, and optional devices), optional keybags and
+system_version metadata, and a complete flag. An extraction failure retains
+completed artifacts, sets complete to false, includes an error, and exits nonzero.`,
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	Example: heredoc.Doc(`
@@ -125,6 +136,9 @@ var extractCmd = &cobra.Command{
 
 		# Extract multiple components with custom output directory
 		$ ipsw extract --kernel --sep --dyld -o /tmp/extracted iPhone.ipsw
+
+		# Emit one versioned JSON document for all extracted components
+		$ ipsw extract --kernel --sep --json --json-format artifacts iPhone.ipsw
 
 		# Extract from remote URL
 		$ ipsw extract --kernel --remote https://updates.cdn-apple.com/iPhone.ipsw
@@ -141,10 +155,19 @@ var extractCmd = &cobra.Command{
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	},
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
+		}
+
+		format := viper.GetString("extract.json-format")
+		if format != "legacy" && format != "artifacts" {
+			return fmt.Errorf("invalid --json-format %q (must be legacy or artifacts)", format)
+		}
+		unified := format == "artifacts"
+		if unified && !viper.GetBool("extract.json") {
+			return fmt.Errorf("--json-format artifacts requires --json")
 		}
 
 		// validate args
@@ -186,6 +209,29 @@ var extractCmd = &cobra.Command{
 			return fmt.Errorf("--sys-ver can NOT be used with a --remote IPSW/OTA")
 		}
 
+		report := extractionReport{SchemaVersion: 1, Artifacts: []extractionArtifact{}}
+		if unified {
+			defer func() { err = errors.Join(err, writeExtractionReport(cmd.OutOrStdout(), &report, err)) }()
+		}
+		reportPaths := func(kind string, paths []string) error {
+			if unified {
+				for _, path := range paths {
+					report.Artifacts = append(report.Artifacts, extractionArtifact{Kind: kind, Path: path})
+				}
+			} else if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(paths)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), string(dat))
+			} else {
+				for _, path := range paths {
+					utils.Indent(log.Info, 2)("Created " + path)
+				}
+			}
+			return nil
+		}
+
 		config := &extract.Config{
 			IPSW:         "",
 			URL:          "",
@@ -224,19 +270,26 @@ var extractCmd = &cobra.Command{
 		if viper.GetBool("extract.kernel") {
 			log.Info("Extracting kernelcache")
 			out, err := extract.Kernelcache(config)
-			if err != nil {
+			if err != nil && len(out) == 0 {
 				return fmt.Errorf("failed to extract kernelcache: %v", err)
 			}
-			if viper.GetBool("extract.json") {
+			if unified {
+				for path, devices := range out {
+					report.Artifacts = append(report.Artifacts, extractionArtifact{Kind: "kernel", Path: path, Devices: devices})
+				}
+			} else if viper.GetBool("extract.json") {
 				dat, err := json.Marshal(out)
 				if err != nil {
 					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
 				}
-				fmt.Println(string(dat))
+				fmt.Fprintln(cmd.OutOrStdout(), string(dat))
 			} else {
 				for fn := range out {
 					utils.Indent(log.Info, 2)("Created " + fn)
 				}
+			}
+			if err != nil {
+				return fmt.Errorf("failed to extract kernelcache: %v", err)
 			}
 		}
 
@@ -246,16 +299,8 @@ var extractCmd = &cobra.Command{
 			if err != nil && len(out) == 0 {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("dyld", out); err != nil {
+				return err
 			}
 			if err != nil {
 				return err
@@ -263,22 +308,13 @@ var extractCmd = &cobra.Command{
 		}
 
 		if viper.GetString("extract.dmg") != "" {
-			config.DMGs = true
 			log.Info("Extracting DMG")
 			out, err := extract.DMG(config)
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("dmg", out); err != nil {
+				return err
 			}
 		}
 
@@ -289,16 +325,8 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("dtree", out); err != nil {
+				return err
 			}
 		}
 
@@ -309,16 +337,8 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("iboot", out); err != nil {
+				return err
 			}
 		}
 
@@ -329,65 +349,50 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("sep", out); err != nil {
+				return err
 			}
 		}
 
 		if viper.GetBool("extract.sptm") {
 			log.Info("Extracting SPTM firmware")
 			out, err := extract.SPTM(config)
-			if err != nil {
+			if err != nil && len(out) == 0 {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("sptm", out); err != nil {
+				return err
+			}
+			if err != nil {
+				return err
 			}
 		}
 
 		if viper.GetBool("extract.exclave") {
 			log.Info("Extracting Exclave Bundle")
 			out, err := extract.Exclave(config)
-			if err != nil {
+			if err != nil && len(out) == 0 {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("exclave", out); err != nil {
+				return err
+			}
+			if err != nil {
+				return err
 			}
 		}
 
 		if viper.GetBool("extract.kbag") {
 			log.Info("Extracting im4p key bags")
+			config.Pattern = viper.GetString("extract.pattern")
 			out, err := extract.Keybags(config)
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				fmt.Println(out)
+			if unified {
+				report.Keybags = json.RawMessage(out)
+			} else if viper.GetBool("extract.json") {
+				fmt.Fprintln(cmd.OutOrStdout(), out)
 			} else {
 				if len(out) > 0 {
 					utils.Indent(log.Info, 2)("Created " + out)
@@ -401,8 +406,14 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				fmt.Println(out)
+			if unified {
+				for _, path := range out {
+					report.Artifacts = append(report.Artifacts, extractionArtifact{Kind: "fcs-key", Path: path})
+				}
+			} else if viper.GetBool("extract.json") {
+				if err := json.NewEncoder(cmd.OutOrStdout()).Encode(out); err != nil {
+					return err
+				}
 			} else {
 				for _, f := range out {
 					utils.Indent(log.Info, 2)("Created " + f)
@@ -416,32 +427,27 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			dat, err := json.MarshalIndent(out, "", "  ")
-			if err != nil {
-				return err
+			if unified {
+				report.SystemVersion = out
+			} else {
+				dat, err := json.MarshalIndent(out, "", "  ")
+				if err != nil {
+					return err
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), string(dat))
 			}
-			fmt.Println(string(dat))
 		}
 
 		if len(viper.GetString("extract.pattern")) > 0 {
 			log.Infof("Extracting files matching pattern %#v", viper.GetString("extract.pattern"))
-			if viper.GetBool("extract.files") {
-				config.DMGs = true
-			}
+			config.Pattern = viper.GetString("extract.pattern")
+			config.DMGs = viper.GetBool("extract.files")
 			out, err := extract.Search(config)
 			if err != nil && len(out) == 0 {
 				return err
 			}
-			if viper.GetBool("extract.json") {
-				dat, err := json.Marshal(out)
-				if err != nil {
-					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
-				}
-				fmt.Println(string(dat))
-			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
-				}
+			if err := reportPaths("pattern", out); err != nil {
+				return err
 			}
 			if err != nil {
 				return err
@@ -450,4 +456,38 @@ var extractCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// extractionReport is the opt-in, single-document --json-format artifacts output.
+// Completed artifacts remain available when a later component fails.
+type extractionReport struct {
+	SchemaVersion int                  `json:"schema_version"`
+	Complete      bool                 `json:"complete"`
+	Artifacts     []extractionArtifact `json:"artifacts"`
+	Keybags       json.RawMessage      `json:"keybags,omitempty"`
+	SystemVersion any                  `json:"system_version,omitempty"`
+	Error         string               `json:"error,omitempty"`
+}
+
+type extractionArtifact struct {
+	Kind    string   `json:"kind"`
+	Path    string   `json:"path"`
+	Devices []string `json:"devices,omitempty"`
+}
+
+func writeExtractionReport(w io.Writer, report *extractionReport, extractErr error) error {
+	report.Complete = extractErr == nil
+	if extractErr != nil {
+		report.Error = extractErr.Error()
+	}
+	for i := range report.Artifacts {
+		slices.Sort(report.Artifacts[i].Devices)
+	}
+	slices.SortFunc(report.Artifacts, func(a, b extractionArtifact) int {
+		if order := cmp.Compare(a.Kind, b.Kind); order != 0 {
+			return order
+		}
+		return cmp.Compare(a.Path, b.Path)
+	})
+	return json.NewEncoder(w).Encode(report)
 }

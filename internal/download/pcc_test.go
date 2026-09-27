@@ -9,12 +9,56 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apex/log"
+	"github.com/apex/log/handlers/memory"
 	"github.com/blacktop/ipsw/internal/download/pcc"
 	"github.com/fatih/color"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+func TestCollectPCCReleasesSummarizesSkippedMetadata(t *testing.T) {
+	previousHandler := log.Log.(*log.Logger).Handler
+	previousLevel := log.Log.(*log.Logger).Level
+	t.Cleanup(func() {
+		log.SetHandler(previousHandler)
+		log.SetLevel(previousLevel)
+	})
+	log.SetLevel(log.InfoLevel)
+	for _, malformed := range []bool{false, true} {
+		captured := memory.New()
+		log.SetHandler(captured)
+		var leaves []*pcc.LogLeavesResponse_Leaf
+		for i := range uint64(100) {
+			leaves = append(leaves, newTestLogLeaf(t, i, pcc.ATLogDataType_RELEASE, false, true))
+		}
+		if malformed {
+			leaf := newTestLogLeaf(t, 100, pcc.ATLogDataType_RELEASE, true, true)
+			leaf.Metadata = []byte{0xff}
+			leaves = append(leaves, leaf)
+		}
+		leaves = append(leaves, newTestLogLeaf(t, 101, pcc.ATLogDataType_RELEASE, true, true))
+		releases, err := collectPCCReleases(0, 1, 1, nil, func(_, _ uint64) ([]*pcc.LogLeavesResponse_Leaf, error) {
+			return leaves, nil
+		})
+		if err != nil || len(releases) != 1 {
+			t.Fatalf("releases=%d err=%v", len(releases), err)
+		}
+		if len(captured.Entries) != 1 {
+			t.Fatalf("got %d normal log entries, want one summary", len(captured.Entries))
+		}
+		summary := captured.Entries[0]
+		wantMalformed := uint64(0)
+		wantLevel := log.InfoLevel
+		if malformed {
+			wantMalformed, wantLevel = 1, log.WarnLevel
+		}
+		if summary.Level != wantLevel || summary.Fields["missing_metadata"] != uint64(100) || summary.Fields["malformed_metadata"] != wantMalformed {
+			t.Fatalf("unexpected summary: %+v", summary)
+		}
+	}
+}
 
 func TestCollectPCCReleasesPagesThroughLogLeaves(t *testing.T) {
 	t.Parallel()
@@ -61,7 +105,7 @@ func TestParsePCCReleaseLeafSkipsMetadataLessLeaf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			release, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 7, pcc.ATLogDataType_RELEASE, false, tt.includeRawData))
+			release, _, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 7, pcc.ATLogDataType_RELEASE, false, tt.includeRawData))
 			if err != nil {
 				t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
 			}
@@ -88,7 +132,7 @@ func TestParsePCCReleaseLeafKeepsReleaseWithUnparseableTicket(t *testing.T) {
 	leaf := newTestLogLeaf(t, 11, pcc.ATLogDataType_RELEASE, true, false)
 	leaf.RawData = v2Ticket
 
-	release, err := parsePCCReleaseLeaf(leaf)
+	release, _, err := parsePCCReleaseLeaf(leaf)
 	if err != nil {
 		t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
 	}
@@ -144,7 +188,7 @@ func TestParseAtLeafParsesLengthPrefixedExtensions(t *testing.T) {
 func TestParsePCCReleaseLeafSkipsNonReleaseLeaf(t *testing.T) {
 	t.Parallel()
 
-	release, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 3, pcc.ATLogDataType_TEST_MARKER, true, true))
+	release, _, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 3, pcc.ATLogDataType_TEST_MARKER, true, true))
 	if err != nil {
 		t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
 	}
@@ -159,7 +203,7 @@ func TestParsePCCReleaseLeafSkipsMalformedNonReleaseLeaf(t *testing.T) {
 	leaf := newTestLogLeaf(t, 8, pcc.ATLogDataType_TEST_MARKER, false, false)
 	leaf.NodeBytes = []byte{0x0a, 0x02, 0x01, byte(pcc.ATLogDataType_TEST_MARKER), 0xff}
 
-	release, err := parsePCCReleaseLeaf(leaf)
+	release, _, err := parsePCCReleaseLeaf(leaf)
 	if err != nil {
 		t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
 	}
@@ -174,7 +218,7 @@ func TestParsePCCReleaseLeafSkipsUndecodableLeaf(t *testing.T) {
 	leaf := newTestLogLeaf(t, 9, pcc.ATLogDataType_RELEASE, true, true)
 	leaf.NodeBytes = mustMarshalProto(t, &pcc.ChangeLogNodeV2{Mutation: []byte{1}})
 
-	release, err := parsePCCReleaseLeaf(leaf)
+	release, _, err := parsePCCReleaseLeaf(leaf)
 	if err == nil {
 		t.Fatal("expected malformed leaf error")
 	}
@@ -291,7 +335,7 @@ func TestPCCReleaseStringPrintsOSBuildNextToCloudOSBuild(t *testing.T) {
 	color.NoColor = true
 	defer func() { color.NoColor = oldNoColor }()
 
-	release, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 4, pcc.ATLogDataType_RELEASE, true, true))
+	release, _, err := parsePCCReleaseLeaf(newTestLogLeaf(t, 4, pcc.ATLogDataType_RELEASE, true, true))
 	if err != nil {
 		t.Fatalf("parsePCCReleaseLeaf returned error: %v", err)
 	}

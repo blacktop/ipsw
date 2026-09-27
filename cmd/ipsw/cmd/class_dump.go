@@ -219,7 +219,7 @@ var classDumpCmd = &cobra.Command{
 		# Class-dump a standalone MachO binary
 		❯ ipsw class-dump <MACHO>
 		# Dump a single class (regex) with RE addresses
-		❯ ipsw class-dump <DSC> <DYLIB> --class 'NSString' --re
+		❯ ipsw class-dump <DSC> <DYLIB> --class 'NSString' --re -V
 		# Write ObjC headers to a folder
 		❯ ipsw class-dump <DSC> <DYLIB> --headers --output /tmp/headers
 		# Structurally diff a dylib's ObjC between two DSC versions (added/removed/changed)

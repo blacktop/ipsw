@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/term"
 )
@@ -250,7 +251,11 @@ func (t *Table) Render() string {
 		output.WriteString("\n")
 	}
 
-	return strings.TrimRight(output.String(), "\n")
+	rendered := strings.TrimRight(output.String(), "\n")
+	if !utils.ColorAllowed() {
+		return ansi.Strip(rendered)
+	}
+	return rendered
 }
 
 // RenderToWriter writes the table output to any writer (maintains tablewriter compatibility)

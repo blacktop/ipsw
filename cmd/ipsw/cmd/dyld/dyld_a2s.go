@@ -38,8 +38,8 @@ import (
 func init() {
 	DyldCmd.AddCommand(AddrToSymCmd)
 	AddrToSymCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
-	AddrToSymCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
-	AddrToSymCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
+	AddrToSymCmd.Flags().BoolP("image", "i", false, "Show the containing image, segment, and section")
+	AddrToSymCmd.Flags().BoolP("mapping", "m", false, "Show the dyld shared-cache mapping")
 	AddrToSymCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	AddrToSymCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 

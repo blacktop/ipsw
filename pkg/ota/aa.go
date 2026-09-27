@@ -620,9 +620,14 @@ func aaList(in io.Reader, pattern string, json bool) (string, error) {
 
 	cmd := exec.Command(aaPath, args...)
 	cmd.Stdin = in
-	out, err := cmd.CombinedOutput()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("%v: %s", err, out)
+		return "", fmt.Errorf("%v: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	if diagnostic := strings.TrimSpace(stderr.String()); diagnostic != "" {
+		log.Warn(diagnostic)
 	}
 
 	return strings.TrimSpace(string(out)), nil

@@ -5,6 +5,9 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/asn1"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,15 +15,220 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+func TestRemoteKeybagsStoredPayloadUsesSmallRanges(t *testing.T) {
+	key := bytes.Repeat([]byte{0x22}, 32)
+	keybag, err := asn1.Marshal([]img4.Keybag{{Type: img4.PRODUCTION, IV: bytes.Repeat([]byte{0x11}, 16), Key: key}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := asn1.Marshal(img4.IM4P{
+		Tag: "IM4P", Type: "test", Version: "synthetic", Data: bytes.Repeat([]byte{0x55}, 2<<20), Keybag: keybag,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, transferred := exclaveTestSource(t, exclaveTestArchive(t, payload), true)
+	defer c.Close()
+	c.Pattern = `exclavecore_bundle\.runtime\.im4p$`
+	c.JSON = true
+	out, err := Keybags(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, hex.EncodeToString(key)) {
+		t.Fatalf("keybag missing from output: %s", out)
+	}
+	if got := transferred.Load(); got >= 512<<10 {
+		t.Fatalf("metadata lookup read %d bytes for a 2 MiB stored payload", got)
+	}
+}
+
+func TestSearchHonorsTemporaryDirectory(t *testing.T) {
+	data := exclaveTestArchive(t, []byte("synthetic firmware"))
+	for _, remote := range []bool{false, true} {
+		t.Run(map[bool]string{false: "local", true: "remote"}[remote], func(t *testing.T) {
+			c, _ := exclaveTestSource(t, data, remote)
+			defer c.Close()
+			c.Pattern = `exclavecore_bundle\.runtime\.im4p$`
+			c.Output = filepath.Join(t.TempDir(), "output")
+			staging := t.TempDir()
+			out, err := Search(c, staging)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := filepath.Join(staging, "Firmware/exclavecore_bundle.runtime.im4p")
+			if len(out) != 1 || out[0] != want {
+				t.Fatalf("artifacts = %v, want [%s]", out, want)
+			}
+			if _, err := os.Stat(c.Output); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("output directory created: %v", err)
+			}
+		})
+	}
+}
+
+func TestExclaveSelectsBeforeExtractingAndCleansInfoStaging(t *testing.T) {
+	config, err := asn1.Marshal(bundle.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bund bytes.Buffer
+	for _, header := range []any{
+		bundle.Header{Magic: [4]byte{'D', 'N', 'U', 'B'}, Type: 3},
+		bundle.Type3{FooterOffset: uint64(len(config)), FooterSz: uint64(len(config))},
+	} {
+		if err := binary.Write(&bund, binary.LittleEndian, header); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bund.Write(config)
+	valid, err := asn1.Marshal(img4.IM4P{Tag: "IM4P", Type: "excl", Version: "synthetic", Data: bund.Bytes()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, remote := range []bool{false, true} {
+		for _, malformed := range []bool{false, true} {
+			name := map[bool]string{false: "local", true: "remote"}[remote] + map[bool]string{false: "/valid", true: "/malformed"}[malformed]
+			t.Run(name, func(t *testing.T) {
+				payload := valid
+				if malformed {
+					payload = []byte("invalid payload")
+				}
+				archive := exclaveTestArchive(t, payload)
+				c, transferred := exclaveTestSource(t, archive, remote)
+				defer c.Close()
+				staging := t.TempDir()
+				t.Setenv("TMPDIR", staging)
+				c.Output = filepath.Join(t.TempDir(), "output")
+				c.Info = true
+				_, err := Exclave(c)
+				if (err != nil) != malformed {
+					t.Fatalf("error = %v, malformed = %v", err, malformed)
+				}
+				if _, err := os.Stat(c.Output); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("output directory created: %v", err)
+				}
+				entries, err := os.ReadDir(staging)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("temporary files remain: %v, %v", entries, err)
+				}
+				if remote && transferred.Load() >= int64(len(archive)/2) {
+					t.Fatalf("read %d of %d archive bytes; restore bundle should be skipped", transferred.Load(), len(archive))
+				}
+			})
+		}
+	}
+}
+
+func TestSelectExclaveBundlesDefault(t *testing.T) {
+	files := []*zip.File{
+		{FileHeader: zip.FileHeader{Name: "Firmware/exclavecore_bundle.restore.im4p"}},
+		{FileHeader: zip.FileHeader{Name: "Firmware/exclavecore_bundle.runtime.im4p"}},
+		{FileHeader: zip.FileHeader{Name: "Firmware/other.im4p"}},
+	}
+	got, err := selectExclaveBundles(files, false)
+	if err != nil || !reflect.DeepEqual(got, []string{files[1].Name}) {
+		t.Fatalf("selection = %v, %v", got, err)
+	}
+	if _, err := selectExclaveBundles(files[:1], false); err == nil || !strings.Contains(err.Error(), "all 1 matches are restore") {
+		t.Fatalf("restore-only selection error = %v", err)
+	}
+	if _, err := selectExclaveBundles(files[2:], false); err == nil || !strings.Contains(err.Error(), "no Exclave bundles found") {
+		t.Fatalf("no-match selection error = %v", err)
+	}
+}
+
+func TestExclaveRetainsSavedBundleOnCoreFailure(t *testing.T) {
+	data := []byte("synthetic invalid bundle")
+	payload, err := asn1.Marshal(img4.IM4P{Tag: "IM4P", Type: "excl", Version: "synthetic", Data: data})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := exclaveTestSource(t, exclaveTestArchive(t, payload), false)
+	defer c.Close()
+	c.Output = t.TempDir()
+	out, err := Exclave(c)
+	if err == nil || !strings.Contains(err.Error(), "failed to extract files from exclave bundle") {
+		t.Fatalf("expected core extraction failure, got %v", err)
+	}
+	want := filepath.Join(c.Output, "exclavecore_bundle.runtime")
+	if len(out) != 1 || out[0] != want {
+		t.Fatalf("completed bundle omitted: paths = %v, want [%s]", out, want)
+	}
+	saved, err := os.ReadFile(want)
+	if err != nil || !bytes.Equal(saved, data) {
+		t.Fatalf("reported bundle is not complete: bytes = %q, error = %v", saved, err)
+	}
+}
+
+func exclaveTestArchive(t *testing.T, runtime []byte) []byte {
+	t.Helper()
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	for _, entry := range []struct {
+		name string
+		data []byte
+	}{
+		{"BuildManifest.plist", []byte(`<plist version="1.0"><dict><key>ProductVersion</key><string>99.0</string><key>ProductBuildVersion</key><string>99A1</string><key>SupportedProductTypes</key><array><string>iPhone99,1</string></array></dict></plist>`)},
+		{"Restore.plist", []byte(`<plist version="1.0"><dict><key>SupportedProductTypes</key><array><string>iPhone99,1</string></array></dict></plist>`)},
+		{"Firmware/exclavecore_bundle.runtime.im4p", runtime},
+		// A large STORE member makes unintended restore downloads measurable.
+		{"Firmware/exclavecore_bundle.restore.im4p", bytes.Repeat([]byte("restore"), 1<<20)},
+	} {
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: entry.name, Method: zip.Store})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(entry.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return archive.Bytes()
+}
+
+type countingZipResponse struct {
+	http.ResponseWriter
+	count *atomic.Int64
+}
+
+func (w countingZipResponse) Write(data []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(data)
+	w.count.Add(int64(n))
+	return n, err
+}
+
+func exclaveTestSource(t *testing.T, data []byte, remote bool) (*Config, *atomic.Int64) {
+	t.Helper()
+	transferred := new(atomic.Int64)
+	if remote {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("ETag", `"synthetic-exclave"`)
+			http.ServeContent(countingZipResponse{w, transferred}, r, "synthetic.ipsw", time.Time{}, bytes.NewReader(data))
+		}))
+		t.Cleanup(server.Close)
+		return &Config{URL: server.URL + "/synthetic.ipsw"}, transferred
+	}
+	path := filepath.Join(t.TempDir(), "synthetic.ipsw")
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	return &Config{IPSW: path}, transferred
+}
 
 func TestFirmwareKeyForFileMatchesNormalizedSuffix(t *testing.T) {
 	keys := download.WikiFWKeys{

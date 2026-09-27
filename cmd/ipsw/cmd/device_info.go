@@ -59,7 +59,8 @@ var deviceInfoCmd = &cobra.Command{
 	Use:           "device-info",
 	Aliases:       []string{"di", "dinfo", "dev-inf"},
 	Short:         "Lookup device info",
-	Args:          cobra.MaximumNArgs(1),
+	Long:          "Lookup device info using selectors such as --prod iPhone15,2 or --name 'iPhone 14 Pro'.",
+	Args:          cobra.NoArgs,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

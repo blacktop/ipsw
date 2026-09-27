@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	preprocTagsURL       = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/tag_links.json"
-	preprocWebKitTagsURL = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/webkit_tags.json"
-	githubApiURL         = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
+	preprocTagsURL            = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/tag_links.json"
+	PreprocessedWebKitTagsURL = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/webkit_tags.json"
+	githubApiURL              = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
 )
 
 type GithubRepos []githubRepo
@@ -452,7 +452,7 @@ func GetPreprocessedAppleOssTags(proxy string, insecure bool) (map[string]Github
 func GetPreprocessedWebKitTags(proxy string, insecure bool) ([]GithubTag, error) {
 	var tags []GithubTag
 
-	req, err := http.NewRequest("GET", preprocWebKitTagsURL, nil)
+	req, err := http.NewRequest("GET", PreprocessedWebKitTagsURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create http request: %v", err)
 	}

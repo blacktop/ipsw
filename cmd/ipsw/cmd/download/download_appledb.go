@@ -34,8 +34,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -168,6 +166,10 @@ var downloadAppledbCmd = &cobra.Command{
 	Short:   "Download IPSWs from appledb",
 	Long: heredoc.Doc(`
 		Download Apple firmware metadata and artifacts from AppleDB.
+
+		Multiple downloads require confirmation; use --confirm when unattended.
+		Declining exits successfully without downloading. Prompt errors or Ctrl-C
+		return an error.
 
 		With --json, output is always a schema-versioned envelope. Schema version 1
 		contains a releases array; a query with no matches emits exactly
@@ -435,139 +437,133 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 
 		cont := true
-		if !confirm {
-			if len(results) > 1 { // if filtered to a single device skip the prompt
-				cont = false
-				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d IPSW files. Continue?", len(results)),
-				}
-				if err := survey.AskOne(prompt, &cont); err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					return nil
-				}
+		if len(results) > 1 { // if filtered to a single device skip the prompt
+			cont, err = utils.Confirm(fmt.Sprintf("You are about to download %d firmware files. Continue?", len(results)), confirm)
+			if err != nil {
+				return err
 			}
 		}
+		if !cont {
+			log.Info("Download declined; no files downloaded")
+			return nil
+		}
 
-		if cont {
-			if kernel || dyld || len(pattern) > 0 || fcsKeys || fcsKeysJson {
-				return forEachAppleDBResult(cmd.Context(), results, func(_ int, _ download.AppleDBRecord, url string) error {
-					switch fwType {
-					case "ipsw":
-						d, v, b := download.ParseIpswURLString(url)
-						log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
-					case "ota", "rsr":
-						log.WithFields(log.Fields{"devices": device, "build": build, "version": version}).Info("Parsing remote OTA")
-					}
-
-					config := &extract.Config{
-						URL:          url,
-						Pattern:      pattern,
-						Proxy:        proxy,
-						Insecure:     insecure,
-						KernelDevice: device,
-						Flatten:      flat,
-						Progress:     true,
-						Output:       output,
-					}
-					defer config.Close()
-
-					// REMOTE KERNEL MODE
-					if kernel {
-						log.Info("Extracting remote kernelcache")
-						out, err := extract.Kernelcache(config)
-						if err != nil {
-							return err
-						}
-						for fn := range out {
-							utils.Indent(log.Info, 2)("Created " + fn)
-						}
-					}
-					// PATTERN MATCHING MODE
-					if len(pattern) > 0 {
-						log.Infof("Downloading files matching pattern %#v", pattern)
-						out, err := extract.Search(config)
-						if err != nil {
-							return err
-						}
-						for _, f := range out {
-							utils.Indent(log.Info, 2)("Created " + f)
-						}
-					}
-					// REMOTE DSC MODE
-					if dyld {
-						log.Info("Extracting remote dyld_shared_cache(s)")
-						out, err := extract.DSC(config)
-						if err != nil {
-							return err
-						}
-						for _, f := range out {
-							utils.Indent(log.Info, 2)("Created " + f)
-						}
-					}
-					// REMOTE AEA1 DMG fcs-key MODE
-					if fcsKeys || fcsKeysJson {
-						if fcsKeysJson {
-							config.JSON = true
-						}
-						log.Info("Extracting remote AEA1 DMG fcs-keys")
-						out, err := extract.FcsKeys(config)
-						if err != nil {
-							return err
-						}
-						for _, f := range out {
-							utils.Indent(log.Info, 2)("Created " + f)
-						}
-					}
-					return nil
-				})
-			}
-			// NORMAL MODE
-			downloader := download.NewDownloadWithProfile(
-				download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
-			defer downloader.Close()
-			return forEachAppleDBResult(cmd.Context(), results, func(idx int, result download.AppleDBRecord, url string) error {
-				var fname string
+		if kernel || dyld || len(pattern) > 0 || fcsKeys || fcsKeysJson {
+			return forEachAppleDBResult(cmd.Context(), results, func(_ int, _ download.AppleDBRecord, url string) error {
 				switch fwType {
 				case "ipsw":
-					fname = filepath.Join(destPath, getDestName(url, removeCommas))
+					d, v, b := download.ParseIpswURLString(url)
+					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
 				case "ota", "rsr":
-					var details string
-					if version != "" {
-						details += fmt.Sprintf("%s_", version)
-					}
-					if build != "" {
-						details += fmt.Sprintf("%s_", build)
-					}
-					if device != "" {
-						details += fmt.Sprintf("%s_", device)
-					} else {
-						var devices string
-						sort.Strings(result.DeviceMap)
-						if len(result.DeviceMap) > 5 {
-							devices = fmt.Sprintf("%s_and_%d_others", result.DeviceMap[0], len(result.DeviceMap)-1)
-						} else {
-							devices = strings.Join(result.DeviceMap, "_")
-						}
-						details += fmt.Sprintf("%s_", devices)
-					}
-					details += fmt.Sprintf("%s_", strings.ToUpper(result.Type))
-					fname = filepath.Join(destPath, fmt.Sprintf("%s%s", details, getDestName(url, removeCommas)))
+					log.WithFields(log.Fields{"devices": device, "build": build, "version": version}).Info("Parsing remote OTA")
 				}
-				if _, err := os.Stat(fname); !os.IsNotExist(err) {
-					log.Warnf("IPSW already exists: %s", fname)
-					return nil
+
+				config := &extract.Config{
+					URL:          url,
+					Pattern:      pattern,
+					Proxy:        proxy,
+					Insecure:     insecure,
+					KernelDevice: device,
+					Flatten:      flat,
+					Progress:     true,
+					Output:       output,
 				}
-				if fwType == "ipsw" {
-					log.Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
-				} else {
-					log.WithFields(log.Fields{"devices": result.DeviceMap}).Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
+				defer config.Close()
+
+				// REMOTE KERNEL MODE
+				if kernel {
+					log.Info("Extracting remote kernelcache")
+					out, err := extract.Kernelcache(config)
+					if err != nil {
+						return err
+					}
+					for fn := range out {
+						utils.Indent(log.Info, 2)("Created " + fn)
+					}
 				}
-				_, err := downloader.DoRequestContext(cmd.Context(), appleDBRequest(result.OsFileSource, url, fname))
-				return err
+				// PATTERN MATCHING MODE
+				if len(pattern) > 0 {
+					log.Infof("Downloading files matching pattern %#v", pattern)
+					out, err := extract.Search(config)
+					if err != nil {
+						return err
+					}
+					for _, f := range out {
+						utils.Indent(log.Info, 2)("Created " + f)
+					}
+				}
+				// REMOTE DSC MODE
+				if dyld {
+					log.Info("Extracting remote dyld_shared_cache(s)")
+					out, err := extract.DSC(config)
+					if err != nil {
+						return err
+					}
+					for _, f := range out {
+						utils.Indent(log.Info, 2)("Created " + f)
+					}
+				}
+				// REMOTE AEA1 DMG fcs-key MODE
+				if fcsKeys || fcsKeysJson {
+					if fcsKeysJson {
+						config.JSON = true
+					}
+					log.Info("Extracting remote AEA1 DMG fcs-keys")
+					out, err := extract.FcsKeys(config)
+					if err != nil {
+						return err
+					}
+					for _, f := range out {
+						utils.Indent(log.Info, 2)("Created " + f)
+					}
+				}
+				return nil
 			})
 		}
-
-		return nil
+		// NORMAL MODE
+		downloader := download.NewDownloadWithProfile(
+			download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, ignoreSha1)
+		defer downloader.Close()
+		return forEachAppleDBResult(cmd.Context(), results, func(idx int, result download.AppleDBRecord, url string) error {
+			var fname string
+			switch fwType {
+			case "ipsw":
+				fname = filepath.Join(destPath, getDestName(url, removeCommas))
+			case "ota", "rsr":
+				var details string
+				if version != "" {
+					details += fmt.Sprintf("%s_", version)
+				}
+				if build != "" {
+					details += fmt.Sprintf("%s_", build)
+				}
+				if device != "" {
+					details += fmt.Sprintf("%s_", device)
+				} else {
+					var devices string
+					sort.Strings(result.DeviceMap)
+					if len(result.DeviceMap) > 5 {
+						devices = fmt.Sprintf("%s_and_%d_others", result.DeviceMap[0], len(result.DeviceMap)-1)
+					} else {
+						devices = strings.Join(result.DeviceMap, "_")
+					}
+					details += fmt.Sprintf("%s_", devices)
+				}
+				details += fmt.Sprintf("%s_", strings.ToUpper(result.Type))
+				fname = filepath.Join(destPath, fmt.Sprintf("%s%s", details, getDestName(url, removeCommas)))
+			}
+			if _, err := os.Stat(fname); !os.IsNotExist(err) {
+				log.Warnf("IPSW already exists: %s", fname)
+				return nil
+			}
+			if fwType == "ipsw" {
+				log.Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
+			} else {
+				log.WithFields(log.Fields{"devices": result.DeviceMap}).Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
+			}
+			_, err := downloader.DoRequestContext(cmd.Context(), appleDBRequest(result.OsFileSource, url, fname))
+			return err
+		})
 	},
 }
 

@@ -22,20 +22,20 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -155,6 +155,8 @@ var dyldSearchObjcCmd = &cobra.Command{
 			return fmt.Errorf("failed to open dyld shared cache %s: %w", dscPath, err)
 		}
 
+		defer f.Close()
+
 		var images []*dyld.CacheImage
 		if len(searchImages) == 0 {
 			images = f.Images
@@ -174,7 +176,11 @@ var dyldSearchObjcCmd = &cobra.Command{
 		}
 
 		// Parallel scan across all images.
-		lines := make(chan []string, len(images))
+		type scanResult struct {
+			lines []string
+			err   error
+		}
+		results := make(chan scanResult, len(images))
 		sem := make(chan struct{}, runtime.NumCPU())
 		var wg sync.WaitGroup
 		for _, img := range images {
@@ -186,13 +192,25 @@ var dyldSearchObjcCmd = &cobra.Command{
 				defer func() { <-sem }()
 
 				var out []string
-				m, err := img.GetPartialMacho()
+				var failures []error
+				defer func() {
+					img.Free()
+					results <- scanResult{lines: out, err: errors.Join(failures...)}
+				}()
+				var m *macho.File
+				var err error
+				if strings.EqualFold(filepath.Base(img.Name), "libobjc.A.dylib") {
+					// The partial libobjc parse bootstraps optimization metadata and
+					// intentionally has no selector base. ObjC inspection needs one.
+					m, err = img.GetMacho()
+				} else {
+					m, err = img.GetPartialMacho()
+				}
 				if err != nil {
-					log.Errorf("failed to parse %s: %v", img.Name, err)
+					failures = append(failures, fmt.Errorf("%s: parse Mach-O: %w", img.Name, err))
 					return
 				}
 				if !m.HasObjC() {
-					img.Free()
 					return
 				}
 				imgBase := filepath.Base(img.Name)
@@ -235,7 +253,7 @@ var dyldSearchObjcCmd = &cobra.Command{
 							}
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
+						failures = append(failures, fmt.Errorf("%s: parse ObjC protocols: %w", img.Name, err))
 					}
 				}
 				if classRE != nil || protRE != nil || selRE != nil || ivarRE != nil {
@@ -291,7 +309,7 @@ var dyldSearchObjcCmd = &cobra.Command{
 							}
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
+						failures = append(failures, fmt.Errorf("%s: parse ObjC classes: %w", img.Name, err))
 					}
 				}
 				if catRE != nil || classRE != nil || protRE != nil || selRE != nil || ivarRE != nil {
@@ -368,7 +386,7 @@ var dyldSearchObjcCmd = &cobra.Command{
 							}
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
+						failures = append(failures, fmt.Errorf("%s: parse ObjC categories: %w", img.Name, err))
 					}
 				}
 				if selRE != nil {
@@ -379,25 +397,27 @@ var dyldSearchObjcCmd = &cobra.Command{
 							}
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
+						failures = append(failures, fmt.Errorf("%s: parse ObjC selector references: %w", img.Name, err))
 					}
-				}
-				img.Free()
-				if len(out) > 0 {
-					lines <- out
 				}
 			}()
 		}
 		go func() {
 			wg.Wait()
-			close(lines)
+			close(results)
 		}()
-		for ls := range lines {
-			for _, l := range ls {
-				fmt.Print(l)
+		var failures []error
+		for result := range results {
+			for _, line := range result.lines {
+				fmt.Fprint(cmd.OutOrStdout(), line)
+			}
+			if result.err != nil {
+				failures = append(failures, result.err)
 			}
 		}
-
+		if len(failures) > 0 {
+			return fmt.Errorf("ObjC search incomplete (%d images failed): %w", len(failures), errors.Join(failures...))
+		}
 		return nil
 	},
 }

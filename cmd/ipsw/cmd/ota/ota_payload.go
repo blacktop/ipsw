@@ -27,19 +27,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
 
-	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/sys/execabs"
 )
 
 func init() {
@@ -56,6 +57,7 @@ var otaPayloadCmd = &cobra.Command{
 	Use:           "payload <PAYLOAD> | <OTA> <PAYLOAD>",
 	Aliases:       []string{"p"},
 	Short:         "List contents of a payloadv2 file",
+	Long:          "List contents of a raw, PBZX, or PBZM payloadv2 file. PBZM requires Apple's aa tool with PBZM support.",
 	Args:          cobra.RangeArgs(1, 2),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,64 +66,36 @@ var otaPayloadCmd = &cobra.Command{
 			return fmt.Errorf("cannot use both --files and --dirs flags")
 		}
 
-		aa := &yaa.YAA{}
-
+		var aa *yaa.YAA
 		if len(args) < 2 {
-			isPBZX, err := magic.IsPBZX(filepath.Clean(args[0]))
-			if err != nil {
-				return fmt.Errorf("failed to check if payload is pbzx: %v", err)
-			}
 			pf, err := os.Open(filepath.Clean(args[0]))
 			if err != nil {
-				return fmt.Errorf("failed to open payload: %v", err)
+				return fmt.Errorf("failed to open payload: %w", err)
 			}
 			defer pf.Close()
-			if isPBZX {
-				var pbuf bytes.Buffer
-				if err := pbzx.Extract(context.Background(), pf, &pbuf, runtime.NumCPU()); err != nil {
-					return err
-				}
-				if err := aa.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
-					return fmt.Errorf("failed to parse payload: %v", err)
-				}
-			} else {
-				if err := aa.Parse(pf); err != nil {
-					return fmt.Errorf("failed to parse payload: %v", err)
-				}
+			aa, err = parseOTAPayload(cmd.Context(), pf, args[0])
+			if err != nil {
+				return err
 			}
 		} else {
 			o, err := ota.Open(filepath.Clean(args[0]), ResolveAEAKeyFromFlags(args[0]))
 			if err != nil {
-				return fmt.Errorf("failed to open OTA file: %v", err)
+				return fmt.Errorf("failed to open OTA file: %w", err)
 			}
 			defer o.Close()
 
 			f, err := o.Open(filepath.Clean(args[1]), false)
 			if err != nil {
-				return fmt.Errorf("failed to open payload: %v", err)
+				return fmt.Errorf("failed to open payload %q: %w", args[1], err)
 			}
-
+			defer f.Close()
 			data, err := io.ReadAll(f)
 			if err != nil {
-				return fmt.Errorf("failed to read payload: %v", err)
+				return fmt.Errorf("failed to read payload %q: %w", args[1], err)
 			}
-
-			isPBZX, err := magic.IsPBZXData(bytes.NewReader(data))
+			aa, err = parseOTAPayload(cmd.Context(), bytes.NewReader(data), args[1])
 			if err != nil {
-				return fmt.Errorf("failed to check if payload is pbzx: %v", err)
-			}
-			if isPBZX {
-				var pbuf bytes.Buffer
-				if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
-					return err
-				}
-				if err := aa.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
-					return fmt.Errorf("failed to parse payload: %v", err)
-				}
-			} else {
-				if err := aa.Parse(bytes.NewReader(data)); err != nil {
-					return fmt.Errorf("failed to parse payload: %v", err)
-				}
+				return err
 			}
 		}
 
@@ -152,4 +126,43 @@ var otaPayloadCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// parseOTAPayload handles the compression wrappers used by payloadv2 members.
+// PBZM uses newer Apple compression support provided by the system aa tool.
+func parseOTAPayload(ctx context.Context, r io.ReadSeeker, name string) (*yaa.YAA, error) {
+	var magic [4]byte
+	if _, err := io.ReadFull(r, magic[:]); err != nil {
+		return nil, fmt.Errorf("failed to read payload %q header: %w", name, err)
+	}
+	if _, err := r.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("failed to rewind payload %q: %w", name, err)
+	}
+	switch string(magic[:]) {
+	case "pbzx":
+		var decoded bytes.Buffer
+		if err := pbzx.Extract(ctx, r, &decoded, runtime.NumCPU()); err != nil {
+			return nil, fmt.Errorf("failed to decompress PBZX payload %q: %w", name, err)
+		}
+		r = bytes.NewReader(decoded.Bytes())
+	case "pbzm":
+		aaPath, err := execabs.LookPath("aa")
+		if err != nil {
+			return nil, fmt.Errorf("PBZM payload %q requires an Apple aa tool with PBZM support: %w", name, err)
+		}
+		convert := exec.CommandContext(ctx, aaPath, "convert", "-a", "raw")
+		convert.Stdin = r
+		var stderr bytes.Buffer
+		convert.Stderr = &stderr
+		decoded, err := convert.Output()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert PBZM payload %q with Apple aa (PBZM support required): %w: %s", name, err, strings.TrimSpace(stderr.String()))
+		}
+		r = bytes.NewReader(decoded)
+	}
+	aa := &yaa.YAA{}
+	if err := aa.Parse(r); err != nil {
+		return nil, fmt.Errorf("failed to parse payload %q: %w", name, err)
+	}
+	return aa, nil
 }

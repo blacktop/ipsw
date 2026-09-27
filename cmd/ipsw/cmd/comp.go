@@ -52,7 +52,7 @@ func init() {
 
 // compCmd represents the comp command
 var compCmd = &cobra.Command{
-	Use:           "comp",
+	Use:           "comp <FILE>",
 	Short:         "Compress files using libcompression",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,

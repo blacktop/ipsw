@@ -46,10 +46,11 @@ func init() {
 
 // syscallCmd represents the syscall command
 var syscallCmd = &cobra.Command{
-	Use:           "syscall",
+	Use:           "syscall [KERNELCACHE]",
 	Aliases:       []string{"sc"},
 	Short:         "Dump kernelcache syscalls",
-	Args:          cobra.MinimumNArgs(0),
+	Long:          "Dump syscalls from a kernelcache. KERNELCACHE is required unless --gen is used.",
+	Args:          cobra.MaximumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

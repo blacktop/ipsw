@@ -24,6 +24,7 @@ package dyld
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,15 +60,22 @@ func init() {
 
 // WebkitCmd represents the webkit command
 var WebkitCmd = &cobra.Command{
-	Use:     "webkit <DSC>",
+	Use:     "webkit <DSC> [DSC]",
 	Aliases: []string{"w"},
 	Short:   "Get WebKit version from a dyld_shared_cache",
-	Args:    cobra.ExactArgs(1),
+	Long: `Get the WebKit version from a dyld_shared_cache. --diff requires two caches.
+With --git, look for an exact source tag, otherwise report the greatest lower
+available version as an unverified approximation. Without a GitHub token the
+tag catalog is preprocessed and its freshness is unknown.`,
+	Args: webkitArgs,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := webkitArgs(cmd, args); err != nil {
+			return err
+		}
 
 		getRev := viper.GetBool("dyld.webkit.rev")
 		getGit := viper.GetBool("dyld.webkit.git")
@@ -148,6 +156,13 @@ var WebkitCmd = &cobra.Command{
 				return fmt.Errorf("failed to get WebKit version: %v", err)
 			}
 
+			if asJSON {
+				return writeWebkitDiff(cmd.OutOrStdout(), webkitDiff{
+					Old:     webkitVersionAt{Path: dscPath, Version: webkit1},
+					New:     webkitVersionAt{Path: dscPath2, Version: webkit2},
+					Changed: webkit1 != webkit2,
+				})
+			}
 			out, err := utils.GitDiff(
 				webkit1+"\n",
 				webkit2+"\n",
@@ -178,7 +193,11 @@ var WebkitCmd = &cobra.Command{
 			log.Infof("WebKit Version: %s", webkit1)
 			log.Info("Querying https://github.com API...")
 			var tags []download.GithubTag
+			catalog := "https://api.github.com/graphql (WebKit/WebKit tags)"
+			freshness := "live query"
 			if len(apiToken) == 0 {
+				catalog = download.PreprocessedWebKitTagsURL
+				freshness = "unknown (preprocessed catalog)"
 				tags, err = download.GetPreprocessedWebKitTags(proxy, insecure)
 				if err != nil {
 					log.Infof("WebKit Version: %s", webkit1)
@@ -191,40 +210,33 @@ var WebkitCmd = &cobra.Command{
 					return err
 				}
 			}
-			wkver, err := semver.NewVersion(webkit1)
+			match, exact, err := selectWebkitTag(webkit1, tags)
 			if err != nil {
-				return fmt.Errorf("failed to parse WebKit version %s: %v", webkit1, err)
+				return err
 			}
-			// search
-			exact := false
-			var match download.GithubTag
-			for _, tag := range tags {
-				if !strings.HasPrefix(tag.Name, "WebKit-7") {
-					continue
-				}
-				tver, err := semver.NewVersion(strings.TrimPrefix(tag.Name, "WebKit-7"))
-				if err != nil {
-					continue
-				}
-				if wkver.Equal(tver) {
-					exact = true
-					match = tag
-					break
-				} else if wkver.GreaterThan(tver) {
-					match = tag
-					break
-				}
+			matchKind := "exact"
+			if !exact {
+				matchKind = "greatest_lower_available"
 			}
+			candidateVersion := strings.TrimPrefix(match.Name, "WebKit-7")
 			// output
 			if asJSON {
 				b, err := json.Marshal(&struct {
-					Version string             `json:"version"`
-					Tag     download.GithubTag `json:"tag"`
-					Exact   bool               `json:"exact"`
+					Version          string             `json:"version"`
+					Tag              download.GithubTag `json:"tag"`
+					Exact            bool               `json:"exact"`
+					MatchKind        string             `json:"match_kind"`
+					CandidateVersion string             `json:"candidate_version"`
+					Catalog          string             `json:"catalog"`
+					CatalogFreshness string             `json:"catalog_freshness"`
 				}{
-					Version: webkit1,
-					Tag:     match,
-					Exact:   exact,
+					Version:          webkit1,
+					Tag:              match,
+					Exact:            exact,
+					MatchKind:        matchKind,
+					CandidateVersion: candidateVersion,
+					Catalog:          catalog,
+					CatalogFreshness: freshness,
 				})
 				if err != nil {
 					return err
@@ -232,8 +244,9 @@ var WebkitCmd = &cobra.Command{
 				fmt.Println(string(b))
 			} else {
 				log.Infof("WebKit Version: %s", webkit1)
+				log.Infof("Tag catalog: %s; freshness: %s", catalog, freshness)
 				if !exact {
-					log.Warn("No exact match found (using closest match)")
+					log.Warnf("No exact match for %s; %s is the greatest lower available version, an unverified source approximation", webkit1, candidateVersion)
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", match.Name))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", match.TarURL))
@@ -263,4 +276,58 @@ var WebkitCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+type webkitVersionAt struct {
+	Path    string `json:"path"`
+	Version string `json:"version"`
+}
+
+// webkitDiff is the --diff --json result: both caches' versions and whether they differ.
+type webkitDiff struct {
+	Old     webkitVersionAt `json:"old"`
+	New     webkitVersionAt `json:"new"`
+	Changed bool            `json:"changed"`
+}
+
+func writeWebkitDiff(w io.Writer, diff webkitDiff) error {
+	return json.NewEncoder(w).Encode(diff)
+}
+
+func webkitArgs(cmd *cobra.Command, args []string) error {
+	if viper.GetBool("dyld.webkit.diff") {
+		if len(args) != 2 {
+			return fmt.Errorf("accepts 2 arg(s) when using --diff, received %d", len(args))
+		}
+		return nil
+	}
+	return cobra.ExactArgs(1)(cmd, args)
+}
+
+func selectWebkitTag(version string, tags []download.GithubTag) (download.GithubTag, bool, error) {
+	wkver, err := semver.NewVersion(version)
+	if err != nil {
+		return download.GithubTag{}, false, fmt.Errorf("failed to parse WebKit version %s: %w", version, err)
+	}
+	var match download.GithubTag
+	var bestVersion *semver.Version
+	for _, tag := range tags {
+		if !strings.HasPrefix(tag.Name, "WebKit-7") {
+			continue
+		}
+		tver, err := semver.NewVersion(strings.TrimPrefix(tag.Name, "WebKit-7"))
+		if err != nil {
+			continue
+		}
+		if wkver.Equal(tver) {
+			return tag, true, nil
+		}
+		if tver.LessThan(wkver) && (bestVersion == nil || tver.GreaterThan(bestVersion)) {
+			match, bestVersion = tag, tver
+		}
+	}
+	if bestVersion == nil {
+		return download.GithubTag{}, false, fmt.Errorf("no exact or lower WebKit tag available for %s in the selected catalog", version)
+	}
+	return match, false, nil
 }

@@ -50,10 +50,11 @@ func init() {
 	downloadTssCmd.Flags().StringP("build", "b", "", "iOS BuildID (i.e. 16F203)")
 	// Command-specific flags
 	downloadTssCmd.Flags().Uint64("ecid", 0, "Device ECID")
-	downloadTssCmd.Flags().BoolP("signed", "s", false, "Check if iOS version is still being signed")
+	downloadTssCmd.Flags().BoolP("signed", "s", false, "Check signing status (exit 0 if signed, exit 1 if unsigned or the check fails)")
 	downloadTssCmd.Flags().BoolP("usb", "u", false, "Download blobs for USB connected device")
 	downloadTssCmd.Flags().BoolP("latest", "l", false, "Check latest iOS version")
 	downloadTssCmd.Flags().Bool("beta", false, "Check for beta iOS versions")
+	downloadTssCmd.Flags().Bool("no-update", false, "Use an existing AppleDB checkout without updating it (signing still requires network access)")
 	downloadTssCmd.Flags().StringP("output", "o", "", "Output path for SHSH blobs")
 	downloadTssCmd.MarkFlagFilename("output")
 	// Bind persistent flags
@@ -68,6 +69,7 @@ func init() {
 	viper.BindPFlag("download.tss.usb", downloadTssCmd.Flags().Lookup("usb"))
 	viper.BindPFlag("download.tss.latest", downloadTssCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.tss.beta", downloadTssCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.tss.no-update", downloadTssCmd.Flags().Lookup("no-update"))
 	viper.BindPFlag("download.tss.output", downloadTssCmd.Flags().Lookup("output"))
 }
 
@@ -145,6 +147,7 @@ var downloadTssCmd = &cobra.Command{
 			Proxy:     proxy,
 			Insecure:  insecure,
 			ConfigDir: configDir,
+			NoUpdate:  viper.GetBool("download.tss.no-update"),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to query AppleDB: %v", err)
@@ -225,33 +228,38 @@ var downloadTssCmd = &cobra.Command{
 		}
 
 		response, err := tss.GetTSSResponse(conf)
-		if err != nil {
-			if !errors.Is(err, tss.ErrNotSigned) {
-				return fmt.Errorf("failed to get TSS response: %v", err)
-			}
-		}
-
-		if isSigned {
-			if err != nil {
-				log.WithFields(fields).Errorf("💀 No longer being signed")
-			} else {
-				log.WithFields(fields).Infof("✅ Is still being signed")
-			}
-		}
-
-		if len(output) > 0 {
-			if len(response) == 0 {
-				return fmt.Errorf("no SHSH blob data returned")
-			}
-			if err := os.MkdirAll(filepath.Dir(output), 0770); err != nil {
-				return fmt.Errorf("failed to create output directory: %v", err)
-			}
-			if err := os.WriteFile(output, response, 0644); err != nil {
-				return fmt.Errorf("failed to write SHSH blob to %s: %v", output, err)
-			}
-			log.WithField("output", output).Info("SHSH blob saved")
-		}
-
-		return nil
+		return processTSSResponse(response, err, isSigned, output, fields)
 	},
+}
+
+func processTSSResponse(response []byte, err error, isSigned bool, output string, fields log.Fields) error {
+	if err != nil && !errors.Is(err, tss.ErrNotSigned) {
+		return fmt.Errorf("failed to get TSS response: %w", err)
+	}
+
+	if isSigned {
+		if err != nil {
+			log.WithFields(fields).Errorf("💀 No longer being signed")
+		} else {
+			log.WithFields(fields).Infof("✅ Is still being signed")
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("build is not signed: %w", err)
+	}
+
+	if len(output) > 0 {
+		if len(response) == 0 {
+			return fmt.Errorf("no SHSH blob data returned")
+		}
+		if err := os.MkdirAll(filepath.Dir(output), 0770); err != nil {
+			return fmt.Errorf("failed to create output directory: %v", err)
+		}
+		if err := os.WriteFile(output, response, 0644); err != nil {
+			return fmt.Errorf("failed to write SHSH blob to %s: %v", output, err)
+		}
+		log.WithField("output", output).Info("SHSH blob saved")
+	}
+
+	return nil
 }

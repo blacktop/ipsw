@@ -41,7 +41,7 @@ func init() {
 	otaLsCmd.Flags().BoolP("payload", "p", false, "List the payloadv2 files")
 	otaLsCmd.Flags().StringP("pattern", "r", "", "Regex pattern to match payloadv2 files (requires --payload)")
 	otaLsCmd.Flags().BoolP("bom", "b", false, "List the post.bom files")
-	otaLsCmd.Flags().BoolP("json", "j", false, "Output payload listing as JSON (requires --payload)")
+	otaLsCmd.Flags().BoolP("json", "j", false, "Output a JSON array per matching payload (requires --payload)")
 	otaLsCmd.MarkFlagsMutuallyExclusive("payload", "bom")
 	viper.BindPFlag("ota.ls.pattern", otaLsCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("ota.ls.payload", otaLsCmd.Flags().Lookup("payload"))
@@ -64,6 +64,7 @@ var otaLsCmd = &cobra.Command{
 	Use:           "ls <OTA>",
 	Aliases:       []string{"l"},
 	Short:         "List OTA files",
+	Long:          "List OTA files. With --payload --json, output is a stream of JSON arrays, one per nonempty payload result. No matches produce no output.",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -81,8 +82,10 @@ var otaLsCmd = &cobra.Command{
 
 		/* PAYLOAD FILES */
 		if viper.GetBool("ota.ls.payload") {
-			fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
-			w.Flush()
+			if !viper.GetBool("ota.ls.json") {
+				fmt.Fprintf(w, "\n- [ PAYLOAD FILES    ] %s\n\n", strings.Repeat("-", 50))
+				w.Flush()
+			}
 			return ota.PayloadFiles(viper.GetString("ota.ls.pattern"), viper.GetBool("ota.ls.json"))
 		}
 		/* BOM FILES */

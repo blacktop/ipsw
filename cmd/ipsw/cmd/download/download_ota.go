@@ -30,8 +30,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
@@ -198,6 +196,10 @@ var downloadOtaCmd = &cobra.Command{
 	Long: heredoc.Doc(`
 		Download OTA updates resolved live from Apple's Pallas
 		(gdmf.apple.com/v2/assets) and asset-set (gdmf.apple.com/v2/pmv) services.
+
+		Multiple downloads require confirmation; use --confirm when unattended.
+		Declining exits successfully without downloading. Prompt errors or Ctrl-C
+		return an error.
 
 		With --json, output is always an indented, schema-versioned envelope. Schema
 		version 1 contains an otas array, which is empty when no OTA matches. Entries
@@ -582,172 +584,167 @@ var downloadOtaCmd = &cobra.Command{
 		}
 
 		cont := true
-		if !confirm {
-			// if filtered to a single device skip the prompt
-			if len(otas) > 1 {
-				cont = false
-				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d OTA files. Continue?", len(otas)),
+		if len(otas) > 1 { // if filtered to a single device skip the prompt
+			cont, err = utils.Confirm(fmt.Sprintf("You are about to download %d OTA files. Continue?", len(otas)), confirm)
+			if err != nil {
+				return err
+			}
+		}
+		if !cont {
+			log.Info("Download declined; no files downloaded")
+			return nil
+		}
+
+		if remoteDyld || remoteKernel || len(remotePattern) > 0 {
+			for _, o := range otas {
+				fields := log.Fields{
+					"version": o.OSVersion,
+					"build":   o.Build,
+					"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices, " "), len(o.SupportedDevices)),
+					"model":   strings.Join(o.SupportedDeviceModels, " "),
 				}
-				if err := survey.AskOne(prompt, &cont); err == terminal.InterruptErr {
-					log.Warn("Exiting...")
+				if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
+					fields["encrypted"] = true
+					fields["key"] = o.ArchiveDecryptionKey
+				}
+				log.WithFields(fields).Info(fmt.Sprintf("Getting %s remote OTA", o.DocumentationID))
+
+				config := &extract.Config{
+					URL:          o.BaseURL + o.RelativePath,
+					Pattern:      remotePattern,
+					Proxy:        proxy,
+					Insecure:     insecure,
+					Arches:       dyldArches,
+					DriverKit:    dyldDriverKit,
+					KernelDevice: device,
+					Flatten:      flat,
+					Progress:     true,
+					Encrypted:    o.IsEncrypted,
+					AEAKey:       o.ArchiveDecryptionKey,
+					Output:       destPath,
+				}
+
+				stop, err := func() (bool, error) {
+					defer config.Close()
+
+					// check if AEA encryption
+					isAEA, err := extract.IsAEA(config)
+					if err != nil {
+						return false, err
+					}
+					if isAEA {
+						log.Warn("This OTA is AEA encrypted and is NOT supported for remote extraction (yet 🤞)")
+						return true, nil
+					}
+
+					if remoteKernel {
+						log.Info("Extracting remote kernelcache")
+						out, err := extract.Kernelcache(config)
+						if err != nil {
+							return false, fmt.Errorf("failed to extract kernelcache: %v", err)
+						}
+						for fn := range out {
+							utils.Indent(log.Info, 2)("Created " + fn)
+						}
+					}
+					if len(remotePattern) > 0 {
+						log.Infof("Downloading files matching pattern %#v", remotePattern)
+						out, err := extract.Search(config)
+						if err != nil {
+							return false, err
+						}
+						for _, f := range out {
+							utils.Indent(log.Info, 2)("Created " + f)
+						}
+					}
+					if remoteDyld {
+						log.Info("Extracting dyld_shared_cache")
+						out, err := extract.DSC(config)
+						if err != nil {
+							return false, err
+						}
+						for _, f := range out {
+							utils.Indent(log.Info, 2)("Created " + f)
+						}
+					}
+					return false, nil
+				}()
+				if err != nil {
+					return err
+				}
+				if stop {
 					return nil
 				}
 			}
-		}
-
-		if cont {
-			if remoteDyld || remoteKernel || len(remotePattern) > 0 {
-				for _, o := range otas {
+		} else {
+			downloader := download.NewDownloadWithProfile(
+				download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
+			defer downloader.Close()
+			for _, o := range otas {
+				folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
+				if getSim {
+					folder = filepath.Join(destPath, fmt.Sprintf("%s_%s_Simulator_OTAs", strings.ToUpper(platform), o.SimulatorVersion))
+				}
+				if err := os.MkdirAll(folder, 0750); err != nil {
+					return fmt.Errorf("failed to create folder %s: %v", folder, err)
+				}
+				var devices string
+				if len(o.SupportedDevices) > 0 {
+					sort.Strings(o.SupportedDevices)
+					if len(o.SupportedDevices) > 5 {
+						devices = fmt.Sprintf("%s_and_%d_others", o.SupportedDevices[0], len(o.SupportedDevices)-1)
+					} else {
+						devices = strings.Join(o.SupportedDevices, "_")
+					}
+				} else {
+					sort.Strings(o.SupportedDeviceModels)
+					if len(o.SupportedDeviceModels) > 5 {
+						devices = fmt.Sprintf("%s_and_%d_others", o.SupportedDeviceModels[0], len(o.SupportedDeviceModels)-1)
+					} else {
+						devices = strings.Join(o.SupportedDeviceModels, "_")
+					}
+				}
+				url := o.BaseURL + o.RelativePath
+				var isRSR string
+				if o.SplatOnly {
+					isRSR = fmt.Sprintf("%s_%s_%s_RSR_", o.OSVersion, o.ProductVersionExtra, o.Build)
+				}
+				var isAEA string
+				if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
+					filesafe := o.ArchiveDecryptionKey
+					filesafe = strings.ReplaceAll(filesafe, "/", "_")
+					filesafe = strings.ReplaceAll(filesafe, "+", "-")
+					isAEA = "KEY_[" + filesafe + "]_"
+				}
+				var buildPrefix string
+				if !o.SplatOnly && o.Build != "" {
+					buildPrefix = o.Build + "_"
+				}
+				destName := filepath.Join(folder, fmt.Sprintf("%s_%s%s%s%s", devices, isRSR, buildPrefix, isAEA, getDestName(url, removeCommas)))
+				if getSim {
+					destName = filepath.Join(folder, fmt.Sprintf("simulator_%s%s%s", buildPrefix, isAEA, getDestName(url, removeCommas)))
+				}
+				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					fields := log.Fields{
-						"version": o.OSVersion,
-						"build":   o.Build,
-						"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices, " "), len(o.SupportedDevices)),
-						"model":   strings.Join(o.SupportedDeviceModels, " "),
+						"device": strings.Join(o.SupportedDevices, " "),
+						"model":  strings.Join(o.SupportedDeviceModels, " "),
+						"build":  o.Build,
+						"type":   or([]string{o.DocumentationID, "simulator"}),
 					}
 					if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
 						fields["encrypted"] = true
 						fields["key"] = o.ArchiveDecryptionKey
 					}
-					log.WithFields(fields).Info(fmt.Sprintf("Getting %s remote OTA", o.DocumentationID))
-
-					config := &extract.Config{
-						URL:          o.BaseURL + o.RelativePath,
-						Pattern:      remotePattern,
-						Proxy:        proxy,
-						Insecure:     insecure,
-						Arches:       dyldArches,
-						DriverKit:    dyldDriverKit,
-						KernelDevice: device,
-						Flatten:      flat,
-						Progress:     true,
-						Encrypted:    o.IsEncrypted,
-						AEAKey:       o.ArchiveDecryptionKey,
-						Output:       destPath,
+					log.WithFields(fields).Info(fmt.Sprintf("Getting %s %s OTA", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
+					downloader.URL = url
+					downloader.DestName = destName
+					if _, err := downloader.DoContext(cmd.Context()); err != nil {
+						return fmt.Errorf("failed to download file: %v", err)
 					}
-
-					stop, err := func() (bool, error) {
-						defer config.Close()
-
-						// check if AEA encryption
-						isAEA, err := extract.IsAEA(config)
-						if err != nil {
-							return false, err
-						}
-						if isAEA {
-							log.Warn("This OTA is AEA encrypted and is NOT supported for remote extraction (yet 🤞)")
-							return true, nil
-						}
-
-						if remoteKernel {
-							log.Info("Extracting remote kernelcache")
-							out, err := extract.Kernelcache(config)
-							if err != nil {
-								return false, fmt.Errorf("failed to extract kernelcache: %v", err)
-							}
-							for fn := range out {
-								utils.Indent(log.Info, 2)("Created " + fn)
-							}
-						}
-						if len(remotePattern) > 0 {
-							log.Infof("Downloading files matching pattern %#v", remotePattern)
-							out, err := extract.Search(config)
-							if err != nil {
-								return false, err
-							}
-							for _, f := range out {
-								utils.Indent(log.Info, 2)("Created " + f)
-							}
-						}
-						if remoteDyld {
-							log.Info("Extracting dyld_shared_cache")
-							out, err := extract.DSC(config)
-							if err != nil {
-								return false, err
-							}
-							for _, f := range out {
-								utils.Indent(log.Info, 2)("Created " + f)
-							}
-						}
-						return false, nil
-					}()
-					if err != nil {
-						return err
-					}
-					if stop {
-						return nil
-					}
-				}
-			} else {
-				downloader := download.NewDownloadWithProfile(
-					download.AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
-				defer downloader.Close()
-				for _, o := range otas {
-					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
-					if getSim {
-						folder = filepath.Join(destPath, fmt.Sprintf("%s_%s_Simulator_OTAs", strings.ToUpper(platform), o.SimulatorVersion))
-					}
-					if err := os.MkdirAll(folder, 0750); err != nil {
-						return fmt.Errorf("failed to create folder %s: %v", folder, err)
-					}
-					var devices string
-					if len(o.SupportedDevices) > 0 {
-						sort.Strings(o.SupportedDevices)
-						if len(o.SupportedDevices) > 5 {
-							devices = fmt.Sprintf("%s_and_%d_others", o.SupportedDevices[0], len(o.SupportedDevices)-1)
-						} else {
-							devices = strings.Join(o.SupportedDevices, "_")
-						}
-					} else {
-						sort.Strings(o.SupportedDeviceModels)
-						if len(o.SupportedDeviceModels) > 5 {
-							devices = fmt.Sprintf("%s_and_%d_others", o.SupportedDeviceModels[0], len(o.SupportedDeviceModels)-1)
-						} else {
-							devices = strings.Join(o.SupportedDeviceModels, "_")
-						}
-					}
-					url := o.BaseURL + o.RelativePath
-					var isRSR string
-					if o.SplatOnly {
-						isRSR = fmt.Sprintf("%s_%s_%s_RSR_", o.OSVersion, o.ProductVersionExtra, o.Build)
-					}
-					var isAEA string
-					if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
-						filesafe := o.ArchiveDecryptionKey
-						filesafe = strings.ReplaceAll(filesafe, "/", "_")
-						filesafe = strings.ReplaceAll(filesafe, "+", "-")
-						isAEA = "KEY_[" + filesafe + "]_"
-					}
-					var buildPrefix string
-					if !o.SplatOnly && o.Build != "" {
-						buildPrefix = o.Build + "_"
-					}
-					destName := filepath.Join(folder, fmt.Sprintf("%s_%s%s%s%s", devices, isRSR, buildPrefix, isAEA, getDestName(url, removeCommas)))
-					if getSim {
-						destName = filepath.Join(folder, fmt.Sprintf("simulator_%s%s%s", buildPrefix, isAEA, getDestName(url, removeCommas)))
-					}
-					if _, err := os.Stat(destName); os.IsNotExist(err) {
-						fields := log.Fields{
-							"device": strings.Join(o.SupportedDevices, " "),
-							"model":  strings.Join(o.SupportedDeviceModels, " "),
-							"build":  o.Build,
-							"type":   or([]string{o.DocumentationID, "simulator"}),
-						}
-						if o.IsEncrypted || len(o.ArchiveDecryptionKey) > 0 {
-							fields["encrypted"] = true
-							fields["key"] = o.ArchiveDecryptionKey
-						}
-						log.WithFields(fields).Info(fmt.Sprintf("Getting %s %s OTA", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
-						downloader.URL = url
-						downloader.DestName = destName
-						if _, err := downloader.DoContext(cmd.Context()); err != nil {
-							return fmt.Errorf("failed to download file: %v", err)
-						}
-					} else if err != nil {
-						return fmt.Errorf("failed to stat file %s: %v", destName, err)
-					} else {
-						log.Warnf("OTA already exists: %s", destName)
-					}
+				} else if err != nil {
+					return fmt.Errorf("failed to stat file %s: %v", destName, err)
+				} else {
+					log.Warnf("OTA already exists: %s", destName)
 				}
 			}
 		}

@@ -50,7 +50,5 @@ var lpmCmd = &cobra.Command{
 		// output := viper.GetString("fw.lpm.output")
 
 		panic("not implemented")
-
-		return nil
 	},
 }

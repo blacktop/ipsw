@@ -50,7 +50,5 @@ var pmpCmd = &cobra.Command{
 		// output := viper.GetString("fw.pmp.output")
 
 		panic("not implemented")
-
-		return nil
 	},
 }

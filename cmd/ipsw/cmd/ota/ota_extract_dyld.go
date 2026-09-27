@@ -33,7 +33,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -104,8 +103,8 @@ type dscOptions struct {
 	ReportRoot     string // base for report-relative paths
 	PayloadRange   string
 	Arches         []string
-	Prompt         func(question string) bool // nil means non-interactive consent
-	ValidateFamily func(path string) error    // nil skips validation (tests only)
+	Prompt         func(question string) (bool, error) // nil means non-interactive consent
+	ValidateFamily func(path string) error             // nil skips validation (tests only)
 
 	pattern *regexp.Regexp
 }
@@ -356,11 +355,16 @@ func dscFromAssets(src dscSource, opts dscOptions, rep *dscReport) {
 }
 
 func dscFromPayloads(src dscSource, opts dscOptions, rep *dscReport) {
-	if !payloadConsent(src, opts) {
+	consent, err := payloadConsent(src, opts)
+	if err != nil {
+		rep.addErrors(ota.PhasePayloadExtract, sourcePayloadV2, err)
+		return
+	}
+	if !consent {
 		return
 	}
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", opts.pattern.String()))
-	err := src.GetPayloadFilesWithCallback(opts.pattern.String(), opts.PayloadRange, opts.Output, func(dst string) {
+	err = src.GetPayloadFilesWithCallback(opts.pattern.String(), opts.PayloadRange, opts.Output, func(dst string) {
 		rep.addFile(opts.ReportRoot, dst, sourcePayloadV2)
 	})
 	if err != nil {
@@ -371,9 +375,9 @@ func dscFromPayloads(src dscSource, opts dscOptions, rep *dscReport) {
 // payloadConsent decides whether the payloadv2 source may run. The post.bom
 // pre-filter lives here because its only purpose is deciding whether asking a
 // human is worth it; with no human to ask its only effect is a false negative.
-func payloadConsent(src dscSource, opts dscOptions) bool {
+func payloadConsent(src dscSource, opts dscOptions) (bool, error) {
 	if opts.Prompt == nil {
-		return true
+		return true, nil
 	}
 	found := false
 	for _, name := range src.PostBOMNames() {
@@ -384,7 +388,7 @@ func payloadConsent(src dscSource, opts dscOptions) bool {
 		}
 	}
 	if !found {
-		return false
+		return false, nil
 	}
 	return opts.Prompt(fmt.Sprintf("Search for '%s' in payloadv2 files?", opts.pattern.String()))
 }
@@ -417,16 +421,6 @@ func dscPatternForArches(arches []string) *regexp.Regexp {
 		patterns = append(patterns, `(System/Library/dyld/aot_shared_cache\.[0-9]+$)`)
 	}
 	return regexp.MustCompile(strings.Join(patterns, "|"))
-}
-
-func confirmPayloadSearch(question string) bool {
-	cont := false
-	if err := survey.AskOne(&survey.Confirm{Message: question}, &cont); err != nil {
-		log.WithError(err).Warn("payloadv2 search prompt failed; skipping " +
-			"(pass --confirm or --json to search non-interactively)")
-		return false
-	}
-	return cont
 }
 
 // writeDSCReport buffers the whole document before touching w, so a partial

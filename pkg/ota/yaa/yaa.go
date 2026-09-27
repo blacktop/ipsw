@@ -256,6 +256,12 @@ func DecodeEntry(r *bytes.Reader) (*Entry, error) {
 			}
 		case "MOD": // access mode
 			switch field[3] {
+			case '1':
+				mod, err := r.ReadByte()
+				if err != nil {
+					return nil, fmt.Errorf("failed to read MOD1 field: %w", err)
+				}
+				entry.Mod = fs.FileMode(mod)
 			case '2':
 				var mod uint16
 				if err := binary.Read(r, binary.LittleEndian, &mod); err != nil {
@@ -672,7 +678,11 @@ func (y *YAA) Parse(r io.ReadSeeker) error {
 
 	for {
 		var ent *Entry
-		err := binary.Read(r, binary.LittleEndian, &magic)
+		offset, err := r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return fmt.Errorf("YAA.Parse: failed to get record offset: %w", err)
+		}
+		err = binary.Read(r, binary.LittleEndian, &magic)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -681,7 +691,7 @@ func (y *YAA) Parse(r io.ReadSeeker) error {
 		}
 
 		if magic != MagicYAA1 && magic != MagicAA01 {
-			return ErrInvalidMagic
+			return fmt.Errorf("YAA.Parse: %w at offset %#x: got %#08x, expected YAA1 or AA01", ErrInvalidMagic, offset, magic)
 		}
 		if err := binary.Read(r, binary.LittleEndian, &headerSize); err != nil {
 			return fmt.Errorf("YAA.Parse: failed to read header size: %w", err)
@@ -697,7 +707,7 @@ func (y *YAA) Parse(r io.ReadSeeker) error {
 
 		ent, err = DecodeEntry(bytes.NewReader(header))
 		if err != nil {
-			return fmt.Errorf("YAA.Parse: failed to decode AA entry: %v", err)
+			return fmt.Errorf("YAA.Parse: failed to decode AA entry at offset %#x: %w", offset, err)
 		}
 		log.Debug(ent.String())
 

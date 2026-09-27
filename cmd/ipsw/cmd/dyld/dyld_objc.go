@@ -38,10 +38,23 @@ func init() {
 	ObjcCmd.Flags().BoolP("sel", "s", false, "Print the selectors")
 	ObjcCmd.Flags().BoolP("proto", "p", false, "Print the protocols")
 	ObjcCmd.Flags().BoolP("imp-cache", "i", false, "Print the imp-caches")
-	viper.BindPFlag("dyld.objc.class", ObjcCmd.Flags().Lookup("class"))
-	viper.BindPFlag("dyld.objc.sel", ObjcCmd.Flags().Lookup("sel"))
-	viper.BindPFlag("dyld.objc.proto", ObjcCmd.Flags().Lookup("proto"))
+	// dump-* keys keep these scalars out of the dyld.objc.{class,sel,proto}
+	// subtrees that the subcommands' --image flags bind (dyld.objc.class.image).
+	viper.BindPFlag("dyld.objc.dump-class", ObjcCmd.Flags().Lookup("class"))
+	viper.BindPFlag("dyld.objc.dump-sel", ObjcCmd.Flags().Lookup("sel"))
+	viper.BindPFlag("dyld.objc.dump-proto", ObjcCmd.Flags().Lookup("proto"))
 	viper.BindPFlag("dyld.objc.imp-cache", ObjcCmd.Flags().Lookup("imp-cache"))
+}
+
+// objcDumpMode accepts the original scalar config keys (dyld.objc.class,
+// .sel, .proto) without binding a flag at the same key as a subcommand's
+// image options; the dump-* keys and explicit flags take precedence.
+func objcDumpMode(mode string) bool {
+	key := "dyld.objc.dump-" + mode
+	if viper.IsSet(key) {
+		return viper.GetBool(key)
+	}
+	return viper.GetBool("dyld.objc." + mode)
 }
 
 // ObjcCmd represents the objc command
@@ -55,9 +68,9 @@ var ObjcCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		printClasses := viper.GetBool("dyld.objc.class")
-		printSelectors := viper.GetBool("dyld.objc.sel")
-		printProtocols := viper.GetBool("dyld.objc.proto")
+		printClasses := objcDumpMode("class")
+		printSelectors := objcDumpMode("sel")
+		printProtocols := objcDumpMode("proto")
 		printImpCaches := viper.GetBool("dyld.objc.imp-cache")
 
 		dscPath := filepath.Clean(args[0])

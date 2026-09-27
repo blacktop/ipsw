@@ -1308,12 +1308,17 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 				w.Flush()
 			}
 		}
-		// try to parse the dylib's symbol table
+		// try to parse the dylib's symbol table; stripped cache images may carry
+		// no LC_SYMTAB and are named by their export trie alone
 		m, err := i.GetMacho()
 		if err != nil {
 			return err
 		}
-		for _, sym := range m.Symtab.Syms {
+		var symtabSyms []macho.Symbol
+		if m.Symtab != nil {
+			symtabSyms = m.Symtab.Syms
+		}
+		for _, sym := range symtabSyms {
 			if sym.Name == "<redacted>" {
 				continue
 			}

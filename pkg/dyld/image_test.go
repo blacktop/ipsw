@@ -603,3 +603,28 @@ func TestSlidePointerMappingAlternation(t *testing.T) {
 		})
 	}
 }
+
+// A stripped cache image with no LC_SYMTAB is still named by its export trie,
+// and parsing its public symbols must not dereference the missing symtab.
+func TestPublicSymbolsWithoutSymtab(t *testing.T) {
+	data := []byte{0, 1, '_', 's', 'y', 'n', 't', 'h', 'e', 't', 'i', 'c', 0, 14, 2, 0, 0x20, 0}
+	f := fileReading(data)
+	f.Mappings = map[mtypes.UUID]cacheMappings{f.UUID: {&CacheMapping{CacheMappingInfo: CacheMappingInfo{Address: 0x1000, Size: uint64(len(data))}}}}
+	img := objcSectionImage(t, "/usr/lib/libSynthetic.dylib", "", nil, 0)
+	img.cache, img.cuuid = f, f.UUID
+	img.LoadAddress = 0x100000000
+	img.CacheImageInfoExtra = CacheImageInfoExtra{ExportsTrieAddr: 0x1000, ExportsTrieSize: uint32(len(data))}
+	if img.m.Symtab != nil {
+		t.Fatal("fixture unexpectedly has a symtab")
+	}
+	exports, err := f.GetExportTrieSymbols(img)
+	if err != nil || len(exports) != 1 || exports[0].Name != "_synthetic" {
+		t.Fatalf("fixture exports = %v, %v", exports, err)
+	}
+	if err := img.ParsePublicSymbols(false); err != nil {
+		t.Fatal(err)
+	}
+	if name, ok := f.AddressToSymbol.Get(0x100000020); !ok || name != "_synthetic" {
+		t.Fatalf("name = %q (%v)", name, ok)
+	}
+}
