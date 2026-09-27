@@ -206,31 +206,8 @@ func (b *BOM) ReadTree(name string) (*Tree, error) {
 		}
 	}
 
-	tree.Indices = make([]TreeIndex, tree.Count)
-
-	for i := uint16(0); i < tree.Count; i++ {
-		var ti TreeIndex
-		if err := binary.Read(tree.r, binary.BigEndian, &ti.Value); err != nil {
-			return nil, err
-		}
-		if err := binary.Read(tree.r, binary.BigEndian, &ti.Key); err != nil {
-			return nil, err
-		}
-		ti.KeyReader, err = b.blockReader(ti.Key)
-		if err != nil {
-			if errors.Is(err, ErrBlockNotFound) {
-				p := make([]byte, 4)
-				binary.BigEndian.PutUint32(p, ti.Key)
-				ti.KeyReader = bytes.NewBuffer(p)
-			} else {
-				return nil, err
-			}
-		}
-		ti.ValueReader, err = b.blockReader(ti.Value)
-		if err != nil {
-			return nil, err
-		}
-		tree.Indices[i] = ti
+	if err := b.readLeafIndices(tree); err != nil {
+		return nil, err
 	}
 
 	return tree, nil
@@ -270,16 +247,37 @@ func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
 		}
 	}
 
+	for {
+		if err := b.readLeafIndices(tree); err != nil {
+			return nil, err
+		}
+		trees = append(trees, tree)
+		if tree.Forward == 0 {
+			break
+		}
+		tree, err = b.readTreeOnce(tree.Forward, seen)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return trees, nil
+}
+
+// readLeafIndices treats an out-of-table key as an inline uint32 on every leaf.
+// Values always refer to blocks; a missing value is still an error.
+func (b *BOM) readLeafIndices(tree *Tree) error {
 	tree.Indices = make([]TreeIndex, tree.Count)
 
 	for i := uint16(0); i < tree.Count; i++ {
 		var ti TreeIndex
 		if err := binary.Read(tree.r, binary.BigEndian, &ti.Value); err != nil {
-			return nil, err
+			return err
 		}
 		if err := binary.Read(tree.r, binary.BigEndian, &ti.Key); err != nil {
-			return nil, err
+			return err
 		}
+		var err error
 		ti.KeyReader, err = b.blockReader(ti.Key)
 		if err != nil {
 			if errors.Is(err, ErrBlockNotFound) {
@@ -287,50 +285,17 @@ func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
 				binary.BigEndian.PutUint32(p, ti.Key)
 				ti.KeyReader = bytes.NewBuffer(p)
 			} else {
-				return nil, err
+				return err
 			}
 		}
 		ti.ValueReader, err = b.blockReader(ti.Value)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		tree.Indices[i] = ti
 	}
 
-	trees = append(trees, tree)
-
-	for {
-		if tree.Forward == 0 {
-			break
-		} else {
-			tree, err = b.readTreeOnce(tree.Forward, seen)
-			if err != nil {
-				return nil, err
-			}
-			tree.Indices = make([]TreeIndex, tree.Count)
-			for i := uint16(0); i < tree.Count; i++ {
-				var ti TreeIndex
-				if err := binary.Read(tree.r, binary.BigEndian, &ti.Value); err != nil {
-					return nil, err
-				}
-				if err := binary.Read(tree.r, binary.BigEndian, &ti.Key); err != nil {
-					return nil, err
-				}
-				ti.KeyReader, err = b.blockReader(ti.Key)
-				if err != nil {
-					return nil, err
-				}
-				ti.ValueReader, err = b.blockReader(ti.Value)
-				if err != nil {
-					return nil, err
-				}
-				tree.Indices[i] = ti
-			}
-			trees = append(trees, tree)
-		}
-	}
-
-	return trees, nil
+	return nil
 }
 
 // A traversal can visit at most one node per block. Share the visited set
