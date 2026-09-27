@@ -234,6 +234,34 @@ func TestParseInternalLinkPayloadCompatibility(t *testing.T) {
 	}
 }
 
+func TestReadCSIFileHeaderNormalizesPixelFormat(t *testing.T) {
+	for _, format := range []string{PixFmtARGB, PixFmtARGB16, PixFmtGray, PixFmtRawData} {
+		payload := bitmapFixture(t, Uncompressed, nil, []byte{11, 22, 33, 255})
+		data := syntheticCSI(t, "pixel", format, OnePart, 1, 1, nil, payload)
+		original := bytes.Clone(data)
+		reader := bytes.NewReader(data)
+		header, err := readCSIFileHeader(reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := string(header.PixelFormat[:]); got != format {
+			t.Fatalf("parsed FourCC = %q, want %q", got, format)
+		}
+		if !bytes.Equal(data, original) {
+			t.Fatal("reading the header changed original CSI bytes")
+		}
+		if format == PixFmtARGB {
+			img, err := decodeImage(reader, *header, nil, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := img.At(0, 0); got != (color.RGBA{33, 22, 11, 255}) {
+				t.Fatalf("direct header-to-image decode = %v", got)
+			}
+		}
+	}
+}
+
 func TestParsePreservesLongKeys(t *testing.T) {
 	items := []syntheticRendition{
 		{[]uint16{7, 1}, syntheticCSI(t, "first", PixFmtRawData, RawData, 0, 0, nil, []byte("a"))},
@@ -432,7 +460,7 @@ func TestUnsupportedImageCodecs(t *testing.T) {
 		writeValue(t, &payload, binary.LittleEndian, csiBitmap{
 			Signature: [4]byte{'M', 'L', 'E', 'C'}, Encoding: encoding, Length: 1})
 		payload.WriteByte(0)
-		h := csiHeader{Width: 1, Height: 1, PixelFormat: [4]byte{'B', 'G', 'R', 'A'}}
+		h := csiHeader{Width: 1, Height: 1, PixelFormat: [4]byte{'A', 'R', 'G', 'B'}}
 		if _, err := decodeImage(&payload, h, nil, 0); !errors.Is(err, errUnsupportedRendition) {
 			t.Fatalf("unsupported %s classification: %v", encoding, err)
 		}

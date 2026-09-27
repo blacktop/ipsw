@@ -10,6 +10,7 @@ import (
 	"image/color"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/apex/log"
@@ -611,7 +612,7 @@ func (a *Asset) parseRendition(keyData, data []byte) (*Rendition, error) {
 	rend.ColorSpace = header.ColorSpace.ColorSpaceID()
 	rend.Colorspace = rend.ColorSpace.String()
 	rend.Type = header.Metadata.Layout.String()
-	rend.PixelFormat = string(utils.ReverseBytes(header.PixelFormat[:]))
+	rend.PixelFormat = string(header.PixelFormat[:])
 	rend.header = *header
 	rend.Size = int(header.ImageIndex.AccumLength[len(header.ImageIndex.AccumLength)-1])
 	// rawCSI owns the storage for deferred payloads, including unselected entries.
@@ -913,6 +914,8 @@ func readCSIFileHeader(r io.Reader) (*csiHeader, error) {
 	if err := binary.Read(r, binary.LittleEndian, &c.PixelFormat); err != nil {
 		return nil, fmt.Errorf("failed to read csiHeader pixel format: %v", err)
 	}
+	// Wire FourCCs are little-endian; parsed headers use display order.
+	slices.Reverse(c.PixelFormat[:])
 	if err := binary.Read(r, binary.LittleEndian, &c.ColorSpace); err != nil {
 		return nil, fmt.Errorf("failed to read csiHeader color space: %v", err)
 	}

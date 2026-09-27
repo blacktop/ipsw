@@ -131,8 +131,8 @@ type csiHeader struct {
 	Flags       csiHeaderFlags
 	Width       uint32
 	Height      uint32
-	ScaleFactor uint32 // 100 to @1x, 200 to @2x, 300 to @3x (0 is native rez)
-	PixelFormat [4]byte
+	ScaleFactor uint32  // 100 to @1x, 200 to @2x, 300 to @3x (0 is native rez)
+	PixelFormat [4]byte // Normalized FourCC after readCSIFileHeader.
 	ColorSpace  csiColorSpace
 	Metadata    csiMetaData
 	ChainSize   uint32
