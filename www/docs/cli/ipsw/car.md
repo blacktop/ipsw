@@ -21,6 +21,8 @@ requested numeric keys must exist and match exactly, including zero.
 HEIF/PDF/SVG rendering and native BC7 decoding require macOS with cgo.
 ASTC decoding can also use an external astcenc executable through
 --astc-decoder. Original JPEG and WebP payloads are preserved unchanged.
+RLE-compressed original payloads, including DATA, are unsupported;
+use --raw to retain their complete CSI records. Bitmap RLE is supported.
 
 Exports replace existing rendition files atomically. Unsupported layouts
 and codecs are reported separately; decode or write failures cause a nonzero

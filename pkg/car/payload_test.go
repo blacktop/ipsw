@@ -6,7 +6,9 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"encoding/binary"
+	"errors"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -76,6 +78,46 @@ func TestOriginalPayload(t *testing.T) {
 	}
 }
 
+func TestOriginalRLEIsUnsupportedAndRawPreservesCSI(t *testing.T) {
+	// PackBits happens to accept these bytes, but CoreUI's DATA/RLE grammar is
+	// unverified. Do not mistake a successful guess for an original payload.
+	payload := bitmapFixture(t, RLE, nil, []byte{2, 1, 2, 3})
+	link := syntheticLink(t, 2)
+	binary.LittleEndian.PutUint16(link[24:], uint16(RawData))
+	items := []syntheticRendition{
+		{[]uint16{1}, syntheticCSI(t, "link", PixFmtARGB, InternalLink, 0, 0, nil, link)},
+		{[]uint16{2}, syntheticCSI(t, "source", PixFmtRawData, RawData, 0, 0, nil, payload)},
+	}
+	input := writeCatalog(t, syntheticCatalog(t, items, []renditionAttributeType{Identifier}))
+	for _, conf := range []*Config{{}, {Render: true}, {MetadataOnly: true}, {Raw: true}} {
+		conf.Export, conf.Output = true, t.TempDir()
+		a, err := Parse(input, conf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range a.PlanExport(conf.Output) {
+			if conf.Raw {
+				data, err := os.ReadFile(entry.Path)
+				if err != nil || entry.Status != "exported" ||
+					!bytes.Equal(data, items[entry.index].data) {
+					t.Fatalf("raw export changed CSI: %+v, %v", entry, err)
+				}
+			} else if entry.Status != "unsupported" {
+				t.Fatalf("unverified RLE was decoded: %+v", entry)
+			}
+		}
+		stats := a.Stats()
+		if stats.DecodeFailures != 0 || stats.ResolveFailures != 0 || stats.ExportFailures != 0 {
+			t.Fatalf("unsupported RLE counted as failure: %+v", stats)
+		}
+	}
+	// Validate the framing before classifying the unimplemented codec.
+	_, err := decodeOriginalPayload(payload[:len(payload)-1], PixFmtRawData)
+	if err == nil || errors.Is(err, errUnsupportedRendition) {
+		t.Fatalf("malformed RLE framing was not a failure: %v", err)
+	}
+}
+
 func TestBitmapCompression(t *testing.T) {
 	want := bytes.Repeat([]byte{1, 2, 3, 4}, 20)
 	for _, format := range []string{"gzip", "zlib", "deflate"} {
@@ -109,20 +151,11 @@ func TestBitmapCompression(t *testing.T) {
 			}
 		})
 	}
-	got, err := decodeBitmapBytes([]byte{2, 1, 2, 3, 254, 9, 128}, RLE, 6)
-	if err != nil || !bytes.Equal(got, []byte{1, 2, 3, 9, 9, 9}) {
-		t.Fatalf("RLE: %x, %v", got, err)
-	}
-	for _, data := range [][]byte{{2, 1}, {254}, {254, 9}} {
-		if _, err := decodeBitmapBytes(data, RLE, 2); err == nil {
-			t.Fatalf("accepted invalid RLE %x", data)
-		}
-	}
 	// A framed uncompressed LZFSE block exercises the native bounded decoder.
 	lzfse := append([]byte("bvx-"), 4, 0, 0, 0)
 	lzfse = append(lzfse, 1, 2, 3, 4)
 	lzfse = append(lzfse, []byte("bvx$")...)
-	got, err = decodeBitmapBytes(lzfse, LZFSE, 4)
+	got, err := decodeBitmapBytes(lzfse, LZFSE, 4)
 	if err != nil || !bytes.Equal(got, []byte{1, 2, 3, 4}) {
 		t.Fatalf("LZFSE: %x, %v", got, err)
 	}

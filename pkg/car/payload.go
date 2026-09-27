@@ -20,6 +20,9 @@ const (
 	PixFmtWebP = "WEBP" // WebP source payload.
 )
 
+var errOriginalRLE = fmt.Errorf(
+	"%w: RLE-compressed original payload; use --raw to preserve CSI", errUnsupportedRendition)
+
 type bitmapChunk struct {
 	data []byte
 	rows uint32
@@ -80,44 +83,13 @@ func decodeBitmapBytes(data []byte, encoding compressionType, limit int) ([]byte
 			return nil, fmt.Errorf("uncompressed data exceeds %d bytes", limit)
 		}
 		return data, nil
-	case RLE:
-		dst := make([]byte, 0, min(len(data), limit))
-		for i := 0; i < len(data); {
-			n := int(int8(data[i]))
-			i++
-			if n == -128 {
-				continue
-			}
-			count := n + 1
-			if n < 0 {
-				count = 1 - n
-			}
-			if count > limit-len(dst) {
-				return nil, fmt.Errorf("RLE output exceeds %d bytes", limit)
-			}
-			if n >= 0 {
-				if count > len(data)-i {
-					return nil, fmt.Errorf("truncated RLE literal")
-				}
-				dst = append(dst, data[i:i+count]...)
-				i += count
-			} else {
-				if i == len(data) {
-					return nil, fmt.Errorf("truncated RLE repeat")
-				}
-				for range count {
-					dst = append(dst, data[i])
-				}
-				i++
-			}
-		}
-		return dst, nil
 	case ZIP:
 		var r io.ReadCloser
 		var err error
 		if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
 			r, err = gzip.NewReader(bytes.NewReader(data))
-		} else if len(data) >= 2 && data[0]&15 == 8 && (uint16(data[0])<<8|uint16(data[1]))%31 == 0 {
+		} else if len(data) >= 2 && data[0]&15 == 8 &&
+			(uint16(data[0])<<8|uint16(data[1]))%31 == 0 {
 			r, err = zlib.NewReader(bytes.NewReader(data))
 		} else {
 			r = flate.NewReader(bytes.NewReader(data))
@@ -142,7 +114,8 @@ func decodeOriginalPayload(data []byte, format string) ([]byte, error) {
 		return nil, fmt.Errorf("payload exceeds size limit")
 	}
 	if bytes.HasPrefix(data, []byte("DWAR")) {
-		if len(data) < 12 || uint64(binary.LittleEndian.Uint32(data[8:12])) != uint64(len(data)-12) {
+		if len(data) < 12 ||
+			uint64(binary.LittleEndian.Uint32(data[8:12])) != uint64(len(data)-12) {
 			return nil, fmt.Errorf("invalid RAWD payload length")
 		}
 		data = data[12:]
@@ -158,12 +131,19 @@ func decodeOriginalPayload(data []byte, format string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Only bitmap row packets have a verified RLE grammar. Do not guess
+		// at the encoding of original-file payloads (including DATA).
+		if elem.Encoding == RLE {
+			return nil, errOriginalRLE
+		}
 		if elem.Encoding == HEVC {
 			if format != PixFmtHEIF || len(chunks) != 1 {
-				return nil, fmt.Errorf("%w: HEVC export requires one HEIF chunk", errUnsupportedRendition)
+				return nil, fmt.Errorf("%w: HEVC export requires one HEIF chunk",
+					errUnsupportedRendition)
 			}
 			data = chunks[0].data
-			if len(data) < 8 || uint64(binary.LittleEndian.Uint32(data[4:8])) != uint64(len(data)-8) {
+			if len(data) < 8 ||
+				uint64(binary.LittleEndian.Uint32(data[4:8])) != uint64(len(data)-8) {
 				return nil, fmt.Errorf("invalid HEVC wrapper length")
 			}
 			data = data[8:]
@@ -183,6 +163,13 @@ func decodeOriginalPayload(data []byte, format string) ([]byte, error) {
 			data = out
 		}
 	}
+	if !validOriginalPayload(data, format) {
+		return nil, fmt.Errorf("invalid %q source payload", format)
+	}
+	return data, nil
+}
+
+func validOriginalPayload(data []byte, format string) bool {
 	valid := false
 	switch format {
 	case PixFmtRawData:
@@ -192,7 +179,8 @@ func decodeOriginalPayload(data []byte, format string) ([]byte, error) {
 	case PixFmtPDF:
 		valid = bytes.HasPrefix(data, []byte("%PDF-"))
 	case PixFmtWebP:
-		valid = len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP" && uint64(binary.LittleEndian.Uint32(data[4:8]))+8 == uint64(len(data))
+		valid = len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP" &&
+			uint64(binary.LittleEndian.Uint32(data[4:8]))+8 == uint64(len(data))
 	case PixFmtSVG:
 		d := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(data, []byte{0xef, 0xbb, 0xbf})))
 		d.CharsetReader = charset.NewReaderLabel
@@ -215,17 +203,29 @@ func decodeOriginalPayload(data []byte, format string) ([]byte, error) {
 						continue
 					}
 					switch string(data[i : i+4]) {
-					case "heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1", "MiHE", "MiHB":
+					case "heic", "heix", "hevc", "hevx", "heim", "heis",
+						"mif1", "msf1", "MiHE", "MiHB":
 						valid = true
 					}
 				}
 			}
 		}
 	}
-	if !valid {
-		return nil, fmt.Errorf("invalid %q source payload", format)
+	return valid
+}
+
+// Identify a known unsupported source wrapper during planning without decoding.
+// Malformed wrappers still need decoding to report their framing error.
+func (rend *Rendition) hasOriginalRLE() bool {
+	if rend.link != nil || rend.Compression != RLE.String() {
+		return false
 	}
-	return data, nil
+	switch rend.PixelFormat {
+	case PixFmtRawData, PixFmtPDF, PixFmtJPEG, PixFmtHEIF, PixFmtSVG, PixFmtWebP:
+		elem, _, err := readCSIBitmap(rend.payload)
+		return err == nil && elem.Encoding == RLE
+	}
+	return false
 }
 
 func isRenderableFormat(format string) bool {

@@ -172,6 +172,9 @@ func exportStatus(rend *Rendition, raw bool) (status, message string) {
 	status = "planned"
 	failures := []error{rend.ExportError}
 	if !raw {
+		if rend.Deferred && rend.hasOriginalRLE() {
+			status, message = "unsupported", errOriginalRLE.Error()
+		}
 		for _, err := range []error{rend.DecodeError, rend.ResolveError} {
 			if errors.Is(err, errUnsupportedRendition) {
 				status, message = "unsupported", err.Error()
@@ -292,6 +295,9 @@ func (a *Asset) planReference(index int, lookup renditionIndex, entry *ExportEnt
 					if !slices.Contains(entry.Warnings, warning) {
 						entry.Warnings = append(entry.Warnings, warning)
 					}
+				}
+				if rend.Deferred && rend.hasOriginalRLE() {
+					return errOriginalRLE
 				}
 			}
 			return nil
