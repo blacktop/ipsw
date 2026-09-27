@@ -10,6 +10,12 @@ description: Download github.com/orgs/apple-oss-distributions tarballs
 
 Download github.com/orgs/apple-oss-distributions tarballs
 
+### Synopsis
+
+Download source tarballs using GitHub GraphQL, which requires authentication.
+Token precedence: --api (or configured API token), GITHUB_TOKEN, GITHUB_API_TOKEN.
+Select a repository with --product; positional arguments are not accepted.
+
 ```
 ipsw download git [flags]
 ```
@@ -26,15 +32,15 @@ ipsw download git [flags]
 # Download WebKit tags (not Apple OSS)
 ❯ ipsw download git --webkit --json
 
-# Download specific product with API token
-❯ ipsw download git --product xnu --api YOUR_TOKEN
+# Download a specific product using the token already in GITHUB_TOKEN
+❯ ipsw download git --product xnu
 
 ```
 
 ### Options
 
 ```
-  -a, --api string       Github API Token
+  -a, --api string       GitHub token (falls back to GITHUB_TOKEN, then GITHUB_API_TOKEN)
   -h, --help             help for git
       --insecure         do not verify ssl certs
       --json             Output downloadable tar.gz URLs as JSON

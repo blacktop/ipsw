@@ -10,6 +10,10 @@ description: Lookup device info
 
 Lookup device info
 
+### Synopsis
+
+Lookup device info using selectors such as --prod iPhone15,2 or --name 'iPhone 14 Pro'.
+
 ```
 ipsw device-info [flags]
 ```

@@ -11,7 +11,7 @@ description: Compress files using libcompression
 Compress files using libcompression
 
 ```
-ipsw comp [flags]
+ipsw comp <FILE> [flags]
 ```
 
 ### Options

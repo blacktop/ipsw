@@ -10,6 +10,10 @@ description: Get ObjC optimization class info
 
 Get ObjC optimization class info
 
+### Synopsis
+
+Get ObjC optimization class info. With --image, list classes referenced by that image.
+
 ```
 ipsw dyld objc class <DSC> [flags]
 ```
@@ -18,7 +22,7 @@ ipsw dyld objc class <DSC> [flags]
 
 ```
   -h, --help           help for class
-  -i, --image string   dylib image to search
+  -i, --image string   List class references from this dylib image
 ```
 
 ### Options inherited from parent commands

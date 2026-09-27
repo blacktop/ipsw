@@ -10,6 +10,14 @@ description: Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
 
 Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
 
+### Synopsis
+
+Extract components from an IPSW or OTA. --json keeps the legacy per-component
+output. Add --json-format artifacts for one schema-versioned document containing
+an artifacts array (kind, path, and optional devices), optional keybags and
+system_version metadata, and a complete flag. An extraction failure retains
+completed artifacts, sets complete to false, includes an error, and exits nonzero.
+
 ```
 ipsw extract <IPSW/OTA | URL> [flags]
 ```
@@ -28,6 +36,9 @@ $ ipsw extract --pattern '.*\.ttf$' iOS.ipsw
 
 # Extract multiple components with custom output directory
 $ ipsw extract --kernel --sep --dyld -o /tmp/extracted iPhone.ipsw
+
+# Emit one versioned JSON document for all extracted components
+$ ipsw extract --kernel --sep --json --json-format artifacts iPhone.ipsw
 
 # Extract from remote URL
 $ ipsw extract --kernel --remote https://updates.cdn-apple.com/iPhone.ipsw
@@ -53,7 +64,7 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
   -d, --dyld                    Extract dyld_shared_cache
   -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
   -x, --exclave                 Extract Exclave Bundle
-      --fcs-key                 Extract AEA1 DMG fcs-key pem files
+      --fcs-key                 Extract AEA1 keys for SystemOS DMGs (legacy filesystem fallback)
   -f, --files                   Extract File System files
       --flat                    Do NOT preserve directory structure when extracting
   -h, --help                    help for extract
@@ -61,6 +72,7 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
       --ident string            Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
       --insecure                do not verify ssl certs
   -j, --json                    Output extracted paths as JSON
+      --json-format string      JSON format: legacy (per component) or artifacts (one versioned report; requires --json) (default "legacy")
       --kbag                    Extract Im4p Keybags
   -k, --kernel                  Extract kernelcache
   -l, --lookup                  Lookup decryption keys on theapplewiki.com

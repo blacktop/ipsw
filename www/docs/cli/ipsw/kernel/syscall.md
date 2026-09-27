@@ -10,8 +10,12 @@ description: Dump kernelcache syscalls
 
 Dump kernelcache syscalls
 
+### Synopsis
+
+Dump syscalls from a kernelcache. KERNELCACHE is required unless --gen is used.
+
 ```
-ipsw kernel syscall [flags]
+ipsw kernel syscall [KERNELCACHE] [flags]
 ```
 
 ### Options

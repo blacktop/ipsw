@@ -11,7 +11,7 @@ description: Parse AEA1 DMGs
 Parse AEA1 DMGs
 
 ```
-ipsw fw aea [flags]
+ipsw fw aea <AEA> [flags]
 ```
 
 ### Options

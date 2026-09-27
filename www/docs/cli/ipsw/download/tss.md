@@ -44,9 +44,10 @@ ipsw download tss [flags]
   -h, --help             help for tss
       --insecure         do not verify ssl certs
   -l, --latest           Check latest iOS version
+      --no-update        Use an existing AppleDB checkout without updating it (signing still requires network access)
   -o, --output string    Output path for SHSH blobs
       --proxy string     HTTP/HTTPS proxy
-  -s, --signed           Check if iOS version is still being signed
+  -s, --signed           Check signing status (exit 0 if signed, exit 1 if unsigned or the check fails)
   -u, --usb              Download blobs for USB connected device
   -v, --version string   iOS Version (i.e. 12.3.1)
 ```

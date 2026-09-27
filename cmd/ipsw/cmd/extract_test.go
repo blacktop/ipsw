@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,9 +35,7 @@ func TestExtractJSONComponents(t *testing.T) {
 			"Firmware/iBoot.test.im4p":      string(payload),
 			"README.txt":                    "synthetic text",
 		}
-		for name, data := range extra {
-			members[name] = data
-		}
+		maps.Copy(members, extra)
 		var archive bytes.Buffer
 		zw := zip.NewWriter(&archive)
 		for name, data := range members {

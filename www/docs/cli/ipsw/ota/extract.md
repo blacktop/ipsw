@@ -10,6 +10,10 @@ description: Extract OTA payload files
 
 Extract OTA payload files
 
+### Synopsis
+
+Extract OTA payload files. Answering no skips the optional payloadv2 search. Prompt failures, including interruption, return an error. Use --confirm to search without a terminal.
+
 ```
 ipsw ota extract <OTA> [FILENAME] [flags]
 ```

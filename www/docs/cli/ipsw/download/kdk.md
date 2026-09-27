@@ -10,6 +10,11 @@ description: Download KDKs
 
 Download KDKs
 
+### Synopsis
+
+Download KDKs. Without a selector, choose a KDK interactively.
+Unattended use requires --host, --build, --latest, or --all.
+
 ```
 ipsw download kdk [flags]
 ```

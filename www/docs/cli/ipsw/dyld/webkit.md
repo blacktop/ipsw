@@ -10,8 +10,15 @@ description: Get WebKit version from a dyld_shared_cache
 
 Get WebKit version from a dyld_shared_cache
 
+### Synopsis
+
+Get the WebKit version from a dyld_shared_cache. --diff requires two caches.
+With --git, look for an exact source tag, otherwise report the greatest lower
+available version as an unverified approximation. Without a GitHub token the
+tag catalog is preprocessed and its freshness is unknown.
+
 ```
-ipsw dyld webkit <DSC> [flags]
+ipsw dyld webkit <DSC> [DSC] [flags]
 ```
 
 ### Options

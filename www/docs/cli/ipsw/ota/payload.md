@@ -10,6 +10,10 @@ description: List contents of a payloadv2 file
 
 List contents of a payloadv2 file
 
+### Synopsis
+
+List contents of a raw, PBZX, or PBZM payloadv2 file. PBZM requires Apple's aa tool with PBZM support.
+
 ```
 ipsw ota payload <PAYLOAD> | <OTA> <PAYLOAD> [flags]
 ```

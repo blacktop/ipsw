@@ -15,6 +15,10 @@ Download OTAs
 Download OTA updates resolved live from Apple's Pallas
 (gdmf.apple.com/v2/assets) and asset-set (gdmf.apple.com/v2/pmv) services.
 
+Multiple downloads require confirmation; use --confirm when unattended.
+Declining exits successfully without downloading. Prompt errors or Ctrl-C
+return an error.
+
 With --json, output is always an indented, schema-versioned envelope. Schema
 version 1 contains an otas array, which is empty when no OTA matches. Entries
 are unique per URL and sorted by os, newest version, newest build, delivery,

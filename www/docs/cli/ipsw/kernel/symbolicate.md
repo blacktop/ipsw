@@ -10,8 +10,12 @@ description: Symbolicate kernelcache
 
 Symbolicate kernelcache
 
+### Synopsis
+
+Symbolicate a kernelcache. With --lookup, input may also be a previously generated symbols JSON map.
+
 ```
-ipsw kernel symbolicate [flags]
+ipsw kernel symbolicate <KERNELCACHE|SYMBOLS_JSON> [flags]
 ```
 
 ### Examples

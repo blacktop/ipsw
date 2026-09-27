@@ -11,7 +11,7 @@ description: Decompress pbzx files
 Decompress pbzx files
 
 ```
-ipsw pbzx [flags]
+ipsw pbzx <PBZX> [flags]
 ```
 
 ### Options

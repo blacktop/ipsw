@@ -21,7 +21,7 @@ ipsw ent [IPSW] [flags]
 ❯ ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_18.2_22C150_Restore.ipsw
 
 # Create database from multiple IPSWs
-❯ ipsw ent --sqlite entitlements.db --ipsw *.ipsw
+❯ ipsw ent --sqlite entitlements.db --ipsw first.ipsw --ipsw second.ipsw
 
 # Create PostgreSQL database from IPSW (for Supabase)
 ❯ ipsw ent --pg-host db.xyz.supabase.co --pg-user postgres --pg-password your-password --pg-database postgres --ipsw iPhone16,1_18.2_22C150_Restore.ipsw

@@ -10,8 +10,19 @@ description: Dump Swift Optimizations Info
 
 Dump Swift Optimizations Info
 
+### Synopsis
+
+Dump Swift optimizations. Specify at least one of --types, --metadata, or --foreign; these modes can be combined.
+
 ```
 ipsw dyld swift <DSC> [flags]
+```
+
+### Examples
+
+```bash
+  ipsw dyld swift --types dyld_shared_cache_arm64e
+  ipsw dyld swift --types --metadata --foreign dyld_shared_cache_arm64e
 ```
 
 ### Options

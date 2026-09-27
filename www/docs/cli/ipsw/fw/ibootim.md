@@ -10,8 +10,12 @@ description: Dump iBoot Images
 
 Dump iBoot Images
 
+### Synopsis
+
+Extract iBoot images from an IPSW, URL (with --remote), IM4P, or raw iBoot image.
+
 ```
-ipsw fw ibootim [flags]
+ipsw fw ibootim <IPSW|URL|IM4P|IBOOTIM> [flags]
 ```
 
 ### Options

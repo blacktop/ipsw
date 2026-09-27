@@ -37,7 +37,7 @@ Examples:
   ipsw sb dec --type profile -i sandbox_profile.bin -o operations.txt --darwin-version 25.0.0
 
   # Disable node budget for heavy profiles (may be slow)
-  ipsw sb dec kernelcache.release.iPhone18,1 com.apple.CommCenter --full-graph
+  ipsw sb dec kernelcache.release.iPhone18,1 CommCenter --full-graph
 
 ```
 ipsw sb dec [KERNELCACHE] [PROFILE] [flags]

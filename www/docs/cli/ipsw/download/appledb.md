@@ -14,6 +14,10 @@ Download IPSWs from appledb
 
 Download Apple firmware metadata and artifacts from AppleDB.
 
+Multiple downloads require confirmation; use --confirm when unattended.
+Declining exits successfully without downloading. Prompt errors or Ctrl-C
+return an error.
+
 With --json, output is always a schema-versioned envelope. Schema version 1
 contains a releases array; a query with no matches emits exactly
 `{"schema_version":1,"releases":[]}`. Each release contains the canonical

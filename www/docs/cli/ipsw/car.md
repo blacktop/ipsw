@@ -96,3 +96,4 @@ $ ipsw car Assets.car --raw --output original
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+

@@ -11,7 +11,7 @@ description: List contents of a BOM file
 List contents of a BOM file
 
 ```
-ipsw lsbom [flags]
+ipsw lsbom <BOM> [flags]
 ```
 
 ### Options

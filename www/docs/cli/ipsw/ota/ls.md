@@ -10,6 +10,10 @@ description: List OTA files
 
 List OTA files
 
+### Synopsis
+
+List OTA files. With --payload --json, output is a stream of JSON arrays, one per nonempty payload result. No matches produce no output.
+
 ```
 ipsw ota ls <OTA> [flags]
 ```
@@ -19,7 +23,7 @@ ipsw ota ls <OTA> [flags]
 ```
   -b, --bom              List the post.bom files
   -h, --help             help for ls
-  -j, --json             Output payload listing as JSON (requires --payload)
+  -j, --json             Output a JSON array per matching payload (requires --payload)
   -r, --pattern string   Regex pattern to match payloadv2 files (requires --payload)
   -p, --payload          List the payloadv2 files
 ```

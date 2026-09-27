@@ -11,7 +11,7 @@ description: Decompress files using libcompression
 Decompress files using libcompression
 
 ```
-ipsw decomp [flags]
+ipsw decomp <FILE> [flags]
 ```
 
 ### Options
