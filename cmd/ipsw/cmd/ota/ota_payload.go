@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/blacktop/ipsw/pkg/ota"
+	"github.com/blacktop/ipsw/pkg/ota/lzraven"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
@@ -145,7 +146,10 @@ func parseOTAPayload(ctx context.Context, r io.ReadSeeker, name string) (*yaa.YA
 			return nil, fmt.Errorf("failed to decompress PBZX payload %q: %w", name, err)
 		}
 		r = bytes.NewReader(decoded.Bytes())
-	case "pbzm":
+	case lzraven.Magic:
+		if err := lzraven.CheckHost(); err != nil {
+			return nil, fmt.Errorf("failed to decompress payload %q: %w", name, err)
+		}
 		aaPath, err := execabs.LookPath("aa")
 		if err != nil {
 			return nil, fmt.Errorf("PBZM payload %q requires an Apple aa tool with PBZM support: %w", name, err)

@@ -894,12 +894,15 @@ func TestAnySystemCryptexSelectorCoversArm64_32(t *testing.T) {
 
 func TestExtractCryptexNumberedSelectorValidation(t *testing.T) {
 	r := &Reader{}
-	for _, kind := range []string{"system-arm64e_x1", "system-arm64e_x2", "system-arm64e_x12"} {
+	for _, kind := range []string{"system-arm64e.x1", "system-arm64e.x2", "system-arm64e.x12"} {
 		if _, err := r.ExtractCryptex(kind, t.TempDir()); !errors.Is(err, ErrCryptexNotFound) {
 			t.Errorf("%s: expected missing member, got %v", kind, err)
 		}
 	}
-	for _, kind := range []string{"system-arm64e_x", "system-arm64e_xfoo", "system-arm64e_x2.dmg", "system-arm64e_x[12]"} {
+	for _, kind := range []string{
+		"system-arm64e.x", "system-arm64e.xfoo", "system-arm64e.x2.dmg", "system-arm64e.x[12]",
+		"system-arm64e_x1",
+	} {
 		if _, err := r.ExtractCryptex(kind, t.TempDir()); err == nil || !strings.Contains(err.Error(), "unknown cryptex type") {
 			t.Errorf("%s: expected invalid selector, got %v", kind, err)
 		}
@@ -909,14 +912,17 @@ func TestExtractCryptexNumberedSelectorValidation(t *testing.T) {
 func TestSystemCryptexNumberedArm64eDiscovery(t *testing.T) {
 	for _, variant := range []string{"arm64e_x1", "arm64e_x2", "arm64e_x12"} {
 		t.Run(variant, func(t *testing.T) {
-			source := "cryptex-system-" + variant
+			source := SystemCryptexBasename(variant)
 			if !reAnySystemCryptex.MatchString(source) {
 				t.Error("unfiltered system selector excludes numbered arm64e variant")
 			}
 			if !IsDscCryptexBasename(source) {
 				t.Error("DSC discovery excludes numbered arm64e variant")
 			}
-			for _, name := range []string{"cryptex-system-arm64e_x", "cryptex-system-arm64e_xfoo", source + ".dmg", source + "-extra"} {
+			for _, name := range []string{
+				"cryptex-system-arm64e.x", "cryptex-system-arm64e.xfoo", "cryptex-system-" + variant,
+				source + ".dmg", source + "-extra",
+			} {
 				if reAnySystemCryptex.MatchString(name) || IsDscCryptexBasename(name) {
 					t.Errorf("accepted invalid cryptex %q", name)
 				}
@@ -926,7 +932,7 @@ func TestSystemCryptexNumberedArm64eDiscovery(t *testing.T) {
 				out, err := extractFromDscCryptexFilesForArches(cryptexFiles("cryptex-system-arm64e", source), arches,
 					func(file *File) ([]string, error) {
 						called = append(called, file.Base())
-						arch := strings.TrimPrefix(file.Base(), "cryptex-system-")
+						arch := SystemCryptexArch(file.Base())
 						return []string{"out/System/Library/dyld/dyld_shared_cache_" + arch}, nil
 					})
 				if err != nil {
@@ -945,5 +951,65 @@ func TestSystemCryptexNumberedArm64eDiscovery(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSystemCryptexArchNames(t *testing.T) {
+	for _, tc := range []struct{ base, arch string }{
+		{"cryptex-system-arm64e", "arm64e"},
+		{"cryptex-system-arm64e.x1", "arm64e_x1"},
+		{"cryptex-system-arm64e.x12", "arm64e_x12"},
+		{"cryptex-system-arm64_32", "arm64_32"},
+		{"cryptex-system-x86_64h", "x86_64h"},
+		{"cryptex-system-rosetta", "rosetta"},
+	} {
+		if got := SystemCryptexArch(tc.base); got != tc.arch {
+			t.Errorf("SystemCryptexArch(%q) = %q, want %q", tc.base, got, tc.arch)
+		}
+		if got := SystemCryptexBasename(tc.arch); got != tc.base {
+			t.Errorf("SystemCryptexBasename(%q) = %q, want %q", tc.arch, got, tc.base)
+		}
+	}
+}
+
+func TestCryptexDeltaBase(t *testing.T) {
+	for _, tc := range []struct {
+		base, parent string
+		delta        bool
+	}{
+		{"cryptex-system-arm64e.x1", "cryptex-system-arm64e", true},
+		{"cryptex-system-arm64e", "", false},
+		{"cryptex-system-arm64_32", "", false},
+		{"cryptex-app", "", false},
+	} {
+		parent, delta := CryptexDeltaBase(tc.base)
+		if delta != tc.delta || (delta && parent != tc.parent) {
+			t.Errorf("CryptexDeltaBase(%q) = %q, %v; want %q, %v", tc.base, parent, delta, tc.parent, tc.delta)
+		}
+	}
+}
+
+// TestCryptexBasenameSuggestsDeltaArch pins that --dyld-arch arm64e_x1 finds
+// the cryptex-system-arm64e.x1 member first rather than sweeping for it.
+func TestCryptexBasenameSuggestsDeltaArch(t *testing.T) {
+	if !CryptexBasenameSuggestsArches("cryptex-system-arm64e.x1", []string{"arm64e_x1"}) {
+		t.Error("arm64e_x1 request does not prefer cryptex-system-arm64e.x1")
+	}
+	if CryptexBasenameSuggestsArches("cryptex-system-arm64e.x1", []string{"arm64e"}) {
+		t.Error("arm64e request prefers the arm64e.x1 delta over its base")
+	}
+}
+
+func TestStageCryptexBaseMissing(t *testing.T) {
+	r := &Reader{}
+	r.fileList = cryptexFiles("cryptex-system-arm64e.x1")
+	r.fileListOnce.Do(func() {})
+	_, err := r.stageCryptexBase(r.fileList[0], t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "which the OTA does not contain") {
+		t.Fatalf("stageCryptexBase() = %v, want missing-base error", err)
+	}
+	var pe *PhaseError
+	if !errors.As(err, &pe) || pe.Phase != PhaseCryptexPatch {
+		t.Fatalf("stageCryptexBase() phase = %v, want %s", err, PhaseCryptexPatch)
 	}
 }

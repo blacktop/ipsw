@@ -1,6 +1,7 @@
 package table
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -14,6 +15,25 @@ func TestBubbleTableStaticOutputHasNoANSI(t *testing.T) {
 
 	if output := table.RenderStatic(); strings.Contains(output, "\x1b[") {
 		t.Fatalf("static table output contains ANSI escapes: %q", output)
+	}
+}
+
+func TestBubbleTableStaticOutputIncludesEveryRow(t *testing.T) {
+	table := NewBubbleTable([]string{"Name"}, false)
+	var data [][]string
+	for i := range 200 {
+		data = append(data, []string{fmt.Sprintf("row-%03d", i)})
+	}
+	table.SetData(data)
+
+	output := table.RenderStatic()
+	for _, want := range []string{"row-000", "row-199"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("static table output is missing %q:\n%s", want, output)
+		}
+	}
+	if got := strings.Count(output, "row-"); got != len(data) {
+		t.Fatalf("static table output has %d rows, want %d", got, len(data))
 	}
 }
 

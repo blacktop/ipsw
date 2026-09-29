@@ -22,12 +22,8 @@ func TestExtractOTASystemCryptexPreference(t *testing.T) {
 		arches []string
 		want   string
 	}{
-		{"generic arm64e first", []string{"arm64", "arm64e_x1", "arm64e"}, "arm64e"},
-		{"x1 before arm64", []string{"arm64", "arm64e_x1"}, "arm64e_x1"},
-		{"x2 before arm64", []string{"arm64", "arm64e_x2"}, "arm64e_x2"},
-		{"x12 before arm64", []string{"arm64", "arm64e_x12"}, "arm64e_x12"},
-		{"generic before x2", []string{"arm64e_x2", "arm64e"}, "arm64e"},
-		{"x1 before x2", []string{"arm64e_x2", "arm64e_x1"}, "arm64e_x1"},
+		{"generic arm64e first", []string{"arm64", "arm64e.x1", "arm64e"}, "arm64e"},
+		{"generic before delta", []string{"arm64e.x2", "arm64e"}, "arm64e"},
 		{"other architecture fallback", []string{"arm64"}, "arm64"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

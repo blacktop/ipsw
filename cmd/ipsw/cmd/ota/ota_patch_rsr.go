@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -67,19 +68,21 @@ func rsrSystemCryptexRE(dyldArches []string) *regexp.Regexp {
 	if len(dyldArches) == 0 {
 		// arm64_32 must be here: `arm64e?` cannot match it, so an unfiltered RSR
 		// patch would skip a watchOS system cryptex it was asked to handle.
-		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x[0-9]+)?)?|x86_64h?)$`)
+		return regexp.MustCompile(`cryptex-system-(arm64(_32|e(\.x[0-9]+)?)?|x86_64h?)$`)
 	}
 
 	patterns := make([]string, 0, len(dyldArches))
 	for _, arch := range dyldArches {
-		patterns = append(patterns, regexp.QuoteMeta(arch))
+		name := strings.TrimPrefix(otapkg.SystemCryptexBasename(arch), "cryptex-system-")
+		patterns = append(patterns, regexp.QuoteMeta(name))
 	}
 
 	return regexp.MustCompile(fmt.Sprintf(`cryptex-system-(%s)$`, strings.Join(patterns, "|")))
 }
 
 // rsrCryptexType returns ("app", "") for app cryptexes, ("system", arch) for
-// system cryptexes (where arch is e.g. "arm64e" or "x86_64h"), or ("", "").
+// system cryptexes (where arch is e.g. "arm64e", "arm64e_x1" or "x86_64h"), or
+// ("", "").
 func rsrCryptexType(name string, systemCryptexRE *regexp.Regexp) (string, string) {
 	base := filepath.Base(name)
 
@@ -87,7 +90,7 @@ func rsrCryptexType(name string, systemCryptexRE *regexp.Regexp) (string, string
 		return "app", ""
 	}
 	if m := systemCryptexRE.FindStringSubmatch(base); m != nil {
-		return "system", m[1]
+		return "system", otapkg.SystemCryptexArch("cryptex-system-" + m[1])
 	}
 	return "", ""
 }
@@ -105,6 +108,56 @@ func rsrInputDMG(inFolder, subdir string) (string, error) {
 	}
 
 	return matches[0], nil
+}
+
+// rsrDeltaBase returns the base image the delta cryptex member name patches,
+// and a cleanup func for any temp image it created. It reuses the base image
+// this invocation already wrote; otherwise it patches the base member into a
+// temp DMG, against the base's own image under inFolder when one is given. An
+// image left in the output folder by an earlier run is never reused, since it
+// may have been mounted read-write since.
+func rsrDeltaBase(
+	o *otapkg.AA, name, inFolder string, patched map[string]string, patchVerbose uint32,
+) (string, func(), error) {
+	baseName, _ := otapkg.CryptexDeltaBase(filepath.Base(name))
+	if out, ok := patched[baseName]; ok {
+		return out, func() {}, nil
+	}
+	basePath := path.Join(path.Dir(name), baseName)
+	for _, f := range o.Files() {
+		if f.IsDir() || f.Name() != basePath {
+			continue
+		}
+		var baseInput string
+		if len(inFolder) > 0 {
+			var err error
+			baseDir := filepath.Join("SystemOS", otapkg.SystemCryptexArch(baseName))
+			baseInput, err = rsrInputDMG(inFolder, baseDir)
+			if err != nil {
+				return "", nil, fmt.Errorf("failed to find input for base %s of %s: %w",
+					baseName, filepath.Base(name), err)
+			}
+		}
+		tmp, err := os.MkdirTemp("", "rsr-delta-base")
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to create temp dir for %s: %w", baseName, err)
+		}
+		cleanup := func() {
+			if err := os.RemoveAll(tmp); err != nil {
+				log.Warnf("failed to remove temp dir %s: %v", tmp, err)
+			}
+		}
+		out := filepath.Join(tmp, baseName+".dmg")
+		log.Infof("Patching %s as the base of %s", baseName, filepath.Base(name))
+		if err := patchRSRCryptex(o, f.Name(), out, baseInput, patchVerbose); err != nil {
+			cleanup()
+			return "", nil, fmt.Errorf("failed to patch base %s of %s: %w",
+				baseName, filepath.Base(name), err)
+		}
+		return out, cleanup, nil
+	}
+	return "", nil, fmt.Errorf("%s is a delta on %s, which the OTA does not contain",
+		filepath.Base(name), baseName)
 }
 
 func patchRSRCryptex(o *otapkg.AA, name, out, inDMG string, patchVerbose uint32) error {
@@ -250,6 +303,9 @@ var otaPatchRsrCmd = &cobra.Command{
 		}
 
 		systemCryptexRE := rsrSystemCryptexRE(dyldArches)
+		// patched maps each system cryptex member basename to the image this
+		// invocation wrote for it, so delta cryptexes can reuse their base.
+		patched := make(map[string]string)
 
 		for _, file := range o.Files() {
 			if file.IsDir() {
@@ -293,7 +349,17 @@ var otaPatchRsrCmd = &cobra.Command{
 				out := filepath.Join(outFolder, subdir, systemDMG)
 
 				var inDMG string
-				if len(inFolder) > 0 {
+				if _, ok := otapkg.CryptexDeltaBase(file.Base()); ok {
+					// A delta always applies to its freshly patched base, never
+					// to an --input image of its own.
+					base, cleanup, err := rsrDeltaBase(o, file.Name(), inFolder, patched,
+						patchVerbose)
+					if err != nil {
+						return err
+					}
+					defer cleanup()
+					inDMG = base
+				} else if len(inFolder) > 0 {
 					inDMG, err = rsrInputDMG(inFolder, subdir)
 					if err != nil {
 						return err
@@ -304,6 +370,7 @@ var otaPatchRsrCmd = &cobra.Command{
 				if err := patchRSRCryptex(o, file.Name(), out, inDMG, patchVerbose); err != nil {
 					return err
 				}
+				patched[file.Base()] = out
 			}
 		}
 

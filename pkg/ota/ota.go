@@ -2,6 +2,7 @@ package ota
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/bom"
+	"github.com/blacktop/ipsw/pkg/ota/lzraven"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
@@ -129,6 +131,11 @@ func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop f
 			}).Debug, 2)("Processing OTA payload")
 			goteet, path, err := Parse(f, destPath, extractPattern)
 			if err != nil {
+				// Every payload shares one codec, so an unsupported host fails
+				// them all; report that instead of a generic "not found".
+				if errors.Is(err, lzraven.ErrUnsupported) {
+					return outfiles, err
+				}
 				log.Error(err.Error())
 			}
 			if goteet {
@@ -164,9 +171,19 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 		}
 		defer rc.Close()
 
+		br := bufio.NewReader(rc)
+		header, err := br.Peek(len(lzraven.Magic))
+		if err != nil && !errors.Is(err, io.EOF) {
+			return false, "", fmt.Errorf("failed to read %s header: %v", payload.Name, err)
+		}
+		if err := lzraven.CheckStream(header); err != nil {
+			return false, "", fmt.Errorf("failed to extract from %s: %w", payload.Name, err)
+		}
+
 		var errb bytes.Buffer
 		cmd := execabs.Command(aaPath, "extract", "-d", dir, "-include-regex", extractPattern)
-		cmd.Stdin = rc
+		cmd.Stdin = br
+		cmd.Stderr = &errb
 		err = cmd.Run()
 		if err != nil && errb.Len() != 0 {
 			err = errors.New(strings.TrimRight(errb.String(), "\r\n"))

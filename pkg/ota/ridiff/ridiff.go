@@ -66,10 +66,17 @@ import (
 	"errors"
 	"fmt"
 	"unsafe"
+
+	"github.com/blacktop/ipsw/pkg/ota/lzraven"
 )
 
 // RawImagePatch takes a Raw Image Diff and converts it to an APFS volume.
 func RawImagePatch(input, patch, output string, verbose uint32) error {
+	// Hosts without LZRaven were reported to segfault inside
+	// libParallelCompression on such a patch, so refuse it before calling in.
+	if err := lzraven.CheckRIDIFF(patch); err != nil {
+		return err
+	}
 
 	i := C.CString(input)
 	defer C.free(unsafe.Pointer(i))

@@ -26,6 +26,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota/lzraven"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
@@ -45,13 +46,14 @@ var (
 	reOTARestorePlist   = regexp.MustCompile(`Restore\.plist$`)
 	reOTABuildManifest  = regexp.MustCompile(`BuildManifest\.plist$`)
 	reOTASystemVersion  = regexp.MustCompile(`SystemVersion\.plist$`)
-	// Numbered arm64e variants share the cryptex naming scheme.
-	reOTADscCryptex = regexp.MustCompile(`^cryptex-system-(arm64(_32|e(_x[0-9]+)?)?|x86_64h?|rosetta)$`)
+	// Numbered arm64e variants ship as delta cryptexes named after their base,
+	// e.g. cryptex-system-arm64e.x1 (see CryptexDeltaBase).
+	reOTADscCryptex = regexp.MustCompile(`^cryptex-system-(arm64(_32|e(\.x[0-9]+)?)?|x86_64h?|rosetta)$`)
 	// reAnySystemCryptex selects a system cryptex when the caller named no
 	// architecture. arm64_32 must be present: `arm64e?` cannot match it, so a
 	// watchOS OTA carrying only cryptex-system-arm64_32 would otherwise report
 	// "cryptex not found" unless the arch was passed explicitly.
-	reAnySystemCryptex = regexp.MustCompile(`cryptex-system-(arm64(_32|e(_x[0-9]+)?)?|x86_64h?)$`)
+	reAnySystemCryptex = regexp.MustCompile(`cryptex-system-(arm64(_32|e(\.x[0-9]+)?)?|x86_64h?)$`)
 )
 
 type File struct {
@@ -494,15 +496,39 @@ func (r *Reader) GetPayloadFilesWithCallback(pattern, payloadRange, output strin
 		}
 	}
 	var errs []error
+	checked := false
 	for _, file := range r.Files() {
 		if file.isDir || !pre.MatchString(file.Base()) {
 			continue
+		}
+		if !checked {
+			checked = true
+			if err := r.checkPayloadCodec(file); err != nil {
+				return wrapPhase(PhasePayloadExtract, file.Base(), err)
+			}
 		}
 		if err := r.getPayloadFile(file, pattern, output, onFile); err != nil {
 			errs = append(errs, wrapPhase(PhasePayloadExtract, file.Base(), err))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// checkPayloadCodec fails fast when payloadv2 members need LZRaven support the
+// host lacks. Every member of an OTA shares one codec, so callers check the
+// first instead of letting aa fail once per member.
+func (r *Reader) checkPayloadCodec(file *File) error {
+	f, err := r.Open(file.Name(), false)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	header := make([]byte, len(lzraven.Magic))
+	n, err := io.ReadFull(f, header)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return fmt.Errorf("failed to read %s header: %w", file.Base(), err)
+	}
+	return lzraven.CheckStream(header[:n])
 }
 
 func (r *Reader) getPayloadFile(file *File, pattern, output string, onFile func(dst string)) (err error) {
@@ -576,11 +602,18 @@ func movePayloadFile(tmpdir, output, path string) (string, error) {
 func (r *Reader) PayloadFiles(pattern string, json bool) error {
 	r.initFileList()
 	pre := regexp.MustCompile(`^payload.\d+$`)
+	checked := false
 	for _, file := range r.Files() {
 		if file.isDir {
 			continue
 		}
 		if pre.MatchString(file.Base()) {
+			if !checked {
+				checked = true
+				if err := r.checkPayloadCodec(file); err != nil {
+					return err
+				}
+			}
 			f, err := r.Open(file.Name(), false)
 			if err != nil {
 				return err
@@ -675,33 +708,14 @@ func (r *Reader) ExtractCryptex(cryptex, output string) (dmg string, err error) 
 	defer func() { err = joinRemoveTempDir(err, "", tmpdir) }()
 
 	for _, file := range r.Files() {
-		if re.MatchString(file.Base()) {
-			cryptexFile, err := r.Open(file.Name(), false)
-			if err != nil {
-				return "", fmt.Errorf("failed to open cryptex file: %v", err)
-			}
-			defer cryptexFile.Close()
-			// create a temp file to hold the OTA cryptex
-			cf, err := os.Create(filepath.Join(tmpdir, file.Base()))
-			if err != nil {
-				return "", fmt.Errorf("failed to create file: %v", err)
-			}
-			// create a temp file to hold the PATCHED OTA cryptex DMG
-			dcf, err := os.Create(filepath.Join(output, file.Base()+".dmg"))
-			if err != nil {
-				return "", fmt.Errorf("failed to create file: %v", err)
-			}
-			dcf.Close()
-			if _, err := io.Copy(cf, cryptexFile); err != nil {
-				return "", fmt.Errorf("failed to write file: %v", err)
-			}
-			cf.Close()
-			// patch the cryptex
-			if err := ridiff.RawImagePatch("", cf.Name(), dcf.Name(), 0); err != nil {
-				return "", fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Name()), err)
-			}
-			return dcf.Name(), nil
+		if file.isDir || !re.MatchString(file.Base()) {
+			continue
 		}
+		dmg := filepath.Join(output, file.Base()+".dmg")
+		if err := r.patchCryptex(file, tmpdir, dmg); err != nil {
+			return "", err
+		}
+		return dmg, nil
 	}
 
 	return "", fmt.Errorf("%w: '%s'", ErrCryptexNotFound, cryptex)
@@ -850,7 +864,7 @@ func CryptexBasenameSuggestsArches(source string, arches []string) bool {
 	if len(arches) == 0 {
 		return true
 	}
-	sourceArch := strings.TrimPrefix(source, "cryptex-system-")
+	sourceArch := SystemCryptexArch(source)
 	for _, arch := range arches {
 		if sourceArch == arch {
 			return true
@@ -867,6 +881,31 @@ func CryptexBasenameSuggestsArches(source string, arches []string) bool {
 		}
 	}
 	return false
+}
+
+// SystemCryptexArch returns the cache family a system cryptex member basename
+// names: "cryptex-system-arm64e.x1" names "arm64e_x1", matching the
+// dyld_shared_cache_arm64e_x1 caches inside it.
+func SystemCryptexArch(base string) string {
+	return strings.ReplaceAll(strings.TrimPrefix(base, "cryptex-system-"), ".", "_")
+}
+
+// SystemCryptexBasename is the inverse of [SystemCryptexArch]: it returns the
+// basename of the system cryptex member named after arch.
+func SystemCryptexBasename(arch string) string {
+	if variant, ok := strings.CutPrefix(arch, "arm64e_x"); ok {
+		return "cryptex-system-arm64e.x" + variant
+	}
+	return "cryptex-system-" + arch
+}
+
+// CryptexDeltaBase reports whether the cryptex member basename names a delta
+// cryptex and, if so, the basename of the member it patches. A delta such as
+// cryptex-system-arm64e.x1 is a RIDIFF against the patched
+// cryptex-system-arm64e image rather than a standalone image.
+func CryptexDeltaBase(base string) (string, bool) {
+	parent, _, ok := strings.Cut(base, ".")
+	return parent, ok
 }
 
 // DSCFileArch classifies a shared-cache file by its basename, which identifies
@@ -957,39 +996,106 @@ func copyMatchesFromMount(file *File, match *regexp.Regexp, mountPoint, output s
 	return out, errors.Join(walkErrs...)
 }
 
-// stageCryptexDMG copies the OTA cryptex member into tmpdir and RIDIFF-patches
-// it into a mountable DMG, returning the patched DMG path.
+// stageCryptexDMG RIDIFF-patches the OTA cryptex member into a mountable DMG
+// in tmpdir and returns its path.
 func (r *Reader) stageCryptexDMG(file *File, tmpdir string) (string, error) {
-	cryptexFile, err := r.Open(file.Name(), false)
+	dmg := filepath.Join(tmpdir, file.Base()+".dmg")
+	if err := r.patchCryptex(file, tmpdir, dmg); err != nil {
+		return "", err
+	}
+	return dmg, nil
+}
+
+// patchCryptex RIDIFF-patches the OTA cryptex member into the DMG at dst. A
+// delta member is applied on top of a freshly patched copy of its base, which
+// is removed afterwards. dst is removed on failure so a partial image is never
+// left behind.
+func (r *Reader) patchCryptex(file *File, tmpdir, dst string) (err error) {
+	base, err := r.stageCryptexBase(file, tmpdir)
+	if err != nil {
+		return err
+	}
+	if base != "" {
+		defer func() {
+			if rerr := os.Remove(base); rerr != nil {
+				err = errors.Join(err, wrapPhase(PhaseCleanup, file.Base(),
+					fmt.Errorf("failed to remove base image %s: %w", base, rerr)))
+			}
+		}()
+	}
+	patch, err := r.copyMemberToDir(file, tmpdir)
+	if err != nil {
+		return err
+	}
+	dcf, err := os.Create(dst)
+	if err != nil {
+		return wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to create file: %v", err))
+	}
+	if err := dcf.Close(); err != nil {
+		return wrapPhase(PhaseCopy, file.Base(),
+			fmt.Errorf("failed to close patched cryptex file: %v", err))
+	}
+	if err := ridiff.RawImagePatch(base, patch, dst, 0); err != nil {
+		perr := fmt.Errorf("failed to patch %s: %w", file.Base(), err)
+		if rerr := os.Remove(dst); rerr != nil {
+			perr = errors.Join(perr, fmt.Errorf("failed to remove partial image %s: %w", dst, rerr))
+		}
+		return wrapPhase(PhaseCryptexPatch, file.Base(), perr)
+	}
+	return nil
+}
+
+// stageCryptexBase patches the base image a delta cryptex member applies to
+// and returns its path, or "" when the member is a standalone image. The base
+// is always patched afresh rather than reusing a staged DMG: MountDMG attaches
+// images read-write, and a mounted base no longer matches what the delta
+// expects.
+func (r *Reader) stageCryptexBase(file *File, tmpdir string) (string, error) {
+	baseName, ok := CryptexDeltaBase(file.Base())
+	if !ok {
+		return "", nil
+	}
+	basePath := path.Join(path.Dir(file.Name()), baseName)
+	for _, f := range r.Files() {
+		if f.isDir || f.Name() != basePath {
+			continue
+		}
+		dmg := filepath.Join(tmpdir, file.Base()+".base.dmg")
+		if err := r.patchCryptex(f, tmpdir, dmg); err != nil {
+			// Attribute the failure to the delta being staged, not to the
+			// base member, which reports its own failures when extracted.
+			if pe, ok := err.(*PhaseError); ok {
+				err = pe.Err
+			}
+			return "", &PhaseError{Phase: PhaseCryptexPatch, Source: file.Base(),
+				Err: fmt.Errorf("base %s: %w", baseName, err)}
+		}
+		return dmg, nil
+	}
+	return "", wrapPhase(PhaseCryptexPatch, file.Base(),
+		fmt.Errorf("%s is a delta on %s, which the OTA does not contain", file.Base(), baseName))
+}
+
+// copyMemberToDir copies the OTA member into dir and returns the copy's path.
+func (r *Reader) copyMemberToDir(file *File, dir string) (string, error) {
+	src, err := r.Open(file.Name(), false)
 	if err != nil {
 		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to open cryptex file: %v", err))
 	}
-	defer cryptexFile.Close()
+	defer src.Close()
 
-	cf, err := os.Create(filepath.Join(tmpdir, file.Base()))
+	dst, err := os.Create(filepath.Join(dir, file.Base()))
 	if err != nil {
 		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to create file: %v", err))
 	}
-	if _, err := io.Copy(cf, cryptexFile); err != nil {
-		_ = cf.Close()
+	if _, err := io.Copy(dst, src); err != nil {
+		_ = dst.Close()
 		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to write file: %v", err))
 	}
-	if err := cf.Close(); err != nil {
+	if err := dst.Close(); err != nil {
 		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to close cryptex file: %v", err))
 	}
-
-	dcf, err := os.Create(filepath.Join(tmpdir, file.Base()+".dmg"))
-	if err != nil {
-		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to create file: %v", err))
-	}
-	if err := dcf.Close(); err != nil {
-		return "", wrapPhase(PhaseCopy, file.Base(), fmt.Errorf("failed to close patched cryptex file: %v", err))
-	}
-	if err := ridiff.RawImagePatch("", cf.Name(), dcf.Name(), 0); err != nil {
-		return "", wrapPhase(PhaseCryptexPatch, file.Base(),
-			fmt.Errorf("failed to patch %s: %v", filepath.Base(file.Name()), err))
-	}
-	return dcf.Name(), nil
+	return dst.Name(), nil
 }
 
 // Open opens the named file in the ZIP archive,

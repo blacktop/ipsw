@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blacktop/ipsw/pkg/ota/lzraven"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 )
 
@@ -104,11 +105,13 @@ func TestOTAPayloadPBZMConversion(t *testing.T) {
 	t.Setenv("PATH", bin)
 	input := append([]byte("pbzm"), payloadFixture()...)
 	_, err := parseOTAPayload(context.Background(), bytes.NewReader(input), "payload.000")
-	if err == nil || !strings.Contains(err.Error(), "requires an Apple aa tool with PBZM support") {
+	if !errors.Is(err, lzraven.ErrUnsupported) {
 		t.Fatalf("missing converter error = %v", err)
 	}
 	tool := filepath.Join(bin, "aa")
-	script := "#!/bin/sh\n[ \"$*\" = 'convert -a raw' ] || exit 42\n/bin/dd bs=1 skip=4 2>/dev/null\n"
+	// `aa list` is the LZRaven capability probe; `aa convert` decodes.
+	script := "#!/bin/sh\n[ \"$1\" = list ] && { /bin/cat >/dev/null; exit 0; }\n" +
+		"[ \"$*\" = 'convert -a raw' ] || exit 42\n/bin/dd bs=1 skip=4 2>/dev/null\n"
 	if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}

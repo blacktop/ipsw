@@ -453,25 +453,17 @@ func mountOTACryptexes(ctx *Context) error {
 }
 
 // extractOTASystemCryptex extracts the system cryptex DMG. On macOS it
-// prefers arm64e, then available numbered variants in file-list order, before
-// falling back to other architectures.
+// prefers arm64e before falling back to other architectures. Numbered arm64e
+// variants (cryptex-system-arm64e.xN) are deltas on arm64e, so they can never
+// stand in for a missing arm64e cryptex.
 func extractOTASystemCryptex(ctx *Context, tmpDir string) (string, error) {
 	if ctx.IsMacOS {
-		arches := []string{"arm64e"}
-		for _, file := range ctx.otaFile.Files() {
-			base := file.Base()
-			if !file.IsDir() && strings.HasPrefix(base, "cryptex-system-arm64e_x") && otapkg.IsDscCryptexBasename(base) {
-				arches = append(arches, strings.TrimPrefix(base, "cryptex-system-"))
-			}
+		dmg, err := ctx.otaFile.ExtractCryptex("system-arm64e", tmpDir)
+		if err == nil {
+			return dmg, nil
 		}
-		for _, arch := range arches {
-			dmg, err := ctx.otaFile.ExtractCryptex("system-"+arch, tmpDir)
-			if err == nil {
-				return dmg, nil
-			}
-			if !errors.Is(err, otapkg.ErrCryptexNotFound) {
-				return "", fmt.Errorf("failed to extract %s system cryptex: %w", arch, err)
-			}
+		if !errors.Is(err, otapkg.ErrCryptexNotFound) {
+			return "", fmt.Errorf("failed to extract arm64e system cryptex: %w", err)
 		}
 	}
 	dmg, err := ctx.otaFile.ExtractCryptex("system", tmpDir)

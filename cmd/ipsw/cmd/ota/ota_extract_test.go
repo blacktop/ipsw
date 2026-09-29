@@ -713,13 +713,17 @@ func TestCopyOTAFileToPathMetadataContract(t *testing.T) {
 }
 
 type fakePatternPayloadSource struct {
-	post  []fs.FileInfo
-	calls int
+	post      []fs.FileInfo
+	extracted []string
+	calls     int
 }
 
 func (s *fakePatternPayloadSource) PostFiles() []fs.FileInfo { return s.post }
-func (s *fakePatternPayloadSource) GetPayloadFiles(string, string, string) error {
+func (s *fakePatternPayloadSource) GetPayloadFilesWithCallback(_, _, _ string, onFile func(string)) error {
 	s.calls++
+	for _, dst := range s.extracted {
+		onFile(dst)
+	}
 	return nil
 }
 
@@ -740,8 +744,8 @@ func TestExtractPatternPayloadsNoninteractiveConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, confirm := range []bool{false, true} {
-		src := &fakePatternPayloadSource{post: []fs.FileInfo{info}}
-		err := extractPatternPayloads(src, otaExtractFlags{pattern: "synthetic", confirm: confirm}, regexp.MustCompile("synthetic"), t.TempDir())
+		src := &fakePatternPayloadSource{post: []fs.FileInfo{info}, extracted: []string{"out/synthetic.bin"}}
+		_, err := extractPatternPayloads(src, otaExtractFlags{pattern: "synthetic", confirm: confirm}, regexp.MustCompile("synthetic"), t.TempDir())
 		if confirm {
 			if err != nil || src.calls != 1 {
 				t.Fatalf("confirmed extraction calls = %d, error = %v", src.calls, err)
@@ -749,5 +753,29 @@ func TestExtractPatternPayloadsNoninteractiveConsent(t *testing.T) {
 		} else if err == nil || !strings.Contains(err.Error(), "--confirm") || strings.Contains(err.Error(), "--json") || src.calls != 0 {
 			t.Fatalf("unconfirmed extraction calls = %d, error = %v", src.calls, err)
 		}
+	}
+}
+
+func TestExtractPatternPayloadsReportsMisses(t *testing.T) {
+	name := filepath.Join(t.TempDir(), "launchd")
+	if err := os.WriteFile(name, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flags := otaExtractFlags{pattern: "launchd$", confirm: true}
+
+	src := &fakePatternPayloadSource{}
+	matched, err := extractPatternPayloads(src, flags, regexp.MustCompile("launchd$"), t.TempDir())
+	if matched || err != nil || src.calls != 0 {
+		t.Fatalf("no post.bom match: matched = %v, calls = %d, err = %v", matched, src.calls, err)
+	}
+
+	src = &fakePatternPayloadSource{post: []fs.FileInfo{info}}
+	matched, err = extractPatternPayloads(src, flags, regexp.MustCompile("launchd$"), t.TempDir())
+	if !matched || err == nil || !strings.Contains(err.Error(), "no payloadv2 member contained them") {
+		t.Fatalf("empty payload search: matched = %v, err = %v", matched, err)
 	}
 }

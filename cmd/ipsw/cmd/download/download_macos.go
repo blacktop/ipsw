@@ -113,7 +113,7 @@ var downloadMacosCmd = &cobra.Command{
 			return fmt.Errorf("you cannot supply a --latest AND (--version OR --build) (they are mutually exclusive)")
 		}
 
-		prods, err := download.GetProductInfo(latest)
+		prods, err := download.GetProductInfo()
 		if err != nil {
 			return err
 		}

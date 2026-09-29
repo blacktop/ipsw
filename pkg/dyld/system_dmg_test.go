@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
 
@@ -43,7 +44,7 @@ func TestNumberedArm64eCacheSelection(t *testing.T) {
 			t.Fatal("numbered selector matched generic cache")
 		}
 		for _, arches := range [][]string{nil, {variant}} {
-			if !RemoteCryptexPattern(arches).MatchString("cryptex-system-" + variant) {
+			if !RemoteCryptexPattern(arches).MatchString(ota.SystemCryptexBasename(variant)) {
 				t.Fatalf("OTA discovery missed numbered variant for %v", arches)
 			}
 		}

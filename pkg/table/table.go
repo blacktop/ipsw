@@ -468,9 +468,16 @@ func (bt *BubbleTable) GetModel() table.Model {
 	return bt.table
 }
 
-// RenderStatic renders the table as a static string (non-interactive)
+// RenderStatic renders every row as a static string (non-interactive). The
+// interactive viewport is sized to the terminal, so it is grown to fit all rows
+// first; otherwise piped output would silently drop the rows below it.
 func (bt *BubbleTable) RenderStatic() string {
-	return ansi.Strip(bt.table.View())
+	t := bt.table
+	// SetHeight counts the header lines too, so measure them before sizing.
+	probe := len(bt.data) + 100
+	t.SetHeight(probe)
+	t.SetHeight(len(bt.data) + probe - t.Height())
+	return ansi.Strip(t.View())
 }
 
 // InteractiveTableModel implements tea.Model for interactive table display

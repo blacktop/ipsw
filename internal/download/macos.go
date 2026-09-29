@@ -12,7 +12,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -29,8 +28,9 @@ import (
 
 // CREDIT: https://github.com/munki/macadmin-scripts
 
+// Older catalogs can still list installers Apple pruned from newer ones, so
+// they are kept alongside the one in use.
 const (
-	seedCatalogsPlist  = "/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/Resources/SeedCatalogs.plist"
 	sucatalogs17       = "https://swscan.apple.com/content/catalogs/others/index-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs18       = "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs19       = "https://swscan.apple.com/content/catalogs/others/index-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
@@ -45,30 +45,24 @@ const (
 	sucatalogs24Cust   = "https://swscan.apple.com/content/catalogs/others/index-15customerseed-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
 	sucatalogs24Dev    = "https://swscan.apple.com/content/catalogs/others/index-15seed-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
 	sucatalogs24Public = "https://swscan.apple.com/content/catalogs/others/index-15beta-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-
-	sucatalogs16Cust = "https://swscan.apple.com/content/catalogs/others/index-16customerseed-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs16Seed = "https://swscan.apple.com/content/catalogs/others/index-16seed-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs16Beta = "https://swscan.apple.com/content/catalogs/others/index-16beta-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs16     = "https://swscan.apple.com/content/catalogs/others/index-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-
-	sucatalogs26Cust = "https://swscan.apple.com/content/catalogs/others/index-26customerseed-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs26Seed = "https://swscan.apple.com/content/catalogs/others/index-26seed-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs26Beta = "https://swscan.apple.com/content/catalogs/others/index-26beta-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs26     = "https://swscan.apple.com/content/catalogs/others/index-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-
-	sucatalogs27Cust = "https://swscan.apple.com/content/catalogs/others/index-27customerseed-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs27Seed = "https://swscan.apple.com/content/catalogs/others/index-27seed-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs27Beta = "https://swscan.apple.com/content/catalogs/others/index-27beta-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-	sucatalogs27     = "https://swscan.apple.com/content/catalogs/others/index-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-
+	sucatalogs16Cust   = "https://swscan.apple.com/content/catalogs/others/index-16customerseed-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs16Seed   = "https://swscan.apple.com/content/catalogs/others/index-16seed-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs16Beta   = "https://swscan.apple.com/content/catalogs/others/index-16beta-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs16       = "https://swscan.apple.com/content/catalogs/others/index-16-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs26Cust   = "https://swscan.apple.com/content/catalogs/others/index-26customerseed-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs26Seed   = "https://swscan.apple.com/content/catalogs/others/index-26seed-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs26Beta   = "https://swscan.apple.com/content/catalogs/others/index-26beta-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs26       = "https://swscan.apple.com/content/catalogs/others/index-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs27Cust   = "https://swscan.apple.com/content/catalogs/others/index-27customerseed-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs27Seed   = "https://swscan.apple.com/content/catalogs/others/index-27seed-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs27Beta   = "https://swscan.apple.com/content/catalogs/others/index-27beta-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	sucatalogs27       = "https://swscan.apple.com/content/catalogs/others/index-27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+	// sucatalogsLatest is the catalog used to list installers. Seed catalogs
+	// list every production installer too, so it covers releases and betas
+	// alike. The host's SeedCatalogs.plist is not used: macOS 27 still ships one
+	// pointing at the macOS 15 catalogs, which hides every newer installer.
 	sucatalogsLatest = sucatalogs27Seed
 )
-
-type seedCatalog struct {
-	CustomerSeed  string
-	DeveloperSeed string
-	PublicSeed    string
-}
 
 type Package struct {
 	URL               string `plist:"URL,omitempty"`
@@ -266,80 +260,31 @@ func getDestName(url string, removeCommas bool) string {
 }
 
 // GetProductInfo downloads and parses the macOS installer product infos
-func GetProductInfo(latest bool) (ProductInfos, error) {
-
-	var catData []byte
+func GetProductInfo() (ProductInfos, error) {
 	var prods ProductInfos
 
-	if runtime.GOOS == "darwin" && !latest {
-		data, err := os.ReadFile(seedCatalogsPlist)
-		if err != nil {
-			return nil, err
-		}
+	resp, err := http.Get(sucatalogsLatest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download the sucatalogs: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to download the sucatalogs %s: %s",
+			sucatalogsLatest, resp.Status)
+	}
 
-		seed := seedCatalog{}
-		if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&seed); err != nil {
-			return nil, fmt.Errorf("failed to decode sucatalogs plist: %v", err)
+	gzr, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gzip reader: %v", err)
+	}
+	defer func() {
+		if closeErr := gzr.Close(); closeErr != nil {
+			log.WithError(closeErr).Warn("failed to close gzip reader")
 		}
-
-		// resp, err := http.Get(seed.CustomerSeed)
-		resp, err := http.Get(seed.DeveloperSeed)
-		if err != nil {
-			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
-		}
-
-		document, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
-		}
-
-		gzr, err := gzip.NewReader(bytes.NewReader(document))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gzip reader: %v", err)
-		}
-		defer func() {
-			if closeErr := gzr.Close(); closeErr != nil {
-				log.WithError(closeErr).Warn("failed to close gzip reader")
-			}
-		}()
-
-		var buff bytes.Buffer
-		if _, err := buff.ReadFrom(gzr); err != nil {
-			return nil, fmt.Errorf("failed to read gzip data: %v", err)
-		}
-		catData = buff.Bytes()
-
-	} else {
-		resp, err := http.Get(sucatalogsLatest)
-		if err != nil {
-			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
-		}
-
-		document, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
-		}
-
-		gzr, err := gzip.NewReader(bytes.NewReader(document))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gzip reader: %v", err)
-		}
-		defer func() {
-			if closeErr := gzr.Close(); closeErr != nil {
-				log.WithError(closeErr).Warn("failed to close gzip reader")
-			}
-		}()
-
-		var buff bytes.Buffer
-		if _, err := buff.ReadFrom(gzr); err != nil {
-			return nil, fmt.Errorf("failed to read gzip data: %v", err)
-		}
-		catData = buff.Bytes()
+	}()
+	catData, err := io.ReadAll(gzr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
 	}
 
 	cat := Catalog{}

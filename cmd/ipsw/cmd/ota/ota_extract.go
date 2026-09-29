@@ -412,35 +412,50 @@ func extractByPattern(o *ota.AA, f otaExtractFlags, output string) error {
 		return fmt.Errorf("failed to compile regex pattern '%s': %v", f.pattern, err)
 	}
 	log.WithField("pattern", re.String()).Info("Extracting Files Matching Pattern")
-	if err := extractPatternAssets(o, f, re, output); err != nil {
+	assetMatched, err := extractPatternAssets(o, f, re, output)
+	if err != nil {
 		return err
 	}
-	return extractPatternPayloads(o, f, re, output)
-}
-
-func extractPatternAssets(o *ota.AA, f otaExtractFlags, re *regexp.Regexp, output string) error {
-	for _, file := range o.Files() { // search in OTA asset files
-		if file.IsDir() || !matchesPostBOMPattern(re, file.Name()) {
-			continue
-		}
-		fname, err := outputPathForExtraction(output, file.Name(), f.flat)
-		if err != nil {
-			return err
-		}
-		utils.Indent(log.Info, 2)(fname)
-		if err := copyOTAFileToPath(o, file.Name(), f.decomp, fname); err != nil {
-			return err
-		}
+	bomMatched, err := extractPatternPayloads(o, f, re, output)
+	if err != nil {
+		return err
+	}
+	if !assetMatched && !bomMatched {
+		return fmt.Errorf("no OTA asset or post.bom path matched pattern '%s' "+
+			"(OTA paths are relative, e.g. 'sbin/launchd' rather than '/sbin/launchd')", f.pattern)
 	}
 	return nil
 }
 
-type patternPayloadSource interface {
-	PostFiles() []fs.FileInfo
-	GetPayloadFiles(pattern, payloadRange, output string) error
+// extractPatternAssets copies the OTA asset files matching re and reports
+// whether any matched.
+func extractPatternAssets(o *ota.AA, f otaExtractFlags, re *regexp.Regexp, output string) (bool, error) {
+	matched := false
+	for _, file := range o.Files() { // search in OTA asset files
+		if file.IsDir() || !matchesPostBOMPattern(re, file.Name()) {
+			continue
+		}
+		matched = true
+		fname, err := outputPathForExtraction(output, file.Name(), f.flat)
+		if err != nil {
+			return matched, err
+		}
+		utils.Indent(log.Info, 2)(fname)
+		if err := copyOTAFileToPath(o, file.Name(), f.decomp, fname); err != nil {
+			return matched, err
+		}
+	}
+	return matched, nil
 }
 
-func extractPatternPayloads(o patternPayloadSource, f otaExtractFlags, re *regexp.Regexp, output string) error {
+type patternPayloadSource interface {
+	PostFiles() []fs.FileInfo
+	GetPayloadFilesWithCallback(pattern, payloadRange, output string, onFile func(dst string)) error
+}
+
+// extractPatternPayloads searches the payloadv2 members for re when post.bom
+// lists a matching path, and reports whether post.bom matched.
+func extractPatternPayloads(o patternPayloadSource, f otaExtractFlags, re *regexp.Regexp, output string) (bool, error) {
 	bomFound := false
 	for _, file := range o.PostFiles() { // search in OTA post.bom files
 		if file.IsDir() || !matchesPostBOMPattern(re, file.Name()) {
@@ -450,17 +465,26 @@ func extractPatternPayloads(o patternPayloadSource, f otaExtractFlags, re *regex
 		bomFound = true
 	}
 	if !bomFound {
-		return nil
+		return false, nil
 	}
 	consent, err := utils.Confirm(fmt.Sprintf("Search for '%s' in payloadv2 files?", re.String()), f.confirm)
 	if err != nil {
-		return fmt.Errorf("payloadv2 search was not performed: %w", err)
+		return true, fmt.Errorf("payloadv2 search was not performed: %w", err)
 	}
 	if !consent {
-		return nil
+		return true, nil
 	}
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
-	return o.GetPayloadFiles(f.pattern, f.payloadRange, output)
+	extracted := 0
+	if err := o.GetPayloadFilesWithCallback(f.pattern, f.payloadRange, output, func(string) { extracted++ }); err != nil {
+		return true, err
+	}
+	if extracted == 0 {
+		return true, fmt.Errorf("post.bom lists paths matching '%s' but no payloadv2 member contained them "+
+			"(payloadv2 search matches full relative paths such as 'sbin/launchd', not basenames; "+
+			"--range limits which members are searched)", f.pattern)
+	}
+	return true, nil
 }
 
 func extractAllFiles(o *ota.AA, f otaExtractFlags, output string) error {
