@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -114,24 +115,13 @@ func DmgInIPSW(path, typ string, cfg *Config) (*Context, error) {
 	return dmgInIPSW(path, typ, cfg, utils.MountDMG, aea.Decrypt)
 }
 
-func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (utils.DMGMount, error), decrypt func(*aea.DecryptConfig) (string, error)) (ctx *Context, err error) {
-	// A session can own cleanup only after acquisition succeeds. Until then,
-	// remove files created by this attempt without deleting pre-existing files.
-	var created []string
-	defer func() {
-		if ctx != nil {
-			return
-		}
-		for _, path := range created {
-			if removeErr := os.Remove(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-				err = errors.Join(err, fmt.Errorf("failed to remove extracted image %s: %w", path, removeErr))
-			}
-		}
-	}()
-
+func dmgInIPSW(
+	path, typ string, cfg *Config, attach attachFunc, decrypt decryptFunc,
+) (*Context, error) {
 	ipswPath := filepath.Clean(path)
 
 	var i *info.Info
+	var err error
 	if cfg.Info != nil {
 		i = cfg.Info
 	} else if wkeys, ok := cfg.Keys.(download.WikiFWKeys); ok {
@@ -200,99 +190,242 @@ func dmgInIPSW(path, typ string, cfg *Config, attach func(string, string) (utils
 		return nil, fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", typ, strings.Join(DmgTypes, "', '"))
 	}
 
-	extractDir := cfg.ExtractDir
+	a := &imageAttempt{cfg: cfg, attach: attach, decrypt: decrypt}
+	return a.acquire(typ, func() (string, error) { return a.extractByName(ipswPath, dmgPath) })
+}
+
+// DmgComponentInIPSW mounts one exact BuildManifest archive path. Callers must
+// provide a private extraction directory and release the context before removing it.
+func DmgComponentInIPSW(ipswPath, component string, cfg *Config) (*Context, error) {
+	a := &imageAttempt{cfg: cfg, attach: utils.MountDMG, decrypt: aea.Decrypt}
+	return a.mountComponent(ipswPath, component)
+}
+
+// ExactArchiveMember returns the single regular archive member named name.
+func ExactArchiveMember(zr *zip.Reader, name string) (*zip.File, error) {
+	var member *zip.File
+	matches := 0
+	for _, file := range zr.File {
+		if file.Name == name && !file.FileInfo().IsDir() {
+			member = file
+			matches++
+		}
+	}
+	if matches != 1 {
+		return nil, fmt.Errorf("component %q requires one exact archive member, found %d", name, matches)
+	}
+	return member, nil
+}
+
+type attachFunc func(string, string) (utils.DMGMount, error)
+type decryptFunc func(*aea.DecryptConfig) (string, error)
+
+// imageAttempt is one acquisition of a backing image. It records every file it
+// creates so a failed attempt removes those and never a pre-existing file.
+type imageAttempt struct {
+	cfg     *Config
+	attach  attachFunc
+	decrypt decryptFunc
+	created []string
+}
+
+// acquire extracts, prepares, and attaches an image. A session can own cleanup
+// only after acquisition succeeds; until then this attempt removes its files.
+func (a *imageAttempt) acquire(
+	typ string, extract func() (string, error),
+) (ctx *Context, err error) {
+	defer func() {
+		if ctx != nil {
+			return
+		}
+		for _, path := range a.created {
+			if removeErr := os.Remove(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				err = errors.Join(err, fmt.Errorf("failed to remove extracted image %s: %w", path, removeErr))
+			}
+		}
+	}()
+	extractedDMG, err := extract()
+	if err != nil {
+		return nil, err
+	}
+	return a.mount(extractedDMG, typ)
+}
+
+func (a *imageAttempt) mountComponent(ipswPath, component string) (*Context, error) {
+	return a.acquire("", func() (string, error) { return a.extractExactMember(ipswPath, component) })
+}
+
+// extractByName reuses an image already extracted under dmgPath, otherwise it
+// extracts the archive member whose base name matches dmgPath.
+func (a *imageAttempt) extractByName(ipswPath, dmgPath string) (string, error) {
+	extractDir := a.cfg.ExtractDir
 	if extractDir == "" {
 		extractDir = os.TempDir()
 	}
 	extractedDMG := filepath.Join(extractDir, dmgPath)
-
-	if _, err := os.Stat(extractedDMG); os.IsNotExist(err) {
-		created = append(created, extractedDMG)
-		dmgs, err := utils.Unzip(ipswPath, extractDir, func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
+	if _, err := os.Stat(extractedDMG); !os.IsNotExist(err) {
+		return extractedDMG, nil
 	}
+	a.created = append(a.created, extractedDMG)
+	dmgs, err := utils.Unzip(ipswPath, extractDir, func(f *zip.File) bool {
+		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	}
+	if len(dmgs) == 0 {
+		return "", fmt.Errorf("failed to find %s in IPSW", dmgPath)
+	}
+	return extractedDMG, nil
+}
 
+// extractExactMember writes the single archive member named component into
+// the private extraction directory. It never reuses or replaces a file there.
+func (a *imageAttempt) extractExactMember(ipswPath, component string) (string, error) {
+	if a.cfg.ExtractDir == "" || !filepath.IsLocal(component) {
+		return "", errors.New("exact component mount requires a private extraction directory " +
+			"and relative component path")
+	}
+	zr, err := zip.OpenReader(ipswPath)
+	if err != nil {
+		return "", err
+	}
+	defer zr.Close()
+	member, err := ExactArchiveMember(&zr.Reader, component)
+	if err != nil {
+		return "", err
+	}
+	extractedDMG := filepath.Join(a.cfg.ExtractDir, filepath.Base(component))
 	if filepath.Ext(extractedDMG) == ".aea" {
-		encryptedDMG := extractedDMG
-		decryptedDMG := strings.TrimSuffix(encryptedDMG, filepath.Ext(encryptedDMG))
-		if _, statErr := os.Stat(decryptedDMG); os.IsNotExist(statErr) {
-			created = append(created, decryptedDMG)
-		}
-		extractedDMG, err = decrypt(&aea.DecryptConfig{
-			Input:    encryptedDMG,
-			Output:   filepath.Dir(encryptedDMG),
-			PemDB:    cfg.PemDB,
-			Proxy:    "",    // TODO: make proxy configurable
-			Insecure: false, // TODO: make insecure configurable
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
-		}
-		if slices.Contains(created, encryptedDMG) {
-			_ = os.Remove(encryptedDMG)
+		// AEA decryption writes beside the member and would replace this file.
+		decryptedDMG := strings.TrimSuffix(extractedDMG, filepath.Ext(extractedDMG))
+		if _, err := os.Lstat(decryptedDMG); !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("component decryption output %s already exists", decryptedDMG)
 		}
 	}
-	if isEncrypted, err := magic.IsEncryptedDMG(extractedDMG); err != nil {
-		return nil, fmt.Errorf("failed to check if DMG is encrypted: %v", err)
-	} else if isEncrypted {
-		var key string
-		switch v := cfg.Keys.(type) {
-		case string:
-			key = v
-		case download.WikiFWKeys:
-			key, err = v.GetKeyByFilename(extractedDMG)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get key for DMG '%s': %v", extractedDMG, err)
-			}
-		}
-		log.Info("Decrypting DMG...")
-		if dmg, err := dmg.Open(extractedDMG, &dmg.Config{
-			Key: key,
-		}); err != nil {
-			return nil, fmt.Errorf("failed to open DMG '%s': %v", extractedDMG, err)
-		} else {
-			defer func() { _ = dmg.Close() }()
-			if err := os.Rename(dmg.DecryptedTemp(), extractedDMG); err != nil {
-				return nil, fmt.Errorf("failed to overwrite encrypted DMG with the decrypted one: %v", err)
-			}
-		}
+	if err := writeArchiveMember(member, extractedDMG); err != nil {
+		return "", err
 	}
+	a.created = append(a.created, extractedDMG)
+	return extractedDMG, nil
+}
 
+// writeArchiveMember creates dst exclusively, so a concurrent writer of the
+// same path fails instead of truncating an image another attempt is using.
+func writeArchiveMember(member *zip.File, dst string) error {
+	src, err := member.Open()
+	if err != nil {
+		return fmt.Errorf("failed to open %s in IPSW: %w", member.Name, err)
+	}
+	defer src.Close()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("failed to create component image: %w", err)
+	}
+	_, err = io.Copy(out, src)
+	err = errors.Join(err, out.Close())
+	if err != nil {
+		err = fmt.Errorf("failed to extract %s from IPSW: %w", member.Name, err)
+		return errors.Join(err, os.Remove(dst))
+	}
+	return nil
+}
+
+// mount decrypts or unwraps an extracted image as needed and attaches it.
+func (a *imageAttempt) mount(extractedDMG, typ string) (*Context, error) {
+	extractedDMG, err := a.decryptAEA(extractedDMG)
+	if err != nil {
+		return nil, err
+	}
+	if err := decryptDMG(extractedDMG, a.cfg.Keys); err != nil {
+		return nil, err
+	}
 	if typ == "rdisk" {
-		// ramdisk DMGs are actually IM4P files
-		im4p, err := img4.OpenPayload(extractedDMG)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse ramdisk IM4P: %v", err)
-		}
-		data, err := im4p.GetData()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get ramdisk IM4P data: %v", err)
-		}
-		// overwrite extractedDMG with the raw IM4P data
-		if err := os.WriteFile(extractedDMG, data, 0644); err != nil {
-			return nil, fmt.Errorf("failed to overwrite ramdisk DMG: %v", err)
+		if err := unwrapRamdisk(extractedDMG); err != nil {
+			return nil, err
 		}
 	}
-
-	m, err := attach(extractedDMG, cfg.MountPoint)
+	m, err := a.attach(extractedDMG, a.cfg.MountPoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount %s: %v", extractedDMG, err)
 	}
-
 	return &Context{
 		DmgPath:        extractedDMG,
 		MountPoint:     m.MountPoint,
 		AlreadyMounted: m.AlreadyMounted,
 		OwnsDirectory:  m.OwnsDirectory,
-		RetainDmg:      !slices.Contains(created, extractedDMG),
+		RetainDmg:      !slices.Contains(a.created, extractedDMG),
 	}, nil
+}
+
+func (a *imageAttempt) decryptAEA(encryptedDMG string) (string, error) {
+	if filepath.Ext(encryptedDMG) != ".aea" {
+		return encryptedDMG, nil
+	}
+	decryptedDMG := strings.TrimSuffix(encryptedDMG, filepath.Ext(encryptedDMG))
+	if _, statErr := os.Stat(decryptedDMG); os.IsNotExist(statErr) {
+		a.created = append(a.created, decryptedDMG)
+	}
+	decrypted, err := a.decrypt(&aea.DecryptConfig{
+		Input:    encryptedDMG,
+		Output:   filepath.Dir(encryptedDMG),
+		PemDB:    a.cfg.PemDB,
+		Proxy:    "",    // TODO: make proxy configurable
+		Insecure: false, // TODO: make insecure configurable
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
+	}
+	if slices.Contains(a.created, encryptedDMG) {
+		_ = os.Remove(encryptedDMG)
+	}
+	return decrypted, nil
+}
+
+func decryptDMG(path string, keys any) error {
+	isEncrypted, err := magic.IsEncryptedDMG(path)
+	if err != nil {
+		return fmt.Errorf("failed to check if DMG is encrypted: %v", err)
+	}
+	if !isEncrypted {
+		return nil
+	}
+	var key string
+	switch v := keys.(type) {
+	case string:
+		key = v
+	case download.WikiFWKeys:
+		key, err = v.GetKeyByFilename(path)
+		if err != nil {
+			return fmt.Errorf("failed to get key for DMG '%s': %v", path, err)
+		}
+	}
+	log.Info("Decrypting DMG...")
+	d, err := dmg.Open(path, &dmg.Config{Key: key})
+	if err != nil {
+		return fmt.Errorf("failed to open DMG '%s': %v", path, err)
+	}
+	defer func() { _ = d.Close() }()
+	if err := os.Rename(d.DecryptedTemp(), path); err != nil {
+		return fmt.Errorf("failed to overwrite encrypted DMG with the decrypted one: %v", err)
+	}
+	return nil
+}
+
+// unwrapRamdisk replaces a ramdisk IM4P with its raw DMG payload.
+func unwrapRamdisk(path string) error {
+	im4p, err := img4.OpenPayload(path)
+	if err != nil {
+		return fmt.Errorf("failed to parse ramdisk IM4P: %v", err)
+	}
+	data, err := im4p.GetData()
+	if err != nil {
+		return fmt.Errorf("failed to get ramdisk IM4P data: %v", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to overwrite ramdisk DMG: %v", err)
+	}
+	return nil
 }
 
 func systemOSPath(i *info.Info, cfg *Config) (string, error) {

@@ -41,6 +41,8 @@ func init() {
 	symbolsCmd.Flags().Bool("kernel", false, "Include kernelcache/KEXT symbols")
 	symbolsCmd.Flags().Bool("filesystem", false, "Include file system Mach-O symbols")
 	symbolsCmd.Flags().Bool("facts", false, "Emit versioned per-image comparison facts")
+	symbolsCmd.Flags().StringSlice("facts-boards", nil,
+		"Scan shared components once for this exact board subset (requires --facts)")
 	symbolsCmd.Flags().String("signatures", "", "Path to kernel symbolication signatures directory")
 	symbolsCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	symbolsCmd.Flags().String("device", "", "Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)")
@@ -51,6 +53,7 @@ func init() {
 	viper.BindPFlag("symbols.kernel", symbolsCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("symbols.filesystem", symbolsCmd.Flags().Lookup("filesystem"))
 	viper.BindPFlag("symbols.facts", symbolsCmd.Flags().Lookup("facts"))
+	viper.BindPFlag("symbols.facts-boards", symbolsCmd.Flags().Lookup("facts-boards"))
 	viper.BindPFlag("symbols.signatures", symbolsCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("symbols.pem-db", symbolsCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("symbols.device", symbolsCmd.Flags().Lookup("device"))
@@ -90,7 +93,13 @@ kernelcaches, or a volume mounted under two labels). Kernelcaches are selected
 from BuildManifest KernelCache components and named from the device-filtered
 metadata, so with --device a kernelcache image path can differ from the same
 scan without --facts. A final "comparison_facts_complete" line is written only
-after every requested source has been scanned successfully.`,
+after every requested source has been scanned successfully.
+
+With --facts --facts-boards board1,board2, collection schema 4 binds the exact
+selected board subset and scans each distinct BuildManifest component once.
+Every facts occurrence and DSC header carries its exact component_path, and
+successful coverage includes per-component counts (including empty components).
+This mode requires JSON output and cannot be combined with --device.`,
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	Hidden:        true,
@@ -107,7 +116,27 @@ after every requested source has been scanned successfully.`,
 			kernel, dyld, filesystem = true, true, true
 		}
 
+		var factsBoards []string
+		if cmd.Flags().Changed("facts-boards") || viper.IsSet("symbols.facts-boards") {
+			factsBoards = viper.GetStringSlice("symbols.facts-boards")
+			if factsBoards == nil {
+				factsBoards = []string{}
+			}
+		}
 		ipswPath := filepath.Clean(args[0])
+		cfg := &syms.JSONLConfig{
+			Device: viper.GetString("symbols.device"), IPSW: ipswPath,
+			PemDB: viper.GetString("symbols.pem-db"), SigsDir: viper.GetString("symbols.signatures"),
+			Kernel: kernel, DSC: dyld, FileSystem: filesystem,
+			Facts: viper.GetBool("symbols.facts"), FactsBoards: factsBoards,
+		}
+		// Reject invalid flag combinations before any source I/O.
+		if factsBoards != nil && !viper.GetBool("symbols.json") {
+			return fmt.Errorf("--facts-boards requires --json")
+		}
+		if err := syms.ValidateFactsBoardsOptions(cfg); err != nil {
+			return err
+		}
 		if _, err := os.Stat(ipswPath); err != nil {
 			return fmt.Errorf("file %s does not exist: %w", ipswPath, err)
 		}
@@ -117,11 +146,13 @@ after every requested source has been scanned successfully.`,
 		if err != nil {
 			return err
 		}
-		device := viper.GetString("symbols.device")
-		if dyld || filesystem {
-			_, err = inf.SelectDevice(device)
+		cfg.Info = inf
+		if factsBoards != nil {
+			err = syms.ValidateFactsSelection(cfg)
+		} else if dyld || filesystem {
+			_, err = inf.SelectDevice(cfg.Device)
 		} else {
-			_, err = inf.ForDevice(device)
+			_, err = inf.ForDevice(cfg.Device)
 		}
 		if err != nil {
 			return err
@@ -137,16 +168,6 @@ after every requested source has been scanned successfully.`,
 			out = f
 		}
 
-		return syms.ScanJSONL(&syms.JSONLConfig{
-			Device:     device,
-			Info:       inf,
-			IPSW:       ipswPath,
-			PemDB:      viper.GetString("symbols.pem-db"),
-			SigsDir:    viper.GetString("symbols.signatures"),
-			Kernel:     kernel,
-			DSC:        dyld,
-			FileSystem: filesystem,
-			Facts:      viper.GetBool("symbols.facts"),
-		}, out)
+		return syms.ScanJSONL(cfg, out)
 	},
 }

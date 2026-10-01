@@ -65,7 +65,7 @@ type scanImage struct {
 	KernelUUID        string                         // parent kernelcache UUID ("kext")
 	KernelVersion     string                         // kernelcache version ("kernel")
 	KernelPath        string                         // canonical path of a file-system kernel ("macho"), see fileSystemKernelPath
-	ComponentPath     string                         // exact BuildManifest KernelCache path for collection v3
+	ComponentPath     string                         // BuildManifest path: v3 kernels, v4 every source
 	VolumeLabel       string                         // exact source volume label for file-system Mach-Os
 	SliceSelection    *comparisonFactsSliceSelection // filesystem facts occurrence selection; nil for other sources
 }
@@ -233,20 +233,25 @@ func kextTextSegment(m *macho.File) *macho.Segment {
 	return m.Segment("__TEXT")
 }
 
+// parseKernelSignatures returns no symbolicators when sigDir is unset.
+func parseKernelSignatures(sigDir string) ([]signature.Symbolicator, error) {
+	if sigDir == "" {
+		return nil, nil
+	}
+	sigs, err := signature.Parse(sigDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signatures: %v", err)
+	}
+	return sigs, nil
+}
+
 // scanKernels extracts every kernelcache from the IPSW and visits the cache
 // container plus each of its KEXTs. Kernel and KEXT symbol addresses are
 // bit-63-cleared (highestBitMask) exactly as the daemon database stores them.
-func scanKernels(ipswPath, sigDir, device string, inf *info.Info, collection *factsCollection, visit scanVisitor, facts scanFactsVisitor) error {
-	var sigs []signature.Symbolicator
-
-	if sigDir != "" {
-		var err error
-		sigs, err = signature.Parse(sigDir)
-		if err != nil {
-			return fmt.Errorf("failed to parse signatures: %v", err)
-		}
-	}
-
+func scanKernels(
+	ipswPath string, sigs []signature.Symbolicator, device string, inf *info.Info,
+	collection *factsCollection, visit scanVisitor, facts scanFactsVisitor,
+) error {
 	scratch, err := os.MkdirTemp("", "ipsw_scan_kernels-")
 	if err != nil {
 		return err
@@ -737,7 +742,12 @@ func scanIPSW(cfg *scanConfig, visit scanVisitor) error {
 	}
 
 	if cfg.Kernel {
-		if err := scanKernels(cfg.IPSW, cfg.SigsDir, cfg.Device, inf, cfg.Collection, visit, cfg.Facts); err != nil {
+		sigs, err := parseKernelSignatures(cfg.SigsDir)
+		if err != nil {
+			return fmt.Errorf("failed to scan kernels: %w", err)
+		}
+		err = scanKernels(cfg.IPSW, sigs, cfg.Device, inf, cfg.Collection, visit, cfg.Facts)
+		if err != nil {
 			return fmt.Errorf("failed to scan kernels: %w", err)
 		}
 		if cfg.Collection != nil {

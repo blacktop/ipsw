@@ -20,6 +20,7 @@ const (
 	factsCollectionSchemaVersionV1 uint32 = 1
 	factsCollectionSchemaVersionV2 uint32 = 2
 	factsCollectionSchemaVersionV3 uint32 = 3
+	factsCollectionSchemaVersionV4 uint32 = 4
 )
 
 type factsSourceIdentity struct {
@@ -171,7 +172,16 @@ func manifestPath(component plist.IdentityManifest) (string, bool) {
 }
 
 func newFactsCollection(cfg *JSONLConfig, inf *info.Info, source factsSourceIdentity) (*factsCollection, error) {
-	selection := factsSelection(cfg.Device, inf)
+	var selection factsManifestSelection
+	if cfg.FactsBoards != nil {
+		var err error
+		selection, err = factsBoardSelection(cfg, inf)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		selection = factsSelection(cfg.Device, inf)
+	}
 	requested := requestedFactsScopes(cfg)
 	version := factsCollectionSchemaVersionV1
 	if cfg.FileSystem {
@@ -191,6 +201,9 @@ func newFactsCollection(cfg *JSONLConfig, inf *info.Info, source factsSourceIden
 				return nil, err
 			}
 		}
+	}
+	if cfg.FactsBoards != nil {
+		version = factsCollectionSchemaVersionV4
 	}
 	collectionID, err := factsCollectionID(version, source, selection, requested)
 	if err != nil {
@@ -326,6 +339,13 @@ func initialFactsCoverage(cfg *JSONLConfig, selection factsManifestSelection) []
 		{Family: "cstring_comparison", Volume: "all", Status: "unavailable", Reason: "unsupported"},
 		{Family: "function_start_comparison", Volume: "all", Status: "unavailable", Reason: "unsupported"},
 	}
+	if cfg.FactsBoards != nil {
+		for idx := range rows {
+			if rows[idx].Volume == "SystemOS" {
+				rows[idx].ComponentPaths = factsSystemComponents(selection)
+			}
+		}
+	}
 	for idx := range rows[:11] {
 		selected := rows[idx].Family == "kernel" && rows[idx].Volume == "kernelcache" && cfg.Kernel ||
 			rows[idx].Family == "kernel" && rows[idx].Volume != "kernelcache" && cfg.FileSystem ||
@@ -350,6 +370,10 @@ func initialFactsCoverage(cfg *JSONLConfig, selection factsManifestSelection) []
 	}
 	if cfg.DSC && len(rows[6].ComponentPaths) == 0 && len(rows[7].ComponentPaths) > 0 {
 		rows[6].ComponentPaths = slices.Clone(rows[7].ComponentPaths)
+		rows[6].AliasOf = "filesystem"
+	}
+	sameSystem := slices.Equal(rows[6].ComponentPaths, rows[7].ComponentPaths)
+	if cfg.FactsBoards != nil && cfg.DSC && sameSystem {
 		rows[6].AliasOf = "filesystem"
 	}
 	for idx := range rows {
@@ -384,19 +408,23 @@ func (c *factsCollection) completion(emitter *jsonlEmitter) (comparisonFactsComp
 			recordVolume = coverage[idx].RecordVolume
 		}
 		coverage[idx].Records = emitter.factsCounts[coverageKey{coverage[idx].Family, recordVolume}]
-		if c.start.CollectionSchemaVersion == factsCollectionSchemaVersionV3 && coverage[idx].Volume == "kernelcache" && coverage[idx].Status == "successful" {
+		version := c.start.CollectionSchemaVersion
+		perComponent := version == factsCollectionSchemaVersionV4 ||
+			version == factsCollectionSchemaVersionV3 && coverage[idx].Volume == "kernelcache"
+		if perComponent && coverage[idx].Status == "successful" {
 			var total uint64
 			counts := emitter.componentCounts[coverageKey{coverage[idx].Family, recordVolume}]
 			for _, component := range coverage[idx].ComponentPaths {
 				count := counts[component]
-				if coverage[idx].Family == "kernel" && count != 1 {
+				if coverage[idx].Family == "kernel" && coverage[idx].Volume == "kernelcache" && count != 1 {
 					return comparisonFactsCompleteLine{}, fmt.Errorf("kernel component %q requires exactly one container", component)
 				}
 				coverage[idx].ComponentRecords = append(coverage[idx].ComponentRecords, factsComponentRecords{Path: component, Records: count})
 				total += count
 			}
 			if len(coverage[idx].ComponentPaths) == 0 || total != coverage[idx].Records {
-				return comparisonFactsCompleteLine{}, fmt.Errorf("kernel component coverage does not reconcile")
+				return comparisonFactsCompleteLine{}, fmt.Errorf(
+					"component coverage does not reconcile for %s/%s", coverage[idx].Family, coverage[idx].Volume)
 			}
 		}
 		covered += coverage[idx].Records

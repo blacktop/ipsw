@@ -297,3 +297,148 @@ func TestContextRetriesBackingCleanupWithoutDetaching(t *testing.T) {
 		t.Fatalf("backing directory not removed: %v", err)
 	}
 }
+
+func TestExactComponentMountDoesNotSelectBasenameOrCaseAlias(t *testing.T) {
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	for _, name := range []string{"wrong/image.dmg", "nested/IMAGE.dmg", "nested/image.dmg"} {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write([]byte("synthetic unencrypted payload: " + name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ipsw := filepath.Join(t.TempDir(), "synthetic.ipsw")
+	if err := os.WriteFile(ipsw, archive.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &Config{ExtractDir: t.TempDir()}
+	attach := func(path, _ string) (utils.DMGMount, error) {
+		data, err := os.ReadFile(path)
+		if err != nil || string(data) != "synthetic unencrypted payload: nested/image.dmg" {
+			t.Fatalf("wrong component bytes: %q, %v", data, err)
+		}
+		return utils.DMGMount{MountPoint: "/synthetic/exact", OwnsDirectory: true}, nil
+	}
+	a := &imageAttempt{cfg: cfg, attach: attach, decrypt: aea.Decrypt}
+	ctx, err := a.mountComponent(ipsw, "nested/image.dmg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx.unmount(func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(ctx.DmgPath); !os.IsNotExist(err) {
+		t.Fatalf("component backing image survived successful cleanup: %v", err)
+	}
+	absent := &imageAttempt{cfg: cfg, attach: func(string, string) (utils.DMGMount, error) {
+		t.Fatal("missing exact member reached attach")
+		return utils.DMGMount{}, nil
+	}, decrypt: aea.Decrypt}
+	if _, err = absent.mountComponent(ipsw, "absent/image.dmg"); err == nil || !strings.Contains(err.Error(), "found 0") {
+		t.Fatalf("basename alias accepted: %v", err)
+	}
+}
+
+func TestExactComponentMountNeverReusesExistingFile(t *testing.T) {
+	for _, tc := range []struct{ component, existing string }{
+		{"nested/image.dmg", "image.dmg"},
+		{"nested/image.dmg.aea", "image.dmg"},
+	} {
+		t.Run(tc.component, func(t *testing.T) {
+			ipsw, dir := writeMountTestIPSW(t, tc.component, []byte("synthetic exact member"))
+			stale := filepath.Join(dir, tc.existing)
+			if err := os.WriteFile(stale, []byte("synthetic stale image"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			a := &imageAttempt{cfg: &Config{ExtractDir: dir}, attach: func(string, string) (utils.DMGMount, error) {
+				t.Fatal("stale extraction reached attach")
+				return utils.DMGMount{}, nil
+			}, decrypt: func(*aea.DecryptConfig) (string, error) {
+				t.Fatal("stale extraction reached decryption")
+				return "", nil
+			}}
+			if _, err := a.mountComponent(ipsw, tc.component); err == nil || !strings.Contains(err.Error(), "exist") {
+				t.Fatalf("existing extraction output accepted: %v", err)
+			}
+			if data, err := os.ReadFile(stale); err != nil || string(data) != "synthetic stale image" {
+				t.Fatalf("pre-existing file changed: %q, %v", data, err)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil || len(entries) != 1 {
+				t.Fatalf("failed attempt left files: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestExactComponentMountFailureRemovesCreatedFiles(t *testing.T) {
+	data := []byte("synthetic unencrypted disk image content")
+	for _, tc := range []struct{ name, component, wantErr string }{
+		{"attach", "nested/image.dmg", "Permission denied"},
+		{"decrypted attach", "nested/image.dmg.aea", "Permission denied"},
+		{"decrypt", "nested/image.dmg.aea", "synthetic decrypt failure"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ipsw, dir := writeMountTestIPSW(t, tc.component, data)
+			a := &imageAttempt{cfg: &Config{ExtractDir: dir}, attach: func(string, string) (utils.DMGMount, error) {
+				return utils.DMGMount{}, errors.New("synthetic attach: Permission denied")
+			}, decrypt: func(cfg *aea.DecryptConfig) (string, error) {
+				path := strings.TrimSuffix(cfg.Input, ".aea")
+				if err := os.WriteFile(path, data, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if tc.name == "decrypt" {
+					return "", errors.New("synthetic decrypt failure")
+				}
+				return path, nil
+			}}
+			ctx, err := a.mountComponent(ipsw, tc.component)
+			if ctx != nil || err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("ctx = %v, error = %v", ctx, err)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("failed attempt left files: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestExactComponentMountRemovesPartialExtraction(t *testing.T) {
+	data := []byte("synthetic stored component payload")
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	entry, err := writer.CreateHeader(&zip.FileHeader{Name: "nested/image.dmg", Method: zip.Store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := entry.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	corrupt := archive.Bytes()
+	corrupt[bytes.Index(corrupt, data)] ^= 0xff // fails the CRC check after the copy starts
+	ipsw := filepath.Join(t.TempDir(), "synthetic.ipsw")
+	if err := os.WriteFile(ipsw, corrupt, 0600); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	a := &imageAttempt{cfg: &Config{ExtractDir: dir}, attach: func(string, string) (utils.DMGMount, error) {
+		t.Fatal("corrupt member reached attach")
+		return utils.DMGMount{}, nil
+	}, decrypt: aea.Decrypt}
+	if _, err := a.mountComponent(ipsw, "nested/image.dmg"); !errors.Is(err, zip.ErrChecksum) {
+		t.Fatalf("corrupt member error = %v, want checksum failure", err)
+	}
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+		t.Fatalf("partial extraction left files: %v, %v", entries, err)
+	}
+}

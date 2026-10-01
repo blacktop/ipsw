@@ -23,14 +23,15 @@ import (
 type JSONLConfig struct {
 	Device string
 	// Info is pre-parsed IPSW metadata; when set the IPSW is not parsed again.
-	Info       *info.Info
-	IPSW       string
-	PemDB      string
-	SigsDir    string
-	Kernel     bool
-	DSC        bool
-	FileSystem bool
-	Facts      bool
+	Info        *info.Info
+	IPSW        string
+	PemDB       string
+	SigsDir     string
+	Kernel      bool
+	DSC         bool
+	FileSystem  bool
+	Facts       bool
+	FactsBoards []string // nil preserves the v1-v3 device-selection path
 }
 
 // ipswLine is the single leading record describing the scanned IPSW.
@@ -51,6 +52,7 @@ type dscLine struct {
 	Type              string `json:"type"`
 	UUID              string `json:"uuid"`
 	SharedRegionStart uint64 `json:"shared_region_start"`
+	ComponentPath     string `json:"component_path,omitempty"`
 }
 
 // imageLine describes a single Mach-O image. dsc_uuid is set for dylibs and
@@ -172,11 +174,13 @@ func (e *jsonlEmitter) facts(img *scanImage, m *macho.File) error {
 		Facts:          facts,
 	}
 	if img.ComponentPath != "" {
-		namespace, err := kernelFactsNamespace(img.ComponentPath)
-		if err != nil {
-			return err
+		if img.Kind == "kernel" || img.Kind == "kext" {
+			namespace, err := kernelFactsNamespace(img.ComponentPath)
+			if err != nil {
+				return err
+			}
+			line.Occurrence.ContainerNamespace = namespace
 		}
-		line.Occurrence.ContainerNamespace = namespace
 		line.Occurrence.ComponentPath = img.ComponentPath
 	}
 	var encoded bytes.Buffer
@@ -260,13 +264,14 @@ func finishFactsStream(bw *bufio.Writer, emitter *jsonlEmitter, collection *fact
 // immediately followed by that image's symbol lines.
 func (e *jsonlEmitter) image(img *scanImage) error {
 	if img.Kind == "dsc" {
-		if !e.first(occurrence{uuid: img.DSCUUID, kind: "dsc"}) {
+		if !e.first(occurrence{uuid: img.DSCUUID, kind: "dsc", path: img.ComponentPath}) {
 			return nil
 		}
 		return e.emit(&dscLine{
 			Type:              "dsc",
 			UUID:              img.DSCUUID,
 			SharedRegionStart: img.SharedRegionStart,
+			ComponentPath:     img.ComponentPath,
 		})
 	}
 	kind, imgPath, mask := img.Kind, img.Macho.GetPath(), ^uint64(0)
@@ -339,6 +344,10 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 // their mount-relative path, the stream emits them as bit-63-cleared "kernel"
 // images at their canonical /System/Library/... path.
 func ScanJSONL(cfg *JSONLConfig, w io.Writer) (retErr error) {
+	// Reject invalid options before hashing the whole IPSW.
+	if err := ValidateFactsBoardsOptions(cfg); err != nil {
+		return err
+	}
 	bw := bufio.NewWriter(w)
 	// Flush buffered lines on every return path, including early errors, so an
 	// aborted scan still writes the records it already produced.
@@ -375,10 +384,13 @@ func ScanJSONL(cfg *JSONLConfig, w io.Writer) (retErr error) {
 	if inf.Plists == nil || inf.Plists.BuildManifest == nil {
 		return fmt.Errorf("missing BuildManifest in %s (not a valid IPSW?)", cfg.IPSW)
 	}
-	if cfg.DSC || cfg.FileSystem {
-		inf, err = inf.SelectDevice(cfg.Device)
-	} else {
-		inf, err = inf.ForDevice(cfg.Device)
+	// V4 retains full metadata and selects exact board identities below.
+	if cfg.FactsBoards == nil {
+		if cfg.DSC || cfg.FileSystem {
+			inf, err = inf.SelectDevice(cfg.Device)
+		} else {
+			inf, err = inf.ForDevice(cfg.Device)
+		}
 	}
 	if err != nil {
 		return err
@@ -389,6 +401,19 @@ func ScanJSONL(cfg *JSONLConfig, w io.Writer) (retErr error) {
 	devices := inf.Plists.BuildManifest.SupportedProductTypes
 	if cfg.Device != "" {
 		devices = []string{inf.ProductType(cfg.Device)}
+	}
+
+	var collection *factsCollection
+	var facts scanFactsVisitor
+	if cfg.FactsBoards != nil {
+		collection, err = newFactsCollection(cfg, inf, source)
+		if err != nil {
+			return err
+		}
+		devices = collection.start.Selection.Devices
+		if err := validateFactsArchive(cfg.IPSW, factsComponentPlan(collection)); err != nil {
+			return err
+		}
 	}
 	if err := em.emit(&ipswLine{
 		Device:   cfg.Device,
@@ -403,19 +428,23 @@ func ScanJSONL(cfg *JSONLConfig, w io.Writer) (retErr error) {
 		return err
 	}
 
-	var collection *factsCollection
-	var facts scanFactsVisitor
 	if cfg.Facts {
-		collection, err = newFactsCollection(cfg, inf, source)
-		if err != nil {
-			return err
+		if collection == nil {
+			collection, err = newFactsCollection(cfg, inf, source)
+			if err != nil {
+				return err
+			}
 		}
 		if err := em.emit(&collection.start); err != nil {
 			return err
 		}
 		facts = em.facts
 	}
-	if err := scanIPSW(&scanConfig{
+	scan := scanIPSW
+	if cfg.FactsBoards != nil {
+		scan = scanFactsComponents
+	}
+	if err := scan(&scanConfig{
 		Info:       inf,
 		IPSW:       cfg.IPSW,
 		Device:     cfg.Device,
