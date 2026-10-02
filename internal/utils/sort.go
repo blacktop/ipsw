@@ -13,10 +13,13 @@ type Device struct {
 	Family string
 	Major  int
 	Minor  int
+	// Variant is the optional trailing variant of a product type (the "-A" of
+	// "iPad16,4-A") that Apple uses to distinguish otherwise identical models.
+	Variant string
 }
 
 func (d Device) String() string {
-	return fmt.Sprintf("%s%d,%d", d.Family, d.Major, d.Minor)
+	return fmt.Sprintf("%s%d,%d%s", d.Family, d.Major, d.Minor, d.Variant)
 }
 
 type Devices []Device
@@ -24,12 +27,12 @@ type Devices []Device
 func (d Devices) Len() int      { return len(d) }
 func (d Devices) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
 func (d Devices) Less(i, j int) bool {
-	return fmt.Sprintf("%s%02d%02d", d[i].Family, d[i].Major, d[i].Minor) < fmt.Sprintf("%s%02d%02d", d[j].Family, d[j].Major, d[j].Minor)
+	return fmt.Sprintf("%s%02d%02d%s", d[i].Family, d[i].Major, d[i].Minor, d[i].Variant) < fmt.Sprintf("%s%02d%02d%s", d[j].Family, d[j].Major, d[j].Minor, d[j].Variant)
 }
 
 func DeconstructDevice(deviceName string) Device {
 	d := Device{}
-	re := regexp.MustCompile(`^(?P<family>[a-zA-Z]+)(?P<major>[0-9]+),(?P<minor>[0-9]+)$`)
+	re := regexp.MustCompile(`^(?P<family>[a-zA-Z]+)(?P<major>[0-9]+),(?P<minor>[0-9]+)(?P<variant>-[a-zA-Z0-9]+)?$`)
 	if re.MatchString(deviceName) {
 		matches := re.FindStringSubmatch(deviceName)
 		d.Family = matches[re.SubexpIndex("family")]
@@ -37,6 +40,7 @@ func DeconstructDevice(deviceName string) Device {
 		d.Major = i
 		i, _ = strconv.Atoi(matches[re.SubexpIndex("minor")])
 		d.Minor = i
+		d.Variant = matches[re.SubexpIndex("variant")]
 		return d
 	}
 
