@@ -52,6 +52,7 @@ func init() {
 	downloadKdkCmd.Flags().BoolP("latest", "l", false, "Download latest KDK")
 	downloadKdkCmd.Flags().BoolP("all", "a", false, "Download all KDKs")
 	downloadKdkCmd.Flags().BoolP("install", "i", false, "Install KDK after download")
+	downloadKdkCmd.Flags().Bool("clean", false, "Delete downloaded KDK after successful installation")
 	downloadKdkCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadKdkCmd.MarkFlagDirname("output")
 	downloadKdkCmd.MarkFlagsMutuallyExclusive("host", "build", "latest", "all")
@@ -67,6 +68,7 @@ func init() {
 	viper.BindPFlag("download.kdk.latest", downloadKdkCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.kdk.all", downloadKdkCmd.Flags().Lookup("all"))
 	viper.BindPFlag("download.kdk.install", downloadKdkCmd.Flags().Lookup("install"))
+	viper.BindPFlag("download.kdk.clean", downloadKdkCmd.Flags().Lookup("clean"))
 	viper.BindPFlag("download.kdk.output", downloadKdkCmd.Flags().Lookup("output"))
 }
 
@@ -75,7 +77,9 @@ var downloadKdkCmd = &cobra.Command{
 	Use:   "kdk",
 	Short: "Download KDKs",
 	Long: "Download KDKs. Without a selector, choose a KDK interactively.\n" +
-		"Unattended use requires --host, --build, --latest, or --all.",
+		"Unattended use requires --host, --build, --latest, or --all.\n" +
+		"After a successful --install, interactive sessions offer to delete the downloaded file.\n" +
+		"Use --install --clean to delete it without prompting.",
 	Example: heredoc.Doc(`
 		# Download KDK for current host OS
 		❯ ipsw download kdk --host
@@ -85,6 +89,9 @@ var downloadKdkCmd = &cobra.Command{
 
 		# Download latest KDK and install
 		❯ ipsw download kdk --latest --install
+
+		# Download, install, and delete the latest KDK installer
+		❯ ipsw download kdk --latest --install --clean
 
 		# Download all available KDKs
 		❯ ipsw download kdk --all
@@ -104,7 +111,11 @@ var downloadKdkCmd = &cobra.Command{
 		latest := viper.GetBool("download.kdk.latest")
 		all := viper.GetBool("download.kdk.all")
 		install := viper.GetBool("download.kdk.install")
+		clean := viper.GetBool("download.kdk.clean")
 		output := viper.GetString("download.kdk.output")
+		if clean && !install {
+			return fmt.Errorf("--clean requires --install")
+		}
 		if !forHost && forBuild == "" && !latest && !all &&
 			(!term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd()))) {
 			return fmt.Errorf("KDK selection requires an interactive terminal; use --host, --build, --latest, or --all")
@@ -218,8 +229,12 @@ var downloadKdkCmd = &cobra.Command{
 					log.Warnf("Skipping installation while %s is being downloaded by another process", destName)
 					continue
 				}
-				log.Infof("Installing %s...", destName)
-				if err := utils.InstallKDK(destName); err != nil {
+				if err := installKDKDownload(destName, clean,
+					term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stderr.Fd())),
+					utils.InstallKDK,
+					func(prompt *survey.Confirm, answer *bool) error {
+						return survey.AskOne(prompt, answer, survey.WithStdio(os.Stdin, os.Stderr, os.Stderr))
+					}); err != nil {
 					return err
 				}
 			}
@@ -227,4 +242,27 @@ var downloadKdkCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func installKDKDownload(destName string, clean, interactive bool, install func(string) error, ask func(*survey.Confirm, *bool) error) error {
+	log.Infof("Installing %s...", destName)
+	if err := install(destName); err != nil {
+		return err
+	}
+	remove := clean
+	if !remove && interactive {
+		if err := ask(&survey.Confirm{
+			Message: fmt.Sprintf("Delete downloaded KDK %s?", destName),
+		}, &remove); err != nil {
+			return fmt.Errorf("keeping %s: cleanup confirmation failed: %w", destName, err)
+		}
+	}
+	if !remove {
+		return nil
+	}
+	if err := os.Remove(destName); err != nil {
+		return fmt.Errorf("failed to delete %s: %w", destName, err)
+	}
+	log.Infof("Deleted %s", destName)
+	return nil
 }

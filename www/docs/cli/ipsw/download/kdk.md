@@ -14,6 +14,8 @@ Download KDKs
 
 Download KDKs. Without a selector, choose a KDK interactively.
 Unattended use requires --host, --build, --latest, or --all.
+After a successful --install, interactive sessions offer to delete the downloaded file.
+Use --install --clean to delete it without prompting.
 
 ```
 ipsw download kdk [flags]
@@ -31,6 +33,9 @@ ipsw download kdk [flags]
 # Download latest KDK and install
 ❯ ipsw download kdk --latest --install
 
+# Download, install, and delete the latest KDK installer
+❯ ipsw download kdk --latest --install --clean
+
 # Download all available KDKs
 ❯ ipsw download kdk --all
 
@@ -41,6 +46,7 @@ ipsw download kdk [flags]
 ```
   -a, --all             Download all KDKs
   -b, --build string    Download KDK for build
+      --clean           Delete downloaded KDK after successful installation
   -h, --help            help for kdk
       --host            Download KDK for current host OS
       --ignore-sha1     skip checksum verification
