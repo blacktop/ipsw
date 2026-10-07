@@ -408,7 +408,19 @@ func extractScanKernels(ipswPath, device, output string, inf *info.Info, collect
 // dylib images. The mount is provided by the caller so the volume is mounted once
 // and shared with the file-system Mach-O walk.
 func scanDSCsInMount(mountPoint string, visit scanVisitor, facts scanFactsVisitor) error {
-	dscPaths, err := dyld.GetDscPathsInMount(mountPoint, false, true)
+	return scanDSCsInMountMode(mountPoint, visit, facts, false)
+}
+
+func scanComponentDSCsInMount(mountPoint string, visit scanVisitor) error {
+	return scanDSCsInMountMode(mountPoint, visit, nil, true)
+}
+
+func scanDSCsInMountMode(mountPoint string, visit scanVisitor, facts scanFactsVisitor, strict bool) error {
+	find := dyld.GetDscPathsInMount
+	if strict {
+		find = dyld.GetDscPathsInMountStrict
+	}
+	dscPaths, err := find(mountPoint, false, true)
 	if err != nil {
 		return fmt.Errorf("failed to find DSCs in %s: %w", mountPoint, err)
 	}
@@ -417,25 +429,38 @@ func scanDSCsInMount(mountPoint string, visit scanVisitor, facts scanFactsVisito
 		// than silently emitting zero dylib symbols.
 		log.Warnf("no dyld_shared_cache found in %s", mountPoint)
 	}
+	mainCaches := 0
 	for _, dscPath := range dscPaths {
 		if len(filepath.Ext(dscPath)) != 0 {
 			continue // skip subcaches/.symbols; dyld.Open pulls them in
 		}
+		mainCaches++
 		f, err := dyld.Open(dscPath)
 		if err != nil {
 			return fmt.Errorf("failed to open DSC %s: %w", dscPath, err)
 		}
-		if err := scanDSC(f, visit, facts); err != nil {
+		if err := scanDSC(f, visit, facts, strict); err != nil {
 			return errors.Join(err, f.Close())
 		}
 		if err := f.Close(); err != nil {
 			return err
 		}
 	}
+	if strict && mainCaches == 0 {
+		return fmt.Errorf("no main dyld_shared_cache found in %s: %w", mountPoint, dyld.ErrNoDscFound)
+	}
 	return nil
 }
 
-func scanDSC(f *dyld.File, visit scanVisitor, facts scanFactsVisitor) error {
+func scanDSC(f *dyld.File, visit scanVisitor, facts scanFactsVisitor, strict bool) error {
+	if strict {
+		if f == nil || f.UUID.IsNull() {
+			return errors.New("DSC has no UUID")
+		}
+		if _, ok := f.Headers[f.UUID]; !ok {
+			return fmt.Errorf("DSC %s has no matching header", f.UUID)
+		}
+	}
 	if err := visit(&scanImage{
 		Kind:              "dsc",
 		DSCUUID:           f.UUID.String(),
@@ -445,18 +470,35 @@ func scanDSC(f *dyld.File, visit scanVisitor, facts scanFactsVisitor) error {
 	}
 
 	for idx, img := range f.Images {
+		if strict && (img == nil || img.Name == "") {
+			return fmt.Errorf("DSC %s has no image identity at index %d", f.UUID, idx)
+		}
 		log.WithFields(log.Fields{
 			"index": idx,
 			"name":  img.Name,
 		}).Debug("Parsing DSC Image")
-		img.ParsePublicSymbols(false)
-		localSymbolsOK := img.ParseLocalSymbols(false) == nil
+		if err := img.ParsePublicSymbols(false); strict && err != nil {
+			img.Free()
+			return fmt.Errorf("failed to parse DSC image %s public symbols: %w", img.Name, err)
+		}
+		localErr := img.ParseLocalSymbols(false)
+		if strict && localErr != nil && !errors.Is(localErr, dyld.ErrNoLocals) {
+			img.Free()
+			return fmt.Errorf("failed to parse DSC image %s local symbols: %w", img.Name, localErr)
+		}
+		localSymbolsOK := localErr == nil
 		m, err := img.GetMacho()
 		if err != nil {
-			if facts != nil {
+			if facts != nil || strict {
 				img.Free()
 			}
 			return fmt.Errorf("failed to parse dyld_shared_cache image: %w", err)
+		}
+		if strict {
+			if err := componentMachoIdentity(img.Name, m); err != nil {
+				img.Free()
+				return err
+			}
 		}
 		dylib := &model.Macho{
 			UUID: m.UUID().String(),
@@ -508,12 +550,12 @@ func scanDSC(f *dyld.File, visit scanVisitor, facts scanFactsVisitor) error {
 			Arch:    machoArch(m),
 			DSCUUID: f.UUID.String(),
 		}); err != nil {
-			if facts != nil {
+			if facts != nil || strict {
 				img.Free()
 			}
 			return err
 		}
-		if facts != nil {
+		if facts != nil || strict {
 			img.Free()
 		}
 	}
@@ -562,6 +604,37 @@ func scanMachosInMount(mountPoint, volumeLabel string, visit scanVisitor, facts 
 		}
 		return scanMachoSlices(path, volumeLabel, slices, visit, facts)
 	})
+}
+
+func scanComponentMachosInMount(mountPoint, volumeLabel string, visit scanVisitor) error {
+	return search.ForEachMachoSlicesStrict(mountPoint, func(path string, slices []*macho.File) error {
+		if _, rest, ok := strings.Cut(path, mountPoint); ok {
+			path = rest
+		}
+		return scanComponentMachoSlices(path, volumeLabel, slices, visit)
+	})
+}
+
+func componentMachoIdentity(path string, m *macho.File) error {
+	if m == nil || m.CPU == 0 {
+		return fmt.Errorf("component Mach-O %s has no architecture identity", path)
+	}
+	if uuid := m.UUID(); uuid == nil || uuid.UUID.IsNull() {
+		return fmt.Errorf("component Mach-O %s has no UUID", path)
+	}
+	return nil
+}
+
+func scanComponentMachoSlices(path, volumeLabel string, slices []*macho.File, visit scanVisitor) error {
+	if len(slices) == 0 {
+		return fmt.Errorf("filesystem Mach-O %s has no legacy slice", path)
+	}
+	// Ordinary symbols select the last FAT slice. Validate that exact image
+	// before reusing its existing enrichment and address normalization.
+	if err := componentMachoIdentity(path, slices[len(slices)-1]); err != nil {
+		return err
+	}
+	return scanMachoSlices(path, volumeLabel, slices, visit, nil)
 }
 
 type machoSliceIdentity struct {

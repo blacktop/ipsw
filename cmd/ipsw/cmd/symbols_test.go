@@ -120,12 +120,14 @@ func TestSymbolsComponentValidatesBeforeOutput(t *testing.T) {
 	}
 }
 
-func TestSymbolsComponentRejectsDiskBeforeOutput(t *testing.T) {
+func TestSymbolsComponentDiskOptionsBeforeOutput(t *testing.T) {
 	for _, tc := range []struct{ name, path, variant, kernel, dyld, filesystem string }{
-		{"OS", "os.dmg", "", "false", "false", "true"},
-		{"Cryptex1,SystemOS", "system.dmg", "", "false", "true", "true"},
-		{"Cryptex1,AppOS", "app.dmg", "", "false", "false", "true"},
-		{"Ap,ExclaveOS", "exclave.dmg", "", "false", "false", "true"},
+		{"OS", "os.dmg", "", "true", "false", "false"},
+		{"Cryptex1,SystemOS", "system.dmg", "research", "false", "true", "true"},
+		{"Cryptex1,AppOS", "app.dmg", "", "false", "true", "false"},
+		{"Ap,ExclaveOS", "exclave.dmg", "", "false", "true", "false"},
+		{"Cryptex1,RosettaOS", "rosetta.dmg", "", "false", "true", "false"},
+		{"BaseSystem", "base.dmg", "", "false", "false", "true"},
 		{"KernelCache", "kernelcache.release.test", "release", "true", "true", "false"},
 		{"KernelCache", "kernelcache.release.test", "release", "true", "false", "true"},
 	} {
@@ -140,11 +142,32 @@ func TestSymbolsComponentRejectsDiskBeforeOutput(t *testing.T) {
 				"kernel": tc.kernel, "dyld": tc.dyld, "filesystem": tc.filesystem, "json": "true", "output": out,
 			})
 			err := symbolsCmd.RunE(symbolsCmd, []string{filepath.Join(dir, "missing.ipsw")})
-			if err == nil || !strings.Contains(err.Error(), "symbols component schema 1") {
+			if err == nil || strings.Contains(err.Error(), "does not exist") {
 				t.Fatalf("unavailable operation reached source I/O: %v", err)
 			}
 			if raw, err := os.ReadFile(out); err != nil || string(raw) != "retain me" {
 				t.Fatalf("unavailable operation changed output: %q %v", raw, err)
+			}
+		})
+	}
+	for _, tc := range []struct{ name, path, dyld, filesystem string }{
+		{"OS", "os.dmg", "false", "true"},
+		{"Cryptex1,SystemOS", "system.dmg", "true", "true"},
+		{"Cryptex1,AppOS", "app.dmg", "false", "true"},
+		{"Ap,ExclaveOS", "exclave.dmg", "false", "true"},
+	} {
+		t.Run("accepted "+tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			out := filepath.Join(dir, "absent.jsonl")
+			setSymbolsTestFlags(t, map[string]string{
+				"component-name": tc.name, "component-path": tc.path, "component-variant": "",
+				"kernel": "false", "dyld": tc.dyld, "filesystem": tc.filesystem, "json": "true", "output": out,
+			})
+			if err := symbolsCmd.RunE(symbolsCmd, []string{filepath.Join(dir, "missing.ipsw")}); err == nil || !strings.Contains(err.Error(), "does not exist") {
+				t.Fatalf("supported disk options did not reach source validation: %v", err)
+			}
+			if _, err := os.Stat(out); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("output created before source validation: %v", err)
 			}
 		})
 	}

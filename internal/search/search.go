@@ -280,6 +280,10 @@ func WalkFilesInRoot(root string, handle func(path string) error) error {
 // WalkFilesInRootFrom is like WalkFilesInRoot, but starts walking at start while
 // still resolving absolute symlinks relative to root.
 func WalkFilesInRootFrom(root, start string, handle func(path string) error) error {
+	return walkFilesInRootFrom(root, start, false, handle)
+}
+
+func walkFilesInRootFrom(root, start string, strict bool, handle func(path string) error) error {
 	rootAbs, err := filepath.Abs(root)
 	if err != nil {
 		return err
@@ -299,6 +303,9 @@ func WalkFilesInRootFrom(root, start string, handle func(path string) error) err
 		if info == nil || info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return nil
 		}
+		if strict && !info.Mode().IsRegular() {
+			return nil
+		}
 		visitKey := absOrSelf(path)
 		if !pathInRoot(rootAbs, visitKey) {
 			return nil
@@ -314,6 +321,9 @@ func WalkFilesInRootFrom(root, start string, handle func(path string) error) err
 	walkDir = func(dir string) error {
 		return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
+				if strict {
+					return err
+				}
 				if os.IsPermission(err) {
 					log.Debugf("skipping path due to permission denied: %s", path)
 					return nil
@@ -322,6 +332,11 @@ func WalkFilesInRootFrom(root, start string, handle func(path string) error) err
 				return nil
 			}
 			if info.Mode()&os.ModeSymlink != 0 {
+				if strict {
+					// Strict scans walk the complete root. Every in-root target is
+					// visited at its real path, so aliases add no files or coverage.
+					return nil
+				}
 				linkPath, err := resolveSymlinkInRoot(root, path)
 				if err != nil {
 					return nil
@@ -457,6 +472,43 @@ func withMachoSlices(machoPath string, handler func([]*macho.File) error) error 
 		return nil
 	}
 	defer m.Close()
+	return handler([]*macho.File{m})
+}
+
+// withMachoSlicesStrict distinguishes ordinary non-Mach-O files from unreadable
+// files and recognized but malformed Mach-Os. Owned handles close before return.
+func withMachoSlicesStrict(machoPath string, handler func([]*macho.File) error) (retErr error) {
+	f, err := os.Open(machoPath)
+	if err != nil {
+		return err
+	}
+	defer func() { retErr = errors.Join(retErr, f.Close()) }()
+	var header [4]byte
+	_, readErr := io.ReadFull(f, header[:])
+	if errors.Is(readErr, io.EOF) || errors.Is(readErr, io.ErrUnexpectedEOF) {
+		return nil // A regular file shorter than magic is not a Mach-O.
+	}
+	if readErr != nil {
+		return fmt.Errorf("failed to read Mach-O magic from %s: %w", machoPath, readErr)
+	}
+	if ok, _ := magic.IsMachOData(header[:]); !ok {
+		return nil
+	}
+	fat, err := macho.NewFatFile(f)
+	if err == nil {
+		slices := make([]*macho.File, 0, len(fat.Arches))
+		for _, arch := range fat.Arches {
+			slices = append(slices, arch.File)
+		}
+		return handler(slices)
+	}
+	if !errors.Is(err, macho.ErrNotFat) {
+		return fmt.Errorf("failed to parse Mach-O %s: %w", machoPath, err)
+	}
+	m, err := macho.NewFile(f)
+	if err != nil {
+		return fmt.Errorf("failed to parse Mach-O %s: %w", machoPath, err)
+	}
 	return handler([]*macho.File{m})
 }
 
@@ -617,6 +669,17 @@ func ForEachMacho(folder string, handler func(string, *macho.File) error, select
 func ForEachMachoSlices(folder string, handler func(string, []*macho.File) error) error {
 	return WalkFilesInRoot(folder, func(file string) error {
 		return withMachoSlices(file, func(slices []*macho.File) error {
+			return handler(file, slices)
+		})
+	})
+}
+
+// ForEachMachoSlicesStrict scans regular files throughout folder, propagating
+// walk, read, recognized-format parse, handler, and owned-close errors. Symlink
+// aliases are skipped; their in-root targets are already part of the full walk.
+func ForEachMachoSlicesStrict(folder string, handler func(string, []*macho.File) error) error {
+	return walkFilesInRootFrom(folder, folder, true, func(file string) error {
+		return withMachoSlicesStrict(file, func(slices []*macho.File) error {
 			return handler(file, slices)
 		})
 	})

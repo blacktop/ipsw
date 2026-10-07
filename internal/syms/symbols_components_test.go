@@ -15,7 +15,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/model"
+	"github.com/blacktop/ipsw/internal/testutil"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 const componentManifestSample = `<?xml version="1.0"?><plist version="1.0"><dict>
@@ -26,11 +31,17 @@ const componentManifestSample = `<?xml version="1.0"?><plist version="1.0"><dict
 <key>Manifest</key><dict>
 <key>OS</key><dict><key>Info</key><dict><key>Path</key><string>os.dmg</string></dict></dict>
 <key>Cryptex1,SystemOS</key><dict><key>Info</key><dict><key>Path</key><string>system.dmg</string></dict></dict>
+<key>Cryptex1,AppOS</key><dict><key>Info</key><dict><key>Path</key><string>app.dmg</string></dict></dict>
 <key>Ap,ExclaveOS</key><dict><key>Info</key><dict><key>Path</key><string>exclave.dmg</string></dict></dict>
 <key>KernelCache</key><dict><key>Info</key><dict><key>Path</key><string>kernelcache.release.test</string></dict></dict>
 </dict></dict></array></dict></plist>`
 
 func componentSource(t *testing.T, members ...string) string {
+	t.Helper()
+	return componentSourceWithManifest(t, componentManifestSample, members...)
+}
+
+func componentSourceWithManifest(t *testing.T, manifest string, members ...string) string {
 	t.Helper()
 	var archive bytes.Buffer
 	zw := zip.NewWriter(&archive)
@@ -41,7 +52,7 @@ func componentSource(t *testing.T, members ...string) string {
 		}
 		data := "synthetic component payload"
 		if name == "BuildManifest.plist" {
-			data = componentManifestSample
+			data = manifest
 		}
 		if _, err := io.WriteString(entry, data); err != nil {
 			t.Fatal(err)
@@ -114,12 +125,14 @@ func TestComponentSourceAndSelectionBinding(t *testing.T) {
 func TestComponentOptionsRejectUnsupportedSelectionsBeforeIO(t *testing.T) {
 	for _, sel := range []SymbolsComponentSelection{
 		{Name: "unknown", Path: "os.dmg", Families: []string{"filesystem"}},
-		{Name: "OS", Path: "os.dmg", Families: []string{"filesystem"}},
+		{Name: "BaseSystem", Path: "base.dmg", Families: []string{"filesystem"}},
+		{Name: "Cryptex1,RosettaOS", Path: "rosetta.dmg", Families: []string{"dsc"}},
 		{Name: "OS", Path: "os.dmg", Families: []string{"kernel"}},
-		{Name: "Cryptex1,SystemOS", Path: "system.dmg", Families: []string{"dsc", "filesystem"}},
-		{Name: "Cryptex1,AppOS", Path: "app.dmg", Families: []string{"filesystem"}},
+		{Name: "Cryptex1,SystemOS", Path: "system.dmg", Families: []string{"dsc", "dsc"}},
+		{Name: "Cryptex1,AppOS", Path: "app.dmg", Families: []string{"dsc"}},
 		{Name: "Ap,ExclaveOS", Path: "exclave.dmg", Families: []string{"dsc"}},
-		{Name: "Ap,ExclaveOS", Path: "exclave.dmg", Families: []string{"filesystem"}},
+		{Name: "Ap,ExclaveOS", Path: "exclave.dmg", Variant: "release", Families: []string{"filesystem"}},
+		{Name: "Ap,ExclaveOS", Path: "exclave.dmg"},
 		{Name: "KernelCache", Path: "../kernelcache.release.test", Variant: "release", Families: []string{"kernel"}},
 		{Name: "KernelCache", Path: "kernelcache.release.test", Variant: "release"},
 		{Name: "KernelCache", Path: "kernelcache.release.test", Variant: "release", Families: []string{"unknown"}},
@@ -148,6 +161,42 @@ func TestComponentOptionsRejectUnsupportedSelectionsBeforeIO(t *testing.T) {
 		if err := ValidateComponentOptions(&JSONLConfig{}, valid); err != nil {
 			t.Errorf("recognized kernel variant %q rejected: %v", variant, err)
 		}
+	}
+}
+
+func TestComponentDiskSelectionMatrix(t *testing.T) {
+	for _, selection := range []SymbolsComponentSelection{
+		{Name: "OS", Path: "os.dmg", Families: []string{"filesystem"}},
+		{Name: "Cryptex1,SystemOS", Path: "system.dmg", Families: []string{"dsc"}},
+		{Name: "Cryptex1,SystemOS", Path: "system.dmg", Families: []string{"filesystem"}},
+		{Name: "Cryptex1,SystemOS", Path: "system.dmg", Families: []string{"filesystem", "dsc"}},
+		{Name: "Cryptex1,AppOS", Path: "app.dmg", Families: []string{"filesystem"}},
+		{Name: "Ap,ExclaveOS", Path: "exclave.dmg", Families: []string{"filesystem"}},
+	} {
+		p := prepareTestComponent(t, selection.Name, selection.Path, "", selection.Families...)
+		if !slices.IsSorted(p.start.RequestedFamilies) {
+			t.Fatalf("families were not sorted: %v", p.start.RequestedFamilies)
+		}
+	}
+	withoutSystem := strings.Replace(componentManifestSample,
+		`<key>Cryptex1,SystemOS</key><dict><key>Info</key><dict><key>Path</key><string>system.dmg</string></dict></dict>`, "", 1)
+	for _, tc := range []struct {
+		name, manifest string
+		families       []string
+		wantErr        bool
+	}{
+		{"non-effective OS", componentManifestSample, []string{"dsc"}, true},
+		{"effective OS", withoutSystem, []string{"dsc", "filesystem"}, false},
+		{"recovery-only OS", strings.Replace(withoutSystem, "Customer Erase Install (IPSW)", "Customer Recovery", 1), []string{"filesystem"}, true},
+		{"recovery-only DSC", strings.Replace(withoutSystem, "Customer Erase Install (IPSW)", "Customer Recovery", 1), []string{"dsc"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := componentSourceWithManifest(t, tc.manifest, "BuildManifest.plist", "os.dmg")
+			_, err := PrepareComponentJSONL(&JSONLConfig{IPSW: source}, SymbolsComponentSelection{Name: "OS", Path: "os.dmg", Families: tc.families})
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("selection error=%v, wantErr=%v", err, tc.wantErr)
+			}
+		})
 	}
 }
 
@@ -220,6 +269,152 @@ func TestComponentKernelStreamCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertComponentCompletion(t, wire.Bytes(), 3, 0, 2, 1)
+}
+
+func TestComponentDiskFailuresHaveNoTerminal(t *testing.T) {
+	for _, tc := range []struct {
+		name, family string
+		setup        func(*testing.T, string)
+	}{
+		{"DSC walk", "dsc", func(t *testing.T, root string) {
+			if err := os.Remove(root); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"no main DSC", "dsc", nil},
+		{"subcache only", "dsc", func(t *testing.T, root string) {
+			writeComponentFile(t, filepath.Join(root, "System/Library/dyld/dyld_shared_cache_arm64e.01"), []byte("subcache"))
+		}},
+		{"malformed main DSC", "dsc", func(t *testing.T, root string) {
+			writeComponentFile(t, filepath.Join(root, "System/Library/dyld/dyld_shared_cache_arm64e"), []byte("broken"))
+		}},
+		{"filesystem walk", "filesystem", func(t *testing.T, root string) {
+			if err := os.Remove(root); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"filesystem read", "filesystem", func(t *testing.T, root string) {
+			file := filepath.Join(root, "unreadable")
+			writeComponentFile(t, file, []byte("contents"))
+			if err := os.Chmod(file, 0); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(file, 0o600) })
+			if f, err := os.Open(file); err == nil {
+				_ = f.Close()
+				t.Skip("test process can read mode-000 files")
+			}
+		}},
+		{"recognized Mach-O parse", "filesystem", func(t *testing.T, root string) {
+			writeComponentFile(t, filepath.Join(root, "broken"), []byte{0xcf, 0xfa, 0xed, 0xfe})
+		}},
+		{"missing Mach-O UUID", "filesystem", func(t *testing.T, root string) {
+			testutil.WriteMacho(t, filepath.Join(root, "uuidless"), testutil.MachoArch{CPU: types.CPUArm64})
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if tc.setup != nil {
+				tc.setup(t, root)
+			}
+			p := prepareTestComponent(t, "Cryptex1,SystemOS", "system.dmg", "", tc.family)
+			var wire bytes.Buffer
+			err := p.scan(&wire, func(visit func(string, *scanImage) error) error {
+				return p.scanMountedComponent(root, visit)
+			})
+			if err == nil || !bytes.Contains(wire.Bytes(), []byte(`symbols_component_start`)) || bytes.Contains(wire.Bytes(), []byte(`symbols_component_complete`)) {
+				t.Fatalf("incomplete disk scan certified: err=%v wire=%s", err, &wire)
+			}
+		})
+	}
+}
+
+func TestComponentFilesystemCompletionAndCleanup(t *testing.T) {
+	p := prepareTestComponent(t, "Ap,ExclaveOS", "exclave.dmg", "", "filesystem")
+	root := t.TempDir()
+	var empty bytes.Buffer
+	if err := p.scan(&empty, func(visit func(string, *scanImage) error) error {
+		return p.scanMountedComponent(root, visit)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	assertComponentCompletion(t, empty.Bytes(), 0, 0, 0, 0)
+	writeComponentFile(t, filepath.Join(root, "usr/bin/tool"), componentMachoData(types.CPUArm64, types.CPUSubtypeArm64E, 1))
+	var wire bytes.Buffer
+	if err := p.scan(&wire, func(visit func(string, *scanImage) error) error {
+		return p.scanMountedComponent(root, visit)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	assertComponentCompletion(t, wire.Bytes(), 1, 0, 1, 0)
+	if !bytes.Contains(wire.Bytes(), []byte(`"path":"/usr/bin/tool"`)) ||
+		!bytes.Contains(wire.Bytes(), []byte(`"component_path":"exclave.dmg","family":"filesystem"`)) {
+		t.Fatalf("missing mount-relative component provenance: %s", &wire)
+	}
+
+	wantErr := errors.New("synthetic unmount failure")
+	var failed bytes.Buffer
+	err := p.scan(&failed, func(visit func(string, *scanImage) error) error {
+		return mountFactsComponent(func(string) (*mount.Context, error) {
+			return &mount.Context{MountPoint: root}, nil
+		}, func(*mount.Context) error { return wantErr }, func(root string) error {
+			return p.scanMountedComponent(root, visit)
+		})
+	})
+	if !errors.Is(err, wantErr) || !bytes.Contains(failed.Bytes(), []byte(`"type":"image"`)) || bytes.Contains(failed.Bytes(), []byte(`symbols_component_complete`)) {
+		t.Fatalf("cleanup failure certified: err=%v wire=%s", err, &failed)
+	}
+}
+
+func TestComponentDiskOperationInventory(t *testing.T) {
+	p := prepareTestComponent(t, "Cryptex1,SystemOS", "system.dmg", "", "filesystem", "dsc")
+	uuid := types.UUID{1}
+	cache := &dyld.File{UUID: uuid, Headers: map[types.UUID]dyld.CacheHeader{uuid: {SharedRegionStart: 4096}}}
+	root := t.TempDir()
+	writeComponentFile(t, filepath.Join(root, "tool"), componentMachoData(types.CPUArm64, types.CPUSubtypeArm64E, 2))
+	var wire bytes.Buffer
+	err := p.scan(&wire, func(visit func(string, *scanImage) error) error {
+		withFamily := func(family string) scanVisitor {
+			return func(image *scanImage) error {
+				image.ComponentPath = p.start.Component.Path
+				return visit(family, image)
+			}
+		}
+		if err := scanDSC(cache, withFamily("dsc"), nil, true); err != nil {
+			return err
+		}
+		return scanComponentMachosInMount(root, p.start.Component.Name, withFamily("filesystem"))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertComponentCompletion(t, wire.Bytes(), 2, 1, 1, 0)
+	lines := rawLines(t, wire.Bytes())
+	var complete symbolsComponentCompleteLine
+	if err := json.Unmarshal(lines[len(lines)-1], &complete); err != nil {
+		t.Fatal(err)
+	}
+	if len(complete.Operations) != 2 || complete.Operations[0].Family != "dsc" || complete.Operations[0].DSCs != 1 ||
+		complete.Operations[1].Family != "filesystem" || complete.Operations[1].Images != 1 {
+		t.Fatalf("operation inventory changed: %+v", complete.Operations)
+	}
+}
+
+func TestComponentDiskLegacyCompatibility(t *testing.T) {
+	root := t.TempDir()
+	writeComponentFile(t, filepath.Join(root, "broken"), []byte{0xcf, 0xfa, 0xed, 0xfe})
+	testutil.WriteMacho(t, filepath.Join(root, "uuidless"), testutil.MachoArch{CPU: types.CPUArm64})
+	visits, facts := 0, 0
+	visit := func(*scanImage) error { visits++; return nil }
+	if err := scanDSCsInMount(root, visit, nil); err != nil {
+		t.Fatalf("legacy zero-DSC behavior changed: %v", err)
+	}
+	if err := scanMachosInMount(root, "SystemOS", visit, func(*scanImage, *macho.File) error {
+		facts++
+		return nil
+	}); err != nil || visits != 0 || facts != 1 {
+		t.Fatalf("legacy/facts behavior changed: visits=%d facts=%d err=%v", visits, facts, err)
+	}
 }
 
 func assertComponentCompletion(t *testing.T, wire []byte, records, dscs, images, symbols uint64) {

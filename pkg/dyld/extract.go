@@ -84,25 +84,42 @@ func IsDscNotFound(err error) bool {
 }
 
 func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error) {
+	return getDscPathsInMount(mountPoint, driverKit, all, false)
+}
+
+// GetDscPathsInMountStrict finds caches without suppressing filesystem errors.
+// Exact-component scans use it when a successful scan must prove coverage.
+func GetDscPathsInMountStrict(mountPoint string, driverKit, all bool) ([]string, error) {
+	return getDscPathsInMount(mountPoint, driverKit, all, true)
+}
+
+func getDscPathsInMount(mountPoint string, driverKit, all, strict bool) ([]string, error) {
 	var matches []string
 	var re *regexp.Regexp
 
 	mountPoint = utils.MountedFilesystemRoot(mountPoint)
+	rootPattern := mountPoint
+	if strict {
+		rootPattern = regexp.QuoteMeta(rootPattern)
+	}
 
 	if driverKit {
-		re = regexp.MustCompile(filepath.Join(mountPoint, DriverKitCacheRegex))
+		re = regexp.MustCompile(filepath.Join(rootPattern, DriverKitCacheRegex))
 	} else if all {
-		re = regexp.MustCompile(filepath.Join(mountPoint, CacheUberRegex))
+		re = regexp.MustCompile(filepath.Join(rootPattern, CacheUberRegex))
 	} else {
-		re = regexp.MustCompile(filepath.Join(mountPoint, CacheRegex))
+		re = regexp.MustCompile(filepath.Join(rootPattern, CacheRegex))
 	}
 
 	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
+			if strict {
+				return err
+			}
 			utils.Indent(log.Warn, 3)(fmt.Sprintf("failed to walk %s: %v", path, err))
 			return nil
 		}
-		if info.IsDir() {
+		if info.IsDir() || (strict && !info.Mode().IsRegular()) {
 			return nil
 		}
 		if re.MatchString(path) {
@@ -110,7 +127,7 @@ func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error
 		}
 		return nil
 	}); err != nil {
-		return nil, err // FIXME: this will never error
+		return nil, err
 	}
 
 	return matches, nil

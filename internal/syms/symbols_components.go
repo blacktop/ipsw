@@ -24,8 +24,8 @@ import (
 const symbolsComponentSchemaVersion uint32 = 1
 const maxComponentManifestBytes = 128 << 20
 
-// SymbolsComponentSelection requests one BuildManifest KernelCache component.
-// Schema 1 currently admits only the kernel family and release/research variants.
+// SymbolsComponentSelection requests exactly one BuildManifest component.
+// Families are kernel, dsc, or filesystem; kernel variants are release/research.
 type SymbolsComponentSelection struct {
 	Name, Path, Variant string
 	Families            []string
@@ -74,22 +74,51 @@ func ValidateComponentOptions(cfg *JSONLConfig, selection SymbolsComponentSelect
 	if cfg.Device != "" || cfg.Facts || cfg.FactsBoards != nil {
 		return errors.New("component symbols cannot be combined with --device, --facts, or --facts-boards")
 	}
-	if selection.Name != "KernelCache" {
-		return fmt.Errorf("symbols component schema 1 supports only KernelCache; component %q is unavailable", selection.Name)
+	switch selection.Name {
+	case "KernelCache", "OS", "Cryptex1,SystemOS", "Cryptex1,AppOS", "Ap,ExclaveOS":
+	default:
+		return fmt.Errorf("unsupported symbols component name %q", selection.Name)
 	}
 	if len(selection.Path) > 4096 || !fs.ValidPath(selection.Path) || selection.Path == "." ||
 		strings.ContainsAny(selection.Path, "\\:") || strings.ContainsFunc(selection.Path, unicode.IsControl) {
 		return fmt.Errorf("invalid symbols component path %q", selection.Path)
 	}
-	if len(selection.Families) != 1 || selection.Families[0] != "kernel" {
-		return errors.New("symbols component schema 1 requires only the kernel family; dsc and filesystem are unavailable")
+	if len(selection.Families) == 0 || len(selection.Families) > 3 {
+		return errors.New("component symbols requires an explicit bounded family selection")
 	}
-	namespace, err := kernelFactsNamespace(selection.Path)
-	if err != nil {
-		return err
+	seen := make(map[string]bool, len(selection.Families))
+	for _, family := range selection.Families {
+		if seen[family] {
+			return fmt.Errorf("duplicate symbols component family %q", family)
+		}
+		seen[family] = true
+		switch family {
+		case "kernel":
+			if selection.Name != "KernelCache" {
+				return errors.New("kernel family requires a KernelCache component")
+			}
+		case "dsc":
+			if selection.Name != "OS" && selection.Name != "Cryptex1,SystemOS" {
+				return errors.New("dsc family requires an OS or Cryptex1,SystemOS component")
+			}
+		case "filesystem":
+			if selection.Name == "KernelCache" {
+				return errors.New("filesystem family cannot scan a KernelCache component")
+			}
+		default:
+			return fmt.Errorf("unsupported symbols component family %q", family)
+		}
 	}
-	if selection.Variant != strings.TrimPrefix(namespace, "kernelcache/") {
-		return fmt.Errorf("kernel component variant %q does not match %q", selection.Variant, selection.Path)
+	if selection.Name == "KernelCache" {
+		namespace, err := kernelFactsNamespace(selection.Path)
+		if err != nil {
+			return err
+		}
+		if selection.Variant != strings.TrimPrefix(namespace, "kernelcache/") {
+			return fmt.Errorf("kernel component variant %q does not match %q", selection.Variant, selection.Path)
+		}
+	} else if selection.Variant != "" {
+		return errors.New("disk components cannot have a kernel variant")
 	}
 	return nil
 }
@@ -185,14 +214,31 @@ func readComponentManifest(member *zip.File) ([]byte, error) {
 }
 
 func validateComponentManifest(manifest *plist.BuildManifest, selection SymbolsComponentSelection) error {
+	matched, dscSource := false, false
 	for _, identity := range manifest.BuildIdentities {
+		if selection.Name == "OS" && strings.Contains(identity.Info.Variant, "Recovery") {
+			continue
+		}
 		component, exists := identity.Manifest[selection.Name]
 		member, valid := manifestPath(component)
-		if exists && valid && member == selection.Path {
-			return nil
+		if !exists || !valid || member != selection.Path {
+			continue
+		}
+		matched = true
+		if selection.Name == "Cryptex1,SystemOS" {
+			dscSource = true
+		} else if selection.Name == "OS" {
+			_, hasSystem := identity.Manifest["Cryptex1,SystemOS"]
+			dscSource = dscSource || !hasSystem
 		}
 	}
-	return fmt.Errorf("component %q path %q is absent from the full BuildManifest", selection.Name, selection.Path)
+	if !matched {
+		return fmt.Errorf("component %q path %q is absent from the full BuildManifest", selection.Name, selection.Path)
+	}
+	if slices.Contains(selection.Families, "dsc") && !dscSource {
+		return fmt.Errorf("component %q is not an effective SystemOS in the full BuildManifest", selection.Path)
+	}
+	return nil
 }
 
 // ScanComponentJSONL validates and streams a single component. Callers that
@@ -238,18 +284,49 @@ func (p *PreparedSymbolsComponent) scan(w io.Writer, scan func(func(string, *sca
 
 func (p *PreparedSymbolsComponent) scanComponent(visit func(string, *scanImage) error) error {
 	component := p.start.Component
-	sigs, err := parseKernelSignatures(p.cfg.SigsDir)
-	if err != nil {
-		return err
+	if component.Name == "KernelCache" {
+		sigs, err := parseKernelSignatures(p.cfg.SigsDir)
+		if err != nil {
+			return err
+		}
+		// The selection narrows extraction, while cfg.Info remains the fixed,
+		// complete source for presentation naming.
+		one := &factsCollection{start: factsCollectionStartLine{Selection: factsManifestSelection{
+			Identities: []factsManifestIdentity{{Components: []factsManifestComponent{{Name: "KernelCache", Path: component.Path}}}},
+		}}}
+		return scanKernels(p.cfg.IPSW, sigs, "", p.cfg.Info, one, func(img *scanImage) error {
+			return visit("kernel", img)
+		}, nil)
 	}
-	// The selection narrows extraction, while cfg.Info remains the fixed,
-	// complete source for presentation naming.
-	one := &factsCollection{start: factsCollectionStartLine{Selection: factsManifestSelection{
-		Identities: []factsManifestIdentity{{Components: []factsManifestComponent{{Name: "KernelCache", Path: component.Path}}}},
-	}}}
-	return scanKernels(p.cfg.IPSW, sigs, "", p.cfg.Info, one, func(img *scanImage) error {
-		return visit("kernel", img)
-	}, nil)
+	acquire := func(dir string) (*mount.Context, error) {
+		return mount.DmgComponentInIPSW(p.cfg.IPSW, component.Path, &mount.Config{ExtractDir: dir, PemDB: p.cfg.PemDB})
+	}
+	return mountFactsComponent(acquire, (*mount.Context).Unmount, func(root string) error {
+		return p.scanMountedComponent(root, visit)
+	})
+}
+
+func (p *PreparedSymbolsComponent) scanMountedComponent(root string, visit func(string, *scanImage) error) error {
+	for _, family := range p.start.RequestedFamilies {
+		contextImage := func(img *scanImage) error {
+			copy := *img
+			copy.ComponentPath = p.start.Component.Path
+			return visit(family, &copy)
+		}
+		switch family {
+		case "dsc":
+			if err := scanComponentDSCsInMount(root, contextImage); err != nil {
+				return err
+			}
+		case "filesystem":
+			if err := scanComponentMachosInMount(root, p.start.Component.Name, contextImage); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unexpected mounted component family %q", family)
+		}
+	}
+	return nil
 }
 
 type componentRecordCounts struct {

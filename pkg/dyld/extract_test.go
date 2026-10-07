@@ -14,6 +14,23 @@ import (
 	"github.com/blacktop/ipsw/pkg/plist"
 )
 
+func TestGetDscPathsInMountStrict(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	if paths, err := GetDscPathsInMount(missing, false, true); err != nil || len(paths) != 0 {
+		t.Fatalf("legacy discovery changed: paths=%v err=%v", paths, err)
+	}
+	if _, err := GetDscPathsInMountStrict(missing, false, true); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("strict discovery suppressed a walk error: %v", err)
+	}
+	root := filepath.Join(t.TempDir(), "root[1]")
+	main := writeDscFixture(t, root, "System/Library/dyld/dyld_shared_cache_arm64e", "cache")
+	sub := writeDscFixture(t, root, "System/Library/dyld/dyld_shared_cache_arm64e.01", "subcache")
+	got, err := GetDscPathsInMountStrict(root, false, true)
+	if err != nil || !slices.Equal(got, []string{main, sub}) {
+		t.Fatalf("strict discovery paths=%v err=%v", got, err)
+	}
+}
+
 func TestGetDscPathsInMountMatchesRosettaAOTCaches(t *testing.T) {
 	root := t.TempDir()
 	paths := []string{

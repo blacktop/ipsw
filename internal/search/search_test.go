@@ -8,7 +8,69 @@ import (
 	"testing"
 
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/testutil"
 )
+
+func TestForEachMachoSlicesStrictFailures(t *testing.T) {
+	visit := func(string, []*macho.File) error { return errors.New("unexpected Mach-O") }
+	missing := filepath.Join(t.TempDir(), "missing")
+	if err := ForEachMachoSlices(missing, visit); err != nil {
+		t.Fatalf("legacy missing-root behavior changed: %v", err)
+	}
+	if err := ForEachMachoSlicesStrict(missing, visit); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("walk failure suppressed: %v", err)
+	}
+	if err := withMachoSlicesStrict(t.TempDir(), func([]*macho.File) error { return nil }); err == nil {
+		t.Fatal("directory read failure suppressed")
+	}
+	for _, magic := range []string{"\xcf\xfa\xed\xfe", "\xca\xfe\xba\xbe"} {
+		root := t.TempDir()
+		mustWrite(t, filepath.Join(root, "broken"), magic)
+		if err := ForEachMachoSlices(root, visit); err != nil {
+			t.Fatalf("legacy recognized-format behavior changed: %v", err)
+		}
+		if err := ForEachMachoSlicesStrict(root, visit); err == nil {
+			t.Fatal("recognized Mach-O parse failure suppressed")
+		}
+	}
+}
+
+func TestForEachMachoSlicesStrictSelectionAndHandler(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "real", "tool")
+	arches := []testutil.MachoArch{
+		{CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E},
+		{CPU: types.CPUAmd64, SubCPU: types.CPUSubtypeX8664All},
+	}
+	testutil.WriteMacho(t, file, arches...)
+	mustWrite(t, filepath.Join(root, "empty"), "")
+	mustWrite(t, filepath.Join(root, "short"), "abc")
+	if err := os.Symlink("/real", filepath.Join(root, "alias")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/absent", filepath.Join(root, "dangling")); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	if err := ForEachMachoSlicesStrict(root, func(path string, slices []*macho.File) error {
+		calls++
+		if path != file || len(slices) != 2 || slices[1].CPU != types.CPUAmd64 {
+			t.Fatalf("unexpected FAT selection: path=%s slices=%v", path, slices)
+		}
+		return nil
+	}); err != nil || calls != 1 {
+		t.Fatalf("strict scan calls=%d err=%v", calls, err)
+	}
+	thin := filepath.Join(t.TempDir(), "thin")
+	testutil.WriteMacho(t, thin, arches[0])
+	wantErr := errors.New("handler failed")
+	if err := withMachoSlicesStrict(thin, func([]*macho.File) error {
+		return wantErr
+	}); !errors.Is(err, wantErr) {
+		t.Fatalf("handler failure suppressed: %v", err)
+	}
+}
 
 func mustWrite(t *testing.T, path, content string) {
 	t.Helper()
