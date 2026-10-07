@@ -274,6 +274,30 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 			ComponentPath:     img.ComponentPath,
 		})
 	}
+	line, mask := normalizedImageLine(img)
+	if !e.first(imageOccurrence(line)) {
+		return nil
+	}
+	if err := e.emit(line); err != nil {
+		return err
+	}
+	for _, sym := range img.Macho.Symbols {
+		if err := e.emit(&symbolLine{
+			Type:      "symbol",
+			ImageUUID: img.Macho.UUID,
+			Name:      sym.GetName(),
+			Start:     sym.Start & mask,
+			End:       sym.End & mask,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// normalizedImageLine is shared by both symbol wires so addresses, names, and
+// the complete ordinary occurrence identity keep the same interpretation.
+func normalizedImageLine(img *scanImage) (*imageLine, uint64) {
 	kind, imgPath, mask := img.Kind, img.Macho.GetPath(), ^uint64(0)
 	if img.KernelPath != "" {
 		// The daemon model keeps file-system kernels as raw "macho" entries;
@@ -294,28 +318,15 @@ func (e *jsonlEmitter) image(img *scanImage) error {
 		DSCUUID:       img.DSCUUID,
 		KernelVersion: img.KernelVersion,
 	}
-	if !e.first(occurrence{
+	return line, mask
+}
+
+func imageOccurrence(line *imageLine) occurrence {
+	return occurrence{
 		uuid: line.UUID, kind: line.Kind, path: line.Path,
 		textStart: line.TextStart, textEnd: line.TextEnd,
 		cpu: line.CPU, arch: line.Arch, dscUUID: line.DSCUUID,
-	}) {
-		return nil
 	}
-	if err := e.emit(line); err != nil {
-		return err
-	}
-	for _, sym := range img.Macho.Symbols {
-		if err := e.emit(&symbolLine{
-			Type:      "symbol",
-			ImageUUID: img.Macho.UUID,
-			Name:      sym.GetName(),
-			Start:     sym.Start & mask,
-			End:       sym.End & mask,
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // ScanJSONL scans an IPSW and streams its symbols to w as newline-delimited JSON

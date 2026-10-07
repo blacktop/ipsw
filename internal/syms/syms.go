@@ -251,12 +251,16 @@ func parseKernelSignatures(sigDir string) ([]signature.Symbolicator, error) {
 func scanKernels(
 	ipswPath string, sigs []signature.Symbolicator, device string, inf *info.Info,
 	collection *factsCollection, visit scanVisitor, facts scanFactsVisitor,
-) error {
+) (retErr error) {
 	scratch, err := os.MkdirTemp("", "ipsw_scan_kernels-")
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(scratch)
+	defer func() {
+		if err := os.RemoveAll(scratch); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("failed to clean kernel scan: %w", err))
+		}
+	}()
 	out, err := extractScanKernels(ipswPath, device, scratch, inf, collection)
 	if err != nil {
 		return fmt.Errorf("failed to extract kernelcache: %w", err)
@@ -273,7 +277,7 @@ func scanKernels(
 		if err != nil {
 			return fmt.Errorf("failed to open kernel: %w", err)
 		}
-		defer m.Close()
+		defer func() { retErr = errors.Join(retErr, m.Close()) }()
 		kv, err := kernelcache.GetVersion(m)
 		if err != nil {
 			return err
@@ -422,10 +426,11 @@ func scanDSCsInMount(mountPoint string, visit scanVisitor, facts scanFactsVisito
 			return fmt.Errorf("failed to open DSC %s: %w", dscPath, err)
 		}
 		if err := scanDSC(f, visit, facts); err != nil {
-			f.Close()
+			return errors.Join(err, f.Close())
+		}
+		if err := f.Close(); err != nil {
 			return err
 		}
-		f.Close()
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
@@ -359,11 +360,19 @@ func ExtractWithInfo(i *info.Info, ipsw, destPath string, targets ...string) (ma
 // the result under destPath. It returns each written path mapped to the devices
 // that kernelcache supports.
 func extractKernelcaches(i *info.Info, ipsw, destPath string, targetKCs []string) (map[string][]string, error) {
+	return extractKernelcachesWithCleanup(i, ipsw, destPath, targetKCs, os.RemoveAll)
+}
+
+func extractKernelcachesWithCleanup(i *info.Info, ipsw, destPath string, targetKCs []string, removeAll func(string) error) (_ map[string][]string, retErr error) {
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary directory to store kernelcache: %v", err)
 	}
-	defer os.RemoveAll(tmpDIR)
+	defer func() {
+		if err := removeAll(tmpDIR); err != nil {
+			retErr = stderrors.Join(retErr, fmt.Errorf("failed to clean kernel extraction: %w", err))
+		}
+	}()
 
 	kcaches, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
 		if !strings.Contains(f.Name, "kernelcache") {

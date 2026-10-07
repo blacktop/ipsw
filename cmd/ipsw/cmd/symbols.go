@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,6 +42,12 @@ func init() {
 	symbolsCmd.Flags().Bool("kernel", false, "Include kernelcache/KEXT symbols")
 	symbolsCmd.Flags().Bool("filesystem", false, "Include file system Mach-O symbols")
 	symbolsCmd.Flags().Bool("facts", false, "Emit versioned per-image comparison facts")
+	symbolsCmd.Flags().String("component-name", "", "Exact BuildManifest component name (opt-in component stream)")
+	symbolsCmd.Flags().String("component-path", "", "Exact archive member for --component-name")
+	symbolsCmd.Flags().String("component-variant", "", "KernelCache variant: release or research")
+	symbolsCmd.Flags().MarkHidden("component-name")
+	symbolsCmd.Flags().MarkHidden("component-path")
+	symbolsCmd.Flags().MarkHidden("component-variant")
 	symbolsCmd.Flags().StringSlice("facts-boards", nil,
 		"Scan shared components once for this exact board subset (requires --facts)")
 	symbolsCmd.Flags().String("signatures", "", "Path to kernel symbolication signatures directory")
@@ -53,6 +60,9 @@ func init() {
 	viper.BindPFlag("symbols.kernel", symbolsCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("symbols.filesystem", symbolsCmd.Flags().Lookup("filesystem"))
 	viper.BindPFlag("symbols.facts", symbolsCmd.Flags().Lookup("facts"))
+	viper.BindPFlag("symbols.component-name", symbolsCmd.Flags().Lookup("component-name"))
+	viper.BindPFlag("symbols.component-path", symbolsCmd.Flags().Lookup("component-path"))
+	viper.BindPFlag("symbols.component-variant", symbolsCmd.Flags().Lookup("component-variant"))
 	viper.BindPFlag("symbols.facts-boards", symbolsCmd.Flags().Lookup("facts-boards"))
 	viper.BindPFlag("symbols.signatures", symbolsCmd.Flags().Lookup("signatures"))
 	viper.BindPFlag("symbols.pem-db", symbolsCmd.Flags().Lookup("pem-db"))
@@ -103,16 +113,21 @@ This mode requires JSON output and cannot be combined with --device.`,
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	Hidden:        true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (retErr error) {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// Default to all sources when none are explicitly selected.
+		componentMode := false
+		for _, flag := range []string{"component-name", "component-path", "component-variant"} {
+			componentMode = componentMode || cmd.Flags().Changed(flag) || viper.IsSet("symbols."+flag)
+		}
+		// Ordinary scans default to all sources. Exact component scans require
+		// an explicit bounded selection so a typo cannot broaden their work.
 		kernel := viper.GetBool("symbols.kernel")
 		dyld := viper.GetBool("symbols.dyld")
 		filesystem := viper.GetBool("symbols.filesystem")
-		if !kernel && !dyld && !filesystem {
+		if !componentMode && !kernel && !dyld && !filesystem {
 			kernel, dyld, filesystem = true, true, true
 		}
 
@@ -130,29 +145,56 @@ This mode requires JSON output and cannot be combined with --device.`,
 			Kernel: kernel, DSC: dyld, FileSystem: filesystem,
 			Facts: viper.GetBool("symbols.facts"), FactsBoards: factsBoards,
 		}
+		selection := syms.SymbolsComponentSelection{
+			Name: viper.GetString("symbols.component-name"), Path: viper.GetString("symbols.component-path"),
+			Variant: viper.GetString("symbols.component-variant"),
+		}
+		if kernel {
+			selection.Families = append(selection.Families, "kernel")
+		}
+		if dyld {
+			selection.Families = append(selection.Families, "dsc")
+		}
+		if filesystem {
+			selection.Families = append(selection.Families, "filesystem")
+		}
 		// Reject invalid flag combinations before any source I/O.
+		if componentMode {
+			if !viper.GetBool("symbols.json") {
+				return fmt.Errorf("component symbols requires --json")
+			}
+			if err := syms.ValidateComponentOptions(cfg, selection); err != nil {
+				return err
+			}
+		}
 		if factsBoards != nil && !viper.GetBool("symbols.json") {
 			return fmt.Errorf("--facts-boards requires --json")
 		}
 		if err := syms.ValidateFactsBoardsOptions(cfg); err != nil {
 			return err
 		}
-		if _, err := os.Stat(ipswPath); err != nil {
+		sourceInfo, err := os.Stat(ipswPath)
+		if err != nil {
 			return fmt.Errorf("file %s does not exist: %w", ipswPath, err)
 		}
 
 		// Validate the selection before creating or truncating the output file.
-		inf, err := info.Parse(ipswPath)
-		if err != nil {
-			return err
-		}
-		cfg.Info = inf
-		if factsBoards != nil {
-			err = syms.ValidateFactsSelection(cfg)
-		} else if dyld || filesystem {
-			_, err = inf.SelectDevice(cfg.Device)
+		var component *syms.PreparedSymbolsComponent
+		if componentMode {
+			component, err = syms.PrepareComponentJSONL(cfg, selection)
 		} else {
-			_, err = inf.ForDevice(cfg.Device)
+			var inf *info.Info
+			inf, err = info.Parse(ipswPath)
+			if err == nil {
+				cfg.Info = inf
+				if factsBoards != nil {
+					err = syms.ValidateFactsSelection(cfg)
+				} else if dyld || filesystem {
+					_, err = inf.SelectDevice(cfg.Device)
+				} else {
+					_, err = inf.ForDevice(cfg.Device)
+				}
+			}
 		}
 		if err != nil {
 			return err
@@ -160,14 +202,24 @@ This mode requires JSON output and cannot be combined with --device.`,
 
 		out := os.Stdout
 		if output := viper.GetString("symbols.output"); output != "" && output != "-" {
+			if componentMode {
+				if outputInfo, statErr := os.Stat(output); statErr == nil && os.SameFile(sourceInfo, outputInfo) {
+					return fmt.Errorf("component output must not overwrite source %s", ipswPath)
+				} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+					return statErr
+				}
+			}
 			f, err := os.Create(output)
 			if err != nil {
 				return fmt.Errorf("failed to create output file %s: %w", output, err)
 			}
-			defer f.Close()
+			defer func() { retErr = errors.Join(retErr, f.Close()) }()
 			out = f
 		}
 
+		if component != nil {
+			return component.Scan(out)
+		}
 		return syms.ScanJSONL(cfg, out)
 	},
 }

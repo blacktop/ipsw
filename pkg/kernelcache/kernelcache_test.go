@@ -53,6 +53,29 @@ func TestExtractWithInfoTargetsOnlyNamedKernelcache(t *testing.T) {
 	}
 }
 
+func TestExtractKernelcachesReportsOwnedCleanupFailure(t *testing.T) {
+	ip := filepath.Join(t.TempDir(), "empty.ipsw")
+	f, err := os.Create(ip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := zip.NewWriter(f).Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("injected removal failure")
+	removed := false
+	_, err = extractKernelcachesWithCleanup(&info.Info{}, ip, t.TempDir(), nil, func(path string) error {
+		removed = true
+		return errors.Join(os.RemoveAll(path), wantErr)
+	})
+	if !removed || !errors.Is(err, wantErr) {
+		t.Fatalf("cleanup failure lost: removed=%t err=%v", removed, err)
+	}
+}
+
 func TestParseImg4DataRejectsEncryptedKernelcache(t *testing.T) {
 	payload, err := img4.CreatePayload(&img4.CreatePayloadConfig{
 		Type:        img4.IM4P_KERNELCACHE,
