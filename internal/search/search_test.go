@@ -1,6 +1,7 @@
 package search
 
 import (
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
@@ -11,6 +12,82 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/testutil"
 )
+
+func metalUniversalFixture() []byte {
+	const airOffset, airSize, gpuOffset, gpuSize = 48, 88, 144, 32
+	data := make([]byte, gpuOffset+gpuSize)
+	for idx, word := range []uint32{
+		0xcafebabe, 2,
+		0x01000017, 13, airOffset, airSize, 3,
+		0x01000013, 83, gpuOffset, gpuSize, 4,
+	} {
+		binary.BigEndian.PutUint32(data[idx*4:], word)
+	}
+	copy(data[airOffset:], "MTLB")
+	binary.LittleEndian.PutUint16(data[airOffset+4:], 0x8001)
+	binary.LittleEndian.PutUint16(data[airOffset+6:], 2)
+	binary.LittleEndian.PutUint16(data[airOffset+8:], 9)
+	binary.LittleEndian.PutUint64(data[airOffset+16:], airSize)
+	for pos := airOffset + 24; pos < airOffset+airSize; pos += 16 {
+		binary.LittleEndian.PutUint64(data[pos:], airSize)
+	}
+	for idx, word := range []uint32{0xfeedfacf, 0x01000013, 83, uint32(types.MH_GPU_EXECUTE), 0, 0, 0, 0} {
+		binary.LittleEndian.PutUint32(data[gpuOffset+idx*4:], word)
+	}
+	return data
+}
+
+func TestForEachMachoSlicesStrictMetalUniversal(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "no-extension")
+	data := metalUniversalFixture()
+	if err := os.WriteFile(file, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unwantedVisit := errors.New("Metal universal reached Mach-O visitor")
+	visit := func(string, []*macho.File) error { return unwantedVisit }
+	if err := ForEachMachoSlicesStrict(root, visit); err != nil {
+		t.Fatalf("valid mixed Metal container was rejected: %v", err)
+	}
+	if err := ForEachMachoSlices(root, visit); err != nil {
+		t.Fatalf("ordinary walker behavior changed: %v", err)
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func([]byte) []byte
+	}{
+		{"short table", func(data []byte) []byte { return data[:47] }},
+		{"excess slices", func(data []byte) []byte { binary.BigEndian.PutUint32(data[4:], 65); return data }},
+		{"member past EOF", func(data []byte) []byte { binary.BigEndian.PutUint32(data[40:], 33); return data }},
+		{"overlap", func(data []byte) []byte { binary.BigEndian.PutUint32(data[36:], 128); return data }},
+		{"misaligned member", func(data []byte) []byte { binary.BigEndian.PutUint32(data[44:], 8); return data }},
+		{"duplicate architecture", func(data []byte) []byte { copy(data[28:36], data[8:16]); return data }},
+		{"unknown architecture", func(data []byte) []byte { binary.BigEndian.PutUint32(data[28:], uint32(types.CPUAmd64)); return data }},
+		{"bad MTLB magic", func(data []byte) []byte { data[48] = 'X'; return data }},
+		{"bad MTLB size", func(data []byte) []byte { binary.LittleEndian.PutUint64(data[64:], 87); return data }},
+		{"bad MTLB section", func(data []byte) []byte { binary.LittleEndian.PutUint64(data[80:], 1); return data }},
+		{"bad GPU magic", func(data []byte) []byte { data[144] = 0; return data }},
+		{"GPU architecture mismatch", func(data []byte) []byte { binary.LittleEndian.PutUint32(data[152:], 84); return data }},
+		{"ordinary Mach-O payload", func(data []byte) []byte {
+			binary.LittleEndian.PutUint32(data[156:], uint32(types.MH_EXECUTE))
+			return data
+		}},
+		{"malformed GPU load commands", func(data []byte) []byte {
+			binary.LittleEndian.PutUint32(data[160:], 1)
+			binary.LittleEndian.PutUint32(data[164:], 8)
+			return data
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.WriteFile(file, tc.mutate(slices.Clone(data)), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := ForEachMachoSlicesStrict(root, visit); err == nil || errors.Is(err, unwantedVisit) {
+				t.Fatalf("malformed/non-Metal universal was not rejected by parsing: %v", err)
+			}
+		})
+	}
+}
 
 func TestForEachMachoSlicesStrictFailures(t *testing.T) {
 	visit := func(string, []*macho.File) error { return errors.New("unexpected Mach-O") }

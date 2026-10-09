@@ -3,6 +3,7 @@ package search
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -503,6 +505,17 @@ func withMachoSlicesStrict(machoPath string, handler func([]*macho.File) error) 
 		return handler(slices)
 	}
 	if !errors.Is(err, macho.ErrNotFat) {
+		info, statErr := f.Stat()
+		if statErr != nil {
+			return statErr
+		}
+		metal, metalErr := isMetalUniversal(f, info.Size())
+		if metalErr != nil {
+			return fmt.Errorf("failed to classify Mach-O %s: %w", machoPath, metalErr)
+		}
+		if metal {
+			return nil
+		}
 		return fmt.Errorf("failed to parse Mach-O %s: %w", machoPath, err)
 	}
 	m, err := macho.NewFile(f)
@@ -510,6 +523,83 @@ func withMachoSlicesStrict(machoPath string, handler func([]*macho.File) error) 
 		return fmt.Errorf("failed to parse Mach-O %s: %w", machoPath, err)
 	}
 	return handler([]*macho.File{m})
+}
+
+// isMetalUniversal recognizes the mixed AIR64/Apple-GPU wrapper used by Metal
+// libraries. FAT alone is not evidence: every bounded member must be either an
+// MTLB archive or a valid MH_GPU_EXECUTE image with a matching architecture.
+func isMetalUniversal(r io.ReaderAt, size int64) (bool, error) {
+	const (
+		cpuAppleGPU = types.CPU(0x01000013)
+		cpuAIR64    = types.CPU(0x01000017)
+		maxSlices   = 64
+	)
+	var header [8]byte
+	if size < int64(len(header)) {
+		return false, nil
+	}
+	if _, err := r.ReadAt(header[:], 0); err != nil {
+		return false, err
+	}
+	count := binary.BigEndian.Uint32(header[4:])
+	if binary.BigEndian.Uint32(header[:4]) != types.MagicFat.Int() || count < 2 || count > maxSlices {
+		return false, nil
+	}
+	tableEnd := uint64(8 + count*20)
+	if tableEnd > uint64(size) {
+		return false, nil
+	}
+	arches := make([]macho.FatArchHeader, count)
+	if err := binary.Read(io.NewSectionReader(r, 8, int64(count)*20), binary.BigEndian, arches); err != nil {
+		return false, err
+	}
+	metal, gpu := false, false
+	for idx, arch := range arches {
+		offset, length := uint64(arch.Offset), uint64(arch.Size)
+		if offset < tableEnd || offset > uint64(size) || length > uint64(size)-offset ||
+			arch.Align >= 32 || offset%(uint64(1)<<arch.Align) != 0 {
+			return false, nil
+		}
+		for _, prior := range arches[:idx] {
+			if (arch.CPU == prior.CPU && arch.SubCPU == prior.SubCPU) ||
+				(offset < uint64(prior.Offset)+uint64(prior.Size) && uint64(prior.Offset) < offset+length) {
+				return false, nil
+			}
+		}
+		switch arch.CPU {
+		case cpuAIR64:
+			var mtlb [88]byte
+			if length < uint64(len(mtlb)) {
+				return false, nil
+			}
+			if _, err := r.ReadAt(mtlb[:], int64(offset)); err != nil {
+				return false, err
+			}
+			if string(mtlb[:4]) != "MTLB" || binary.LittleEndian.Uint64(mtlb[16:24]) != length {
+				return false, nil
+			}
+			for pos := 24; pos < len(mtlb); pos += 16 {
+				start := binary.LittleEndian.Uint64(mtlb[pos : pos+8])
+				sectionSize := binary.LittleEndian.Uint64(mtlb[pos+8 : pos+16])
+				if start > length || sectionSize > length-start || (sectionSize != 0 && start < uint64(len(mtlb))) {
+					return false, nil
+				}
+			}
+			metal = true
+		case cpuAppleGPU:
+			m, err := macho.NewFile(io.NewSectionReader(r, int64(offset), int64(length)))
+			if err != nil {
+				return false, err
+			}
+			if m.Magic != types.Magic64 || m.CPU != arch.CPU || m.SubCPU != arch.SubCPU || m.Type != types.MH_GPU_EXECUTE {
+				return false, nil
+			}
+			gpu = true
+		default:
+			return false, nil
+		}
+	}
+	return metal && gpu, nil
 }
 
 // handlePlistInMount reads a .plist under directory, keyed relative to directory.
