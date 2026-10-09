@@ -41,16 +41,30 @@ func TestForEachMachoSlicesStrictMetalUniversal(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "no-extension")
 	data := metalUniversalFixture()
-	if err := os.WriteFile(file, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	allMTLB := append(slices.Clone(data[:144]), data[48:136]...)
+	binary.BigEndian.PutUint32(allMTLB[12:], 8)
+	binary.BigEndian.PutUint32(allMTLB[28:], 0x01000017)
+	binary.BigEndian.PutUint32(allMTLB[32:], 13)
+	binary.BigEndian.PutUint32(allMTLB[40:], 88)
 	unwantedVisit := errors.New("Metal universal reached Mach-O visitor")
 	visit := func(string, []*macho.File) error { return unwantedVisit }
-	if err := ForEachMachoSlicesStrict(root, visit); err != nil {
-		t.Fatalf("valid mixed Metal container was rejected: %v", err)
+	for _, valid := range [][]byte{data, allMTLB} {
+		if err := os.WriteFile(file, valid, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := ForEachMachoSlicesStrict(root, visit); err != nil {
+			t.Fatalf("valid Metal container was rejected: %v", err)
+		}
+		if err := ForEachMachoSlices(root, visit); err != nil {
+			t.Fatalf("ordinary walker behavior changed: %v", err)
+		}
 	}
-	if err := ForEachMachoSlices(root, visit); err != nil {
-		t.Fatalf("ordinary walker behavior changed: %v", err)
+	allMTLB[144] = 'X'
+	if err := os.WriteFile(file, allMTLB, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ForEachMachoSlicesStrict(root, visit); err == nil || errors.Is(err, unwantedVisit) {
+		t.Fatalf("malformed second MTLB member was not rejected by parsing: %v", err)
 	}
 	for _, tc := range []struct {
 		name   string

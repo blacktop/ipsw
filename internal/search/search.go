@@ -525,7 +525,7 @@ func withMachoSlicesStrict(machoPath string, handler func([]*macho.File) error) 
 	return handler([]*macho.File{m})
 }
 
-// isMetalUniversal recognizes the mixed AIR64/Apple-GPU wrapper used by Metal
+// isMetalUniversal recognizes the AIR64/Apple-GPU wrappers used by Metal
 // libraries. FAT alone is not evidence: every bounded member must be either an
 // MTLB archive or a valid MH_GPU_EXECUTE image with a matching architecture.
 func isMetalUniversal(r io.ReaderAt, size int64) (bool, error) {
@@ -553,7 +553,7 @@ func isMetalUniversal(r io.ReaderAt, size int64) (bool, error) {
 	if err := binary.Read(io.NewSectionReader(r, 8, int64(count)*20), binary.BigEndian, arches); err != nil {
 		return false, err
 	}
-	metal, gpu := false, false
+	metal := false
 	for idx, arch := range arches {
 		offset, length := uint64(arch.Offset), uint64(arch.Size)
 		if offset < tableEnd || offset > uint64(size) || length > uint64(size)-offset ||
@@ -594,12 +594,11 @@ func isMetalUniversal(r io.ReaderAt, size int64) (bool, error) {
 			if m.Magic != types.Magic64 || m.CPU != arch.CPU || m.SubCPU != arch.SubCPU || m.Type != types.MH_GPU_EXECUTE {
 				return false, nil
 			}
-			gpu = true
 		default:
 			return false, nil
 		}
 	}
-	return metal && gpu, nil
+	return metal, nil
 }
 
 // handlePlistInMount reads a .plist under directory, keyed relative to directory.
