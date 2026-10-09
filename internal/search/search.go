@@ -594,6 +594,20 @@ func isMetalUniversal(r io.ReaderAt, size int64) (bool, error) {
 			if m.Magic != types.Magic64 || m.CPU != arch.CPU || m.SubCPU != arch.SubCPU || m.Type != types.MH_GPU_EXECUTE {
 				return false, nil
 			}
+			if uint64(len(m.Loads)) != uint64(m.NCommands) {
+				return false, nil
+			}
+			commandBytes, declaredBytes := uint64(0), uint64(m.SizeCommands)
+			for _, load := range m.Loads {
+				size := uint64(len(load.Raw()))
+				if size > declaredBytes-commandBytes {
+					return false, nil
+				}
+				commandBytes += size
+			}
+			if commandBytes != declaredBytes {
+				return false, nil
+			}
 		default:
 			return false, nil
 		}

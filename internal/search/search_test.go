@@ -91,6 +91,12 @@ func TestForEachMachoSlicesStrictMetalUniversal(t *testing.T) {
 			binary.LittleEndian.PutUint32(data[164:], 8)
 			return data
 		}},
+		{"unconsumed GPU load commands", func(data []byte) []byte {
+			data = append(data, make([]byte, 8)...)
+			binary.BigEndian.PutUint32(data[40:], 40)
+			binary.LittleEndian.PutUint32(data[164:], 8)
+			return data
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := os.WriteFile(file, tc.mutate(slices.Clone(data)), 0o600); err != nil {
