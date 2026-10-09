@@ -76,7 +76,7 @@
       "@docusaurus/utils>js-yaml": "4.1.1",
       "cosmiconfig>js-yaml": "4.1.1",
       "copy-webpack-plugin>serialize-javascript": "7.0.5",
-      "dompurify": "3.3.2",
+      "dompurify": "3.4.16",
       "estree-util-value-to-estree": "3.3.3",
       "fast-xml-builder": "1.1.7",
       "glob": "10.5.0",
