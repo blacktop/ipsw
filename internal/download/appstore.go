@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/storeauth"
 	"github.com/blacktop/ipsw/internal/utils"
 
 	"github.com/99designs/keyring"
@@ -44,6 +46,8 @@ const (
 	appStoreBagURL         = "https://init.itunes.apple.com/bag.xml"
 	appStoreSearchURL      = "https://itunes.apple.com/search"
 	appStoreLookupURL      = "https://itunes.apple.com/lookup"
+	maxSAPLoginRedirects   = 4
+	maxSAPRequestAttempts  = 3
 
 	// AppStoreSearchLimit is the maximum number of results returned by the App Store search API
 	AppStoreSearchLimit = 200
@@ -190,6 +194,7 @@ type bagResponse struct {
 	AuthenticateAccount string `plist:"authenticateAccount,omitempty"`
 	URLBag              struct {
 		AuthenticateAccount string `plist:"authenticateAccount,omitempty"`
+		SAPVersion          string `plist:"sign-sap-version,omitempty"`
 	} `plist:"urlBag,omitempty"`
 }
 
@@ -291,31 +296,27 @@ func appStoreHostForPod(pod string) string {
 }
 
 func isAppStoreBuyHost(host string) bool {
+	return isAppStorePodHost(host, appStoreBuyHost)
+}
+
+func isAppStorePodHost(host, root string) bool {
 	host = strings.ToLower(host)
-	if host == appStoreBuyHost {
+	if host == root {
 		return true
 	}
 	pod, ok := strings.CutPrefix(host, "p")
 	if !ok {
 		return false
 	}
-	pod, ok = strings.CutSuffix(pod, "-"+appStoreBuyHost)
-	if !ok || len(pod) == 0 || len(pod) > 58 {
-		return false
-	}
-	for _, c := range pod {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
+	pod, ok = strings.CutSuffix(pod, "-"+root)
+	return ok && pod != "" && validAppStorePod(pod)
 }
 
 func isAppStoreAuthURL(endpoint *url.URL) bool {
 	return endpoint != nil && endpoint.Scheme == "https" && endpoint.User == nil &&
 		endpoint.Opaque == "" && endpoint.Fragment == "" &&
 		(endpoint.Port() == "" || endpoint.Port() == "443") &&
-		(strings.EqualFold(endpoint.Hostname(), appStoreAuthHost) || isAppStoreBuyHost(endpoint.Hostname()))
+		(isAppStorePodHost(endpoint.Hostname(), appStoreAuthHost) || isAppStoreBuyHost(endpoint.Hostname()))
 }
 
 func resolveRedirectEndpoint(base *url.URL, location string) (*url.URL, error) {
@@ -337,10 +338,17 @@ func resolveRedirectEndpoint(base *url.URL, location string) (*url.URL, error) {
 }
 
 func decodePlistResponse(body []byte, out any) error {
-	return plist.NewDecoder(bytes.NewReader(normalizePlistBody(body))).Decode(out)
+	body = normalizePlistBody(body)
+	if len(body) == 0 {
+		return io.ErrUnexpectedEOF
+	}
+	return plist.NewDecoder(bytes.NewReader(body)).Decode(out)
 }
 
 func normalizePlistBody(body []byte) []byte {
+	if bytes.HasPrefix(body, []byte("bplist00")) {
+		return body
+	}
 	normalized := bytes.TrimSpace(body)
 	if len(normalized) == 0 {
 		return normalized
@@ -393,10 +401,10 @@ func extractDictBody(body []byte) []byte {
 	return bytes.TrimSpace(match)
 }
 
-func (as *AppStore) getBagAuthEndpoint(guid string) (string, error) {
+func (as *AppStore) appStoreBag(guid string) (bagResponse, error) {
 	req, err := http.NewRequestWithContext(as.config.Context, "GET", appStoreBagURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create bag request: %w", err)
+		return bagResponse{}, fmt.Errorf("failed to create bag request: %w", err)
 	}
 
 	query := req.URL.Query()
@@ -405,24 +413,39 @@ func (as *AppStore) getBagAuthEndpoint(guid string) (string, error) {
 	req.Header.Set("Accept", "application/xml")
 	req.Header.Set("User-Agent", userAgent)
 
-	res, err := as.Client.Do(req)
+	client := *as.Client
+	if client.Timeout <= 0 || client.Timeout > 30*time.Second {
+		client.Timeout = 30 * time.Second
+	}
+	res, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("bag request failed: %w", err)
+		return bagResponse{}, fmt.Errorf("bag request failed: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("bag request returned status: %s", res.Status)
+		return bagResponse{}, fmt.Errorf("bag request returned status: %s", res.Status)
 	}
 
-	body, err := io.ReadAll(res.Body)
+	body, err := io.ReadAll(io.LimitReader(res.Body, (4<<20)+1))
 	if err != nil {
-		return "", fmt.Errorf("failed to read bag response: %w", err)
+		return bagResponse{}, fmt.Errorf("failed to read bag response: %w", err)
+	}
+	if len(body) > 4<<20 {
+		return bagResponse{}, errors.New("App Store bag response exceeds size limit")
 	}
 
 	var bag bagResponse
 	if err := decodePlistResponse(body, &bag); err != nil {
-		return "", fmt.Errorf("failed to decode bag response: %w", err)
+		return bagResponse{}, fmt.Errorf("failed to decode bag response: %w", err)
+	}
+	return bag, nil
+}
+
+func (as *AppStore) getBagAuthEndpoint(guid string) (string, error) {
+	bag, err := as.appStoreBag(guid)
+	if err != nil {
+		return "", err
 	}
 
 	endpoint := strings.TrimSpace(bag.AuthenticateAccount)
@@ -433,12 +456,66 @@ func (as *AppStore) getBagAuthEndpoint(guid string) (string, error) {
 	return normalizeAuthEndpoint(endpoint), nil
 }
 
+// The SAP 200 password service uses the legacy authentication family. The
+// trailing slash is significant: the bare path can return an empty response.
+func (as *AppStore) resolveSAPAuthEndpoint(guid string) (string, error) {
+	bag, err := as.appStoreBag(guid)
+	if err != nil {
+		return "", fmt.Errorf("get SAP authentication endpoint: %w", err)
+	}
+	if bag.URLBag.SAPVersion != "200" {
+		return "", errors.New("App Store bag does not advertise SAP version 200")
+	}
+	endpoint, err := parseSAPAuthEndpoint(bag.URLBag.AuthenticateAccount)
+	if err != nil {
+		return "", err
+	}
+	endpoint.Path = appStoreAuthPath + "/"
+	return endpoint.String(), nil
+}
+
+func parseSAPAuthEndpoint(source string) (*url.URL, error) {
+	invalid := errors.New("invalid SAP App Store authentication endpoint")
+	if !validNativeAuthReference(source) {
+		return nil, invalid
+	}
+	endpoint, err := url.Parse(source)
+	if err != nil || !isAppStoreAuthURL(endpoint) || !isAppStoreBuyHost(endpoint.Hostname()) ||
+		endpoint.RawPath != "" || strings.HasSuffix(endpoint.Host, ":") ||
+		(endpoint.Path != appStoreAuthPath && endpoint.Path != appStoreAuthPath+"/") {
+		return nil, invalid
+	}
+	return endpoint, nil
+}
+
+func resolveSAPAuthRedirect(base *url.URL, location string) (*url.URL, error) {
+	if base == nil || !validNativeAuthReference(location) {
+		return nil, errors.New("invalid SAP App Store authentication redirect")
+	}
+	reference, err := url.Parse(location)
+	if err != nil {
+		return nil, errors.New("invalid SAP App Store authentication redirect")
+	}
+	return parseSAPAuthEndpoint(base.ResolveReference(reference).String())
+}
+
+func waitAppStoreAuthRetry(ctx context.Context, retries int) error {
+	timer := time.NewTimer(time.Second << retries)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 // normalizeAuthEndpoint selects the native /fast/ entry point for bags that
 // advertise the native root. Redirects returned by that endpoint are followed
 // separately, without rewriting their paths.
 func normalizeAuthEndpoint(endpoint string) string {
 	parsed, err := url.Parse(endpoint)
-	if err != nil || !strings.EqualFold(parsed.Hostname(), appStoreAuthHost) {
+	if err != nil || !isAppStorePodHost(parsed.Hostname(), appStoreAuthHost) {
 		return endpoint
 	}
 	switch parsed.Path {
@@ -640,40 +717,83 @@ func (as *AppStore) Login(username, password string) error {
 	}
 
 	if err := as.loadSession(); err != nil { // load previous session (if error, login)
-		return as.signIn(username, password, "", 1, "")
+		return as.authenticate(username, password)
 	}
 
 	return nil
 }
 
-func (as *AppStore) signIn(username, password, code string, attempt int, pod string) error {
+func (as *AppStore) signIn(username, password, code string, attempt int, pod string, sign appStoreRequestSigner) error {
+	if code != "" {
+		var err error
+		code, err = storeauth.NormalizeTwoFactorCode(code)
+		if err != nil {
+			return err
+		}
+	}
 	mac, err := getMacAddress()
 	if err != nil {
 		return fmt.Errorf("failed to get mac address: %v", err)
 	}
 	guid := strings.ReplaceAll(strings.ToUpper(mac), ":", "")
-	as.authEndpoint = as.resolveAuthEndpoint(guid)
+	if sign != nil {
+		as.authEndpoint, err = as.resolveSAPAuthEndpoint(guid)
+		if err != nil {
+			return err
+		}
+	} else {
+		as.authEndpoint = as.resolveAuthEndpoint(guid)
+	}
 	log.WithField("endpoint", as.authEndpoint).Debug("Using App Store auth endpoint")
 
 	if pod == "" {
 		as.pod = ""
 	}
 
-	return as.signInWithEndpoint(username, password, code, attempt, pod, as.authEndpoint, false)
+	return as.signInAttempt(username, password, code, attempt, pod, as.authEndpoint, false, readAppStoreCode, sign, 0, 0, guid)
 }
 
-func (as *AppStore) signInWithEndpoint(username, password, code string, attempt int, pod, endpoint string, triedFallback bool) error {
+func readAppStoreCode() (string, error) {
+	var code string
+	if err := survey.AskOne(&survey.Password{Message: "Please type your verification code:"}, &code); err != nil {
+		if err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+		}
+		return "", err
+	}
+	return code, nil
+}
+
+func (as *AppStore) signInAttempt(username, password, code string, attempt int, pod, endpoint string, triedFallback bool, readCode func() (string, error), sign appStoreRequestSigner, redirects, requestRetries int, guid string) error {
 	if attempt > 4 {
 		return errors.New("too many authentication attempts")
+	}
+	if !validAppStorePod(pod) {
+		return errors.New("invalid App Store authentication pod")
+	}
+	if code != "" {
+		var err error
+		code, err = storeauth.NormalizeTwoFactorCode(code)
+		if err != nil {
+			return err
+		}
 	}
 	parsedEndpoint, err := url.Parse(endpoint)
 	if err != nil || !isAppStoreAuthURL(parsedEndpoint) {
 		return errors.New("App Store authentication URL is not a trusted HTTPS endpoint")
 	}
+	if sign != nil {
+		if _, err := parseSAPAuthEndpoint(endpoint); err != nil {
+			return err
+		}
+	}
 
-	mac, err := getMacAddress()
-	if err != nil {
-		return fmt.Errorf("failed to get mac address: %v", err)
+	if guid == "" {
+		mac, err := getMacAddress()
+		if err != nil {
+			return fmt.Errorf("failed to get mac address: %v", err)
+		}
+		guid = strings.ReplaceAll(strings.ToUpper(mac), ":", "")
 	}
 
 	var buf bytes.Buffer
@@ -682,8 +802,8 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 	lr := loginRequest{
 		AppleID:  username,
 		Attempt:  strconv.Itoa(attempt),
-		GuID:     strings.ReplaceAll(strings.ToUpper(mac), ":", ""),
-		Password: password + strings.ReplaceAll(code, " ", ""),
+		GuID:     guid,
+		Password: password + code,
 		Rmp:      "0",
 		Why:      "signIn",
 	}
@@ -691,28 +811,51 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 	if err := encoder.Encode(lr); err != nil {
 		return err
 	}
+	var signature []byte
+	if sign != nil {
+		signature, err = sign(as.config.Context, buf.Bytes())
+		if err != nil {
+			return fmt.Errorf("sign App Store login: %w", err)
+		}
+		if len(signature) == 0 {
+			return errors.New("App Store login signature is empty")
+		}
+	}
 
 	req, err := http.NewRequestWithContext(as.config.Context, "POST", endpoint, &buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
 
+	_, nativeEndpointErr := parseNativeAuthEndpoint(endpoint)
+	nativeEndpoint := nativeEndpointErr == nil
+	// Preserve the password-login profile even when its endpoint is native.
+	// The separate PET/token bridge uses application/x-apple-plist.
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("User-Agent", userAgent)
+	if signature != nil {
+		req.Header.Set("X-Apple-ActionSignature", base64.StdEncoding.EncodeToString(signature))
+	}
 
 	// Handle every auth redirect here so credentials, 2FA codes, and the retry
 	// budget survive each hop. Other App Store requests keep normal HTTP behavior.
 	client := *as.Client
+	if client.Timeout <= 0 || client.Timeout > 30*time.Second {
+		client.Timeout = 30 * time.Second
+	}
 	client.CheckRedirect = func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return err
+		return redactAppStoreTransportError(err)
 	}
 	defer res.Body.Close()
 
 	responsePod := strings.TrimSpace(res.Header.Get("pod"))
+	if !validAppStorePod(responsePod) {
+		return errors.New("App Store returned an invalid pod")
+	}
 	if responsePod != "" {
 		as.pod = responsePod
 	} else if pod != "" {
@@ -727,7 +870,18 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 	switch res.StatusCode {
 	case http.StatusMovedPermanently, http.StatusFound, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
 		if loc := strings.TrimSpace(res.Header.Get("Location")); loc != "" {
-			resolvedEndpoint, err := resolveRedirectEndpoint(req.URL, loc)
+			var resolvedEndpoint *url.URL
+			var err error
+			nextAttempt := attempt + 1
+			if sign != nil {
+				if redirects >= maxSAPLoginRedirects {
+					return errors.New("too many App Store authentication redirects")
+				}
+				resolvedEndpoint, err = resolveSAPAuthRedirect(req.URL, loc)
+				nextAttempt = attempt
+			} else {
+				resolvedEndpoint, err = resolveRedirectEndpoint(req.URL, loc)
+			}
 			if err != nil {
 				return err
 			}
@@ -736,24 +890,41 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 				"location": resolvedEndpoint.Host + resolvedEndpoint.EscapedPath(),
 			}).Debug("Following App Store authentication redirect")
 			res.Body.Close()
-			return as.signInWithEndpoint(username, password, code, attempt+1, as.pod, resolvedEndpoint.String(), triedFallback)
+			return as.signInAttempt(username, password, code, nextAttempt, as.pod, resolvedEndpoint.String(), triedFallback, readCode, sign, redirects+1, 0, guid)
 		}
 		missingRedirectLocation = true
 	}
 
-	body, err := io.ReadAll(res.Body)
+	body, err := io.ReadAll(io.LimitReader(res.Body, maxNativeAuthBody+1))
 	if err != nil {
 		return err
+	}
+	if len(body) > maxNativeAuthBody {
+		return errors.New("App Store login response exceeds size limit")
 	}
 
 	logHTTPResponseMetadata("POST Login", res.StatusCode, len(body))
 
 	var login loginResponse
 	decodeErr := decodePlistResponse(body, &login)
+	if sign != nil && decodeErr != nil && (res.StatusCode == http.StatusNoContent ||
+		res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusNotFound ||
+		res.StatusCode == http.StatusTooManyRequests || res.StatusCode/100 == 5) {
+		if requestRetries+1 >= maxSAPRequestAttempts {
+			return fmt.Errorf("App Store returned no usable authentication response after %d requests (HTTP %d)", maxSAPRequestAttempts, res.StatusCode)
+		}
+		log.WithField("status", res.StatusCode).Debug("Retrying signed App Store request")
+		res.Body.Close()
+		if err := waitAppStoreAuthRetry(as.config.Context, requestRetries); err != nil {
+			return err
+		}
+		return as.signInAttempt(username, password, code, attempt, as.pod, endpoint, triedFallback, readCode, sign, redirects, requestRetries+1, guid)
+	}
 	legacyEndpoint := isAppStoreBuyHost(req.URL.Hostname()) && req.URL.Path == appStoreAuthPath
 	// A valid 404 plist can be a 2FA challenge. Only a malformed 404 response
 	// establishes that the legacy endpoint is unavailable.
-	if !triedFallback && legacyEndpoint && (res.StatusCode == http.StatusForbidden ||
+	if sign == nil && !triedFallback && legacyEndpoint && (res.StatusCode == http.StatusForbidden ||
+		(res.StatusCode == http.StatusNoContent && decodeErr != nil) ||
 		(res.StatusCode == http.StatusNotFound && decodeErr != nil) || missingRedirectLocation) {
 		fallbackEndpoint := appStoreURL(appStoreAuthHost, appStoreAuthNativePath)
 		log.WithFields(log.Fields{
@@ -761,7 +932,7 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 			"fallback": fallbackEndpoint,
 		}).Debug("Retrying App Store login with fallback auth endpoint")
 		res.Body.Close()
-		return as.signInWithEndpoint(username, password, code, attempt+1, as.pod, fallbackEndpoint, true)
+		return as.signInAttempt(username, password, code, attempt+1, as.pod, fallbackEndpoint, true, readCode, sign, redirects, 0, guid)
 	}
 	if missingRedirectLocation {
 		return fmt.Errorf("App Store login failed: HTTP %d %s (Content-Type: %q): missing redirect Location", res.StatusCode, http.StatusText(res.StatusCode), res.Header.Get("Content-Type"))
@@ -770,24 +941,53 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 		return fmt.Errorf("App Store login failed: HTTP %d %s (Content-Type: %q): response is not a valid plist", res.StatusCode, http.StatusText(res.StatusCode), res.Header.Get("Content-Type"))
 	}
 
+	log.WithFields(log.Fields{
+		"failure_type": nativeFailureType(login.FailureType),
+		"has_account":  login.DsPersonID != "",
+		"has_token":    login.PasswordToken != "",
+	}).Debug("App Store authentication result")
 	if attempt == 1 && login.FailureType == FailureTypeInvalidCredentials {
-		return as.signInWithEndpoint(username, password, "", attempt+1, as.pod, endpoint, triedFallback)
+		return as.signInAttempt(username, password, code, attempt+1, as.pod, endpoint, triedFallback, readCode, sign, redirects, 0, guid)
 	}
 
 	if res.StatusCode == http.StatusNotFound || login.CustomerMessage == ErrLoginRequires2fa {
-		if len(code) == 0 {
-			prompt := &survey.Password{
-				Message: "Please type your verification code:",
-			}
-			if err := survey.AskOne(prompt, &code); err != nil {
-				if err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					os.Exit(0)
-				}
+		if code != "" {
+			return errors.New("Apple did not complete verification; try a fresh verification code")
+		}
+		if attempt >= 4 {
+			return errors.New("too many authentication attempts")
+		}
+		code, err = readCode()
+		if err != nil {
+			return err
+		}
+		code, err = storeauth.NormalizeTwoFactorCode(code)
+		if err != nil {
+			return err
+		}
+		return as.signInAttempt(username, password, code, attempt+1, as.pod, endpoint, triedFallback, readCode, sign, redirects, 0, guid)
+	}
+	// Native auth can send a device verification code yet return this ambiguous
+	// password error. Let the user supply a code they actually received; the
+	// same error after that single code submission remains a terminal failure.
+	if code == "" && nativeEndpoint && res.StatusCode == http.StatusOK &&
+		(login.CustomerMessage == "Did you forget your password?" || login.FailureType == "5020") &&
+		(login.PasswordToken == "" || login.DsPersonID == "") {
+		if attempt >= 4 {
+			return errors.New("too many authentication attempts")
+		}
+		log.Info("Apple did not finish signing in. If a verification code arrived, enter it; otherwise leave the prompt empty.")
+		code, err = readCode()
+		if err != nil {
+			return err
+		}
+		if code != "" {
+			code, err = storeauth.NormalizeTwoFactorCode(code)
+			if err != nil {
 				return err
 			}
+			return as.signInAttempt(username, password, code, attempt+1, as.pod, endpoint, triedFallback, readCode, sign, redirects, 0, guid)
 		}
-		return as.signInWithEndpoint(username, password, code, attempt+1, as.pod, endpoint, triedFallback)
 	}
 
 	if login.FailureType != "" {
@@ -823,7 +1023,7 @@ func (as *AppStore) reSignInFromVault() error {
 		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
 	}
 
-	if err := as.signIn(auth.Credentials.Username, auth.Credentials.Password, "", 1, ""); err != nil {
+	if err := as.authenticate(auth.Credentials.Username, auth.Credentials.Password); err != nil {
 		return fmt.Errorf("failed to re-signin: %v", err)
 	}
 	auth = AppleAccountAuth{}
@@ -884,11 +1084,15 @@ func (as *AppStore) loadSession() error {
 	if err := json.Unmarshal(sess.Data, &auth); err != nil {
 		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
 	}
+	pod := strings.TrimSpace(auth.Credentials.Pod)
+	if !validAppStorePod(pod) {
+		return errors.New("vault contains an invalid App Store pod")
+	}
 
 	as.username = auth.Credentials.Username
 	as.dsid = auth.Credentials.DsPersonID
 	as.token = auth.Credentials.PasswordToken
-	as.pod = strings.TrimSpace(auth.Credentials.Pod)
+	as.pod = pod
 	as.storeFront = strings.TrimSpace(auth.Credentials.StoreFront)
 	as.authEndpoint = ""
 
@@ -1105,7 +1309,7 @@ func (as *AppStore) purchaseWithPricing(app *App, guid, pricing string, allowRea
 		if err := json.Unmarshal(key.Data, &auth); err != nil {
 			return false, fmt.Errorf("failed to unmarshal dev auth: %v", err)
 		}
-		if err := as.signIn(auth.Credentials.Username, auth.Credentials.Password, "", 1, ""); err != nil {
+		if err := as.authenticate(auth.Credentials.Username, auth.Credentials.Password); err != nil {
 			return false, fmt.Errorf("failed to re-signin: %v", err)
 		}
 		auth = AppleAccountAuth{}

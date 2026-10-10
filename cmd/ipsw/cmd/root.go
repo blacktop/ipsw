@@ -66,8 +66,9 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "ipsw",
-	Short: "Download and Parse IPSWs (and SO much more)",
+	Use:          "ipsw",
+	Short:        "Download and Parse IPSWs (and SO much more)",
+	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
