@@ -13,18 +13,41 @@ name: "CodeQL"
 
 on:
   pull_request:
-    paths-ignore:
-      - "www/**"
-      - "docs/**"
-      - "*.md"
-      - "LICENSE"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "go.work"
+      - "go.work.sum"
+      - "api/**"
+      - "cmd/**"
+      - "internal/**"
+      - "pkg/**"
+      - "Makefile"
+      - ".github/actions/**"
+      - ".github/codeql/**"
+      - "!www/**"
+      - "!docs/**"
+      - "!.github/workflows/**"
   push:
     branches: [master]
-    paths-ignore:
-      - "www/**"
-      - "docs/**"
-      - "*.md"
-      - "LICENSE"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "go.work"
+      - "go.work.sum"
+      - "api/**"
+      - "cmd/**"
+      - "internal/**"
+      - "pkg/**"
+      - "Makefile"
+      - ".github/actions/**"
+      - ".github/codeql/**"
+      - "!www/**"
+      - "!docs/**"
+      - "!.github/workflows/**"
+  workflow_dispatch:
 
 jobs:
   analyze:

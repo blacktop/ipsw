@@ -7,17 +7,34 @@ on:
       - "**/*.go"
       - "go.mod"
       - "go.sum"
+      - "go.work"
+      - "go.work.sum"
       - "cmd/**"
       - "pkg/**"
       - "internal/**"
       - "api/**"
       - "Makefile"
-      - ".github/workflows/go.yml"
-      - ".github/workflows/release.yml"
-      - ".github/workflows/prerelease.yml"
+      - "!www/**"
+      - "!docs/**"
+      - "!.github/workflows/**"
   pull_request:
     branches:
       - master
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "go.work"
+      - "go.work.sum"
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "api/**"
+      - "Makefile"
+      - "!www/**"
+      - "!docs/**"
+      - "!.github/workflows/**"
+  workflow_dispatch:
 
 permissions:
   contents: read

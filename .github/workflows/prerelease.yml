@@ -3,12 +3,25 @@ name: Pre-Release
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - "www/**"
-      - "docs/**"
-      - ".github/workflows/**"
-      - "*.md"
-      - "LICENSE"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "go.work"
+      - "go.work.sum"
+      - "api/**"
+      - "cmd/**"
+      - "internal/**"
+      - "pkg/**"
+      - "hack/frida-compat/**"
+      - "hack/goreleaser/**"
+      - "hack/make/**"
+      - "Makefile"
+      - ".goreleaser.yml"
+      - "config.example.yml"
+      - "!www/**"
+      - "!docs/**"
+      - "!.github/workflows/**"
   workflow_dispatch:
 
 permissions:

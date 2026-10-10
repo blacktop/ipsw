@@ -2,20 +2,38 @@ name: Benchmarks
 
 on:
   pull_request:
-    paths-ignore:
-      - "www/**"
-      - "docs/**"
-      - ".github/workflows/docs.yml"
-      - "*.md"
-      - "LICENSE"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "go.work"
+      - "go.work.sum"
+      - "api/**"
+      - "cmd/**"
+      - "internal/**"
+      - "pkg/**"
+      - "hack/bench/**"
+      - "Makefile"
+      - "!www/**"
+      - "!docs/**"
+      - "!.github/workflows/**"
   push:
     branches: [master]
-    paths-ignore:
-      - "www/**"
-      - "docs/**"
-      - ".github/workflows/docs.yml"
-      - "*.md"
-      - "LICENSE"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "go.work"
+      - "go.work.sum"
+      - "api/**"
+      - "cmd/**"
+      - "internal/**"
+      - "pkg/**"
+      - "hack/bench/**"
+      - "Makefile"
+      - "!www/**"
+      - "!docs/**"
+      - "!.github/workflows/**"
   workflow_dispatch:
 
 permissions:
