@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,11 +34,13 @@ var Providers = []string{
 	"google",
 	"ollama",
 	"openai",
+	"openai-compatible",
 	"openrouter",
 	"orcarouter",
 }
 
 var ProviderAliases = map[string]string{
+	"openai-compatible": "openai",
 	// Legacy ACP provider names
 	"claude-code-acp": "claude",
 	"codex-acp":       "codex",
@@ -78,6 +81,9 @@ type AI interface {
 type Config struct {
 	UUID           string
 	Provider       string
+	BaseURL        string
+	APIKey         string
+	APIKeyEnv      string
 	Prompt         string
 	Model          string
 	Temperature    float64
@@ -95,6 +101,7 @@ type CachingAI struct {
 	ai             AI
 	cache          db.CacheDB
 	config         *Config
+	chatCacheKey   string
 	modelsCacheKey string
 }
 
@@ -110,8 +117,12 @@ func modelsCacheKeyForProvider(provider string) string {
 }
 
 func (c *CachingAI) Chat() (string, error) {
+	providerKey := c.chatCacheKey
+	if providerKey == "" {
+		providerKey = c.config.Provider
+	}
 	if c.cache != nil && !c.config.DisableCache && !c.config.Stream {
-		chat, err := c.cache.Get(c.config.UUID, c.config.Provider, c.config.Model, c.config.Prompt, c.config.Temperature, c.config.TopP)
+		chat, err := c.cache.Get(c.config.UUID, providerKey, c.config.Model, c.config.Prompt, c.config.Temperature, c.config.TopP)
 		if err == nil && chat != nil {
 			return chat.Response, nil
 		}
@@ -150,7 +161,7 @@ func (c *CachingAI) Chat() (string, error) {
 	if c.cache != nil && !c.config.DisableCache && !c.config.Stream {
 		newEntry := &model.ChatResponse{
 			UUID:        c.config.UUID,
-			Provider:    c.config.Provider,
+			Provider:    providerKey,
 			LLMModel:    c.config.Model,
 			Prompt:      c.config.Prompt,
 			Temperature: c.config.Temperature,
@@ -248,20 +259,11 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	var baseAI AI
 	var err error
 	var cache db.CacheDB
+	var chatCacheKey, modelsCacheKey string
 
 	cfg.Provider = NormalizeProvider(cfg.Provider)
-
-	if !cfg.DisableCache && !cfg.Stream {
-		cache, err = db.NewCacheDB(cfg.Verbose)
-		if err != nil {
-			log.Warnf("Failed to initialize AI cache: %v. Proceeding without DB caching for tokens/chat.", err)
-			cache = nil
-		} else {
-			log.Info("AI caching is enabled")
-		}
-	} else {
-		log.Warn("AI caching is disabled by config")
-		cache = nil
+	if cfg.Provider != "openai" && (cfg.BaseURL != "" || cfg.APIKey != "" || cfg.APIKeyEnv != "") {
+		return nil, fmt.Errorf("custom API endpoint and key options require the openai or openai-compatible provider")
 	}
 
 	// Set default values for retry-related fields if not specified
@@ -355,13 +357,33 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 			Stream:      cfg.Stream,
 		})
 	case "openai":
-		baseAI, err = openai.NewOpenAI(ctx, &openai.Config{
-			Prompt:      cfg.Prompt,
-			Model:       cfg.Model,
-			Temperature: cfg.Temperature,
-			TopP:        cfg.TopP,
-			Stream:      cfg.Stream,
+		var client *openai.OpenAI
+		client, err = openai.NewOpenAI(ctx, &openai.Config{
+			BaseURL:        cfg.BaseURL,
+			APIKey:         cfg.APIKey,
+			APIKeyEnv:      cfg.APIKeyEnv,
+			Prompt:         cfg.Prompt,
+			Model:          cfg.Model,
+			Temperature:    cfg.Temperature,
+			TemperatureSet: cfg.TemperatureSet,
+			TopP:           cfg.TopP,
+			TopPSet:        cfg.TopPSet,
+			Stream:         cfg.Stream,
 		})
+		if err == nil {
+			baseAI = client
+			modelsCacheKey = client.CacheKey()
+			var temperature, topP string
+			if cfg.TemperatureSet {
+				temperature = strconv.FormatFloat(cfg.Temperature, 'g', -1, 64)
+			}
+			if cfg.TopPSet {
+				topP = strconv.FormatFloat(cfg.TopP, 'g', -1, 64)
+			}
+			// The DB's struct-based query omits zero values, so retain the
+			// actual optional controls in this provider's cache identity.
+			chatCacheKey = fmt.Sprintf("%s:temperature=%s:top-p=%s", modelsCacheKey, temperature, topP)
+		}
 	case "openrouter":
 		baseAI, err = openrouter.NewOpenRouter(ctx, &openrouter.Config{
 			Prompt:      cfg.Prompt,
@@ -385,16 +407,37 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create base AI provider %s: %w", cfg.Provider, err)
 	}
+	if modelsCacheKey == "" {
+		modelsCacheKey = modelsCacheKeyForProvider(cfg.Provider)
+	}
+	if !cfg.DisableCache && !cfg.Stream {
+		cache, err = db.NewCacheDB(cfg.Verbose)
+		if err != nil {
+			log.Warnf("Failed to initialize AI cache: %v. Proceeding without DB caching for tokens/chat.", err)
+			cache = nil
+		} else {
+			log.Info("AI caching is enabled")
+		}
+	} else {
+		log.Warn("AI caching is disabled by config")
+	}
 
 	ai := &CachingAI{
 		ai:             baseAI,
 		cache:          cache,
 		config:         cfg,
-		modelsCacheKey: modelsCacheKeyForProvider(cfg.Provider),
+		chatCacheKey:   chatCacheKey,
+		modelsCacheKey: modelsCacheKey,
 	}
 
-	if _, err := ai.Models(); err != nil {
-		return nil, fmt.Errorf("failed to prefetch models: %w", err)
+	// Compatible endpoints may support chat without offering a model catalog.
+	if cfg.Provider != "openai" || cfg.Model == "" {
+		if _, err := ai.Models(); err != nil {
+			if closeErr := ai.Close(); closeErr != nil {
+				log.Warnf("Failed to close AI client: %v", closeErr)
+			}
+			return nil, fmt.Errorf("failed to prefetch models: %w", err)
+		}
 	}
 
 	return ai, nil

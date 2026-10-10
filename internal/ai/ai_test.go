@@ -1,11 +1,100 @@
 package ai
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	model "github.com/blacktop/ipsw/internal/model/ai"
 )
+
+func TestCompatibleProviderUsesEndpointScopedCaches(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/models"):
+			fmt.Fprint(w, `{"data":[{"id":"test-model"}]}`)
+		case strings.HasSuffix(r.URL.Path, "/chat/completions"):
+			fmt.Fprint(w, `{"choices":[{"message":{"content":"test response"}}]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	t.Setenv("OPENAI_BASE_URL", server.URL+"/first/v1")
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	var firstModelsKey, firstChatKey string
+	for _, endpoint := range []string{"", server.URL + "/second/v1"} {
+		cfg := &Config{Provider: "openai-compatible", BaseURL: endpoint, Model: "test-model", DisableCache: true}
+		client, err := NewAI(context.Background(), cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cached, ok := client.(*CachingAI)
+		if !ok {
+			t.Fatal("NewAI did not return CachingAI")
+		}
+		cache := &recordingCache{}
+		cached.cache = cache
+		cfg.DisableCache = false
+		if _, err := cached.Models(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cached.Chat(); err != nil {
+			t.Fatal(err)
+		}
+		if cache.getModelsKey != cached.modelsCacheKey || cache.setModelsKey != cached.modelsCacheKey || cache.getChatKey != cached.chatCacheKey || cache.setChatKey != cached.chatCacheKey {
+			t.Fatalf("cache operations used incorrect identity: %+v", cache)
+		}
+		if endpoint == "" {
+			firstModelsKey, firstChatKey = cached.modelsCacheKey, cached.chatCacheKey
+		} else if firstModelsKey == cached.modelsCacheKey || firstChatKey == cached.chatCacheKey {
+			t.Error("different endpoints share a cache identity")
+		}
+		cached.ai = &stubAI{chatErr: errors.New("unknown model")}
+		if _, err := cached.Chat(); err == nil || cache.deleteModelsKey != cached.modelsCacheKey {
+			t.Errorf("model error did not invalidate the endpoint catalog: %v", err)
+		}
+	}
+	client, err := NewAI(context.Background(), &Config{Provider: "openai", Model: "test-model", TemperatureSet: true, DisableCache: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cached := client.(*CachingAI); cached.modelsCacheKey != firstModelsKey || cached.chatCacheKey == firstChatKey {
+		t.Error("explicit sampling must change the chat cache identity only")
+	}
+	other, err := NewAI(context.Background(), &Config{Provider: "openai", Model: "test-model", Temperature: 0.8, TemperatureSet: true, DisableCache: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.(*CachingAI).chatCacheKey == client.(*CachingAI).chatCacheKey {
+		t.Error("an explicit zero must not reuse a nonzero sampling response")
+	}
+}
+
+func TestCompatibleExplicitModelSkipsCatalog(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"choices":[{"message":{"content":"test response"}}]}`)
+	}))
+	defer server.Close()
+	client, err := NewAI(context.Background(), &Config{Provider: "openai-compatible", BaseURL: server.URL + "/v1", APIKey: "test-key", Model: "unlisted-model", DisableCache: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := client.Chat(); err != nil || got != "test response" {
+		t.Fatalf("Chat() = %q, %v", got, err)
+	}
+}
 
 func TestCopilotProviderAvailable(t *testing.T) {
 	if !IsValidProvider("copilot") {
@@ -89,16 +178,20 @@ func (s *stubAI) Close() error {
 }
 
 type recordingCache struct {
+	getChatKey      string
+	setChatKey      string
 	getModelsKey    string
 	setModelsKey    string
 	deleteModelsKey string
 }
 
-func (c *recordingCache) Get(string, string, string, string, float64, float64) (*model.ChatResponse, error) {
+func (c *recordingCache) Get(_ string, provider string, _, _ string, _, _ float64) (*model.ChatResponse, error) {
+	c.getChatKey = provider
 	return nil, model.ErrNotFound
 }
 
-func (c *recordingCache) Set(*model.ChatResponse) error {
+func (c *recordingCache) Set(chat *model.ChatResponse) error {
+	c.setChatKey = chat.Provider
 	return nil
 }
 

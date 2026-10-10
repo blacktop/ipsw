@@ -11,10 +11,10 @@ The **ipsw AI decompiler** revolutionizes binary analysis by leveraging state-of
 
 ## Requirements
 
-There are currently 10 supported LLM providers. Select one explicitly with
+Select a supported LLM provider explicitly with
 `--dec-llm` whenever you use `--dec`.
 
-- OpenAI
+- OpenAI and OpenAI-compatible Chat Completions services
 - Anthropic (Claude API)
 - Google (Gemini API)
 - Claude (ACP)
@@ -116,17 +116,65 @@ ipsw macho disass binary --dec --dec-llm ollama --dec-model "qwen2.5:32b-instruc
 Local LLMs require significant computational resources. Smaller models (7B-13B) may produce lower quality results compared to cloud-based models.
 :::
 
-### LM Studio / vLLM / Other OpenAI-Compatible Servers
+### OpenAI-Compatible Services
 
-Any server that exposes an **OpenAI-compatible API** (LM Studio, vLLM, text-generation-inference, LocalAI, etc.) can be used with the `openai` provider by setting the `OPENAI_BASE_URL` environment variable:
+Use `openai-compatible` (an alias of `openai`) for services that implement
+OpenAI Chat Completions. Set the API base URL, including its version prefix,
+and select the environment variable containing that service's key. Both
+disassemblers support the same options.
 
-```bash
-# Point the OpenAI provider at LM Studio (default port 1234)
-export OPENAI_BASE_URL="http://localhost:1234/v1"
-export OPENAI_API_KEY="lm-studio"  # LM Studio ignores this but the SDK requires it
+For example, [Cheaper Inference](https://cheaperinference.com/docs) can be used
+from a macOS terminal with:
 
-ipsw macho disass binary --dec --dec-llm openai --dec-model "my-local-model"
+```sh
+env CHEAPER_INFERENCE_API_KEY=your-key \
+  ipsw macho disass binary --entry --dec --dec-llm openai-compatible \
+  --dec-base-url https://api.cheaperinference.com/v1 \
+  --dec-api-key-env CHEAPER_INFERENCE_API_KEY --dec-model gpt-5.4-mini
 ```
+
+The existing `OPENAI_BASE_URL` and `OPENAI_API_KEY` variables still work. An
+explicit `--dec-base-url` overrides `OPENAI_BASE_URL`. A named key variable
+must be set; ipsw does not fall back to an unrelated OpenAI key if it is absent.
+Servers that need no authentication can run without an API key.
+
+```sh
+# LM Studio, vLLM, or another local server
+env OPENAI_API_KEY=local \
+  ipsw macho disass binary --entry --dec --dec-llm openai-compatible \
+  --dec-base-url http://localhost:1234/v1 --dec-model my-local-model
+```
+
+The same settings can be saved in the ipsw YAML configuration:
+
+```yaml
+macho:
+  disass:
+    dec-llm: openai-compatible
+    dec-base-url: https://api.cheaperinference.com/v1
+    dec-api-key-env: CHEAPER_INFERENCE_API_KEY
+    dec-model: gpt-5.4-mini
+dyld:
+  disass:
+    dec-llm: openai-compatible
+    dec-base-url: https://api.cheaperinference.com/v1
+    dec-api-key-env: CHEAPER_INFERENCE_API_KEY
+    dec-model: gpt-5.4-mini
+```
+
+Each setting also has the usual `IPSW_` environment override, such as
+`IPSW_MACHO_DISASS_DEC_BASE_URL` or `IPSW_DYLD_DISASS_DEC_API_KEY_ENV`.
+`dec-api-key` is available through configuration or the corresponding `IPSW_`
+environment variable when a direct key is preferred; it takes precedence over
+`dec-api-key-env` and `OPENAI_API_KEY`.
+
+With an explicit `--dec-model`, ipsw sends that exact model ID without requiring
+`GET /models`. Interactive selection uses the model catalog and excludes known
+media-only or incompatible endpoints when the service supplies capability
+metadata. A catalog containing only standard model IDs cannot prove which
+models support text chat. Temperature and top-p are sent only when explicitly
+configured, since some models reject those controls. Cached catalogs and
+responses are isolated by endpoint and account.
 
 ### OpenRouter (Multi-Provider Access)
 

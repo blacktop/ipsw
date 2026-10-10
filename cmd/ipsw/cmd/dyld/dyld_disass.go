@@ -59,6 +59,8 @@ func init() {
 		return ai.Providers, cobra.ShellCompDirectiveDefault
 	})
 	DisassCmd.Flags().String("dec-model", "", "LLM model to use for decompilation")
+	DisassCmd.Flags().String("dec-base-url", "", "OpenAI-compatible API base URL (defaults to OPENAI_BASE_URL)")
+	DisassCmd.Flags().String("dec-api-key-env", "", "Environment variable holding the OpenAI-compatible API key (defaults to OPENAI_API_KEY)")
 	DisassCmd.Flags().Bool("dec-nocache", false, "Do not use decompilation cache")
 	DisassCmd.Flags().Float64("dec-temp", 0.2, "LLM temperature for decompilation")
 	DisassCmd.Flags().Float64("dec-top-p", 0.1, "LLM top_p for decompilation")
@@ -86,6 +88,8 @@ func init() {
 	viper.BindPFlag("dyld.disass.dec-lang", DisassCmd.Flags().Lookup("dec-lang"))
 	viper.BindPFlag("dyld.disass.dec-llm", DisassCmd.Flags().Lookup("dec-llm"))
 	viper.BindPFlag("dyld.disass.dec-model", DisassCmd.Flags().Lookup("dec-model"))
+	viper.BindPFlag("dyld.disass.dec-base-url", DisassCmd.Flags().Lookup("dec-base-url"))
+	viper.BindPFlag("dyld.disass.dec-api-key-env", DisassCmd.Flags().Lookup("dec-api-key-env"))
 	viper.BindPFlag("dyld.disass.dec-nocache", DisassCmd.Flags().Lookup("dec-nocache"))
 	viper.BindPFlag("dyld.disass.dec-temp", DisassCmd.Flags().Lookup("dec-temp"))
 	viper.BindPFlag("dyld.disass.dec-top-p", DisassCmd.Flags().Lookup("dec-top-p"))
@@ -201,6 +205,9 @@ var DisassCmd = &cobra.Command{
 			decompConfig = &dcmd.Config{
 				UUID:           f.UUID.String(),
 				LLM:            provider,
+				BaseURL:        viper.GetString("dyld.disass.dec-base-url"),
+				APIKey:         viper.GetString("dyld.disass.dec-api-key"),
+				APIKeyEnv:      viper.GetString("dyld.disass.dec-api-key-env"),
 				Language:       viper.GetString("dyld.disass.dec-lang"),
 				Model:          viper.GetString("dyld.disass.dec-model"),
 				Temperature:    viper.GetFloat64("dyld.disass.dec-temp"),

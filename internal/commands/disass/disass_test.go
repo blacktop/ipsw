@@ -1,6 +1,19 @@
 package disass
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/spf13/cobra"
+)
+
+func TestFlagWasProvidedByEnvironmentAtDefault(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().Float64("dec-temp", 0.2, "")
+	t.Setenv("IPSW_MACHO_DISASS_DEC_TEMP", "0.2")
+	if !FlagWasProvided(cmd, "dec-temp", "macho.disass.dec-temp") {
+		t.Fatal("an environment value equal to the default is still explicit")
+	}
+}
 
 func TestReusableModel(t *testing.T) {
 	models := map[string]string{

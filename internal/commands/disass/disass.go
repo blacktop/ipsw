@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
@@ -26,6 +27,9 @@ import (
 type Config struct {
 	UUID           string
 	LLM            string
+	BaseURL        string
+	APIKey         string
+	APIKeyEnv      string
 	Language       string
 	Model          string
 	Temperature    float64
@@ -49,6 +53,9 @@ func Decompile(asm string, cfg *Config) (string, error) {
 	llm, err := ai.NewAI(context.Background(), &ai.Config{
 		UUID:           cfg.UUID,
 		Provider:       cfg.LLM,
+		BaseURL:        cfg.BaseURL,
+		APIKey:         cfg.APIKey,
+		APIKeyEnv:      cfg.APIKeyEnv,
 		Prompt:         fmt.Sprintf(promptFmt, asm),
 		Model:          cfg.Model,
 		Temperature:    cfg.Temperature,
@@ -136,13 +143,17 @@ func reusableModel(provider string, models map[string]string, choice string) str
 }
 
 // FlagWasProvided reports whether a CLI flag was explicitly set via the command line
-// or supplied through a config file. This allows callers to distinguish user intent
+// or supplied through configuration or the environment. This distinguishes intent
 // from default values when forwarding options to downstream systems.
 func FlagWasProvided(cmd *cobra.Command, flagName, viperKey string) bool {
 	if cmd.Flags().Changed(flagName) {
 		return true
 	}
 	if viper.InConfig(viperKey) {
+		return true
+	}
+	envKey := "IPSW_" + strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(viperKey))
+	if value, ok := os.LookupEnv(envKey); ok && value != "" {
 		return true
 	}
 	flag := cmd.Flags().Lookup(flagName)

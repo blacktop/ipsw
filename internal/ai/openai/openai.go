@@ -2,35 +2,140 @@ package openai
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"net/url"
+	"os"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/blacktop/ipsw/internal/ai/utils"
 	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
 )
 
+const defaultBaseURL = "https://api.openai.com/v1"
+
 type Config struct {
-	Prompt      string  `json:"prompt"`
-	Model       string  `json:"model"`
-	Temperature float64 `json:"temperature"`
-	TopP        float64 `json:"top_p"`
-	Stream      bool    `json:"stream"`
+	BaseURL        string  `json:"base_url"`
+	APIKey         string  `json:"-"`
+	APIKeyEnv      string  `json:"api_key_env"`
+	Prompt         string  `json:"prompt"`
+	Model          string  `json:"model"`
+	Temperature    float64 `json:"temperature"`
+	TopP           float64 `json:"top_p"`
+	TemperatureSet bool    `json:"-"`
+	TopPSet        bool    `json:"-"`
+	Stream         bool    `json:"stream"`
 }
 
 type OpenAI struct {
-	ctx    context.Context
-	conf   *Config
-	cli    *openai.Client
-	models map[string]string
+	ctx      context.Context
+	conf     *Config
+	cli      *openai.Client
+	models   map[string]string
+	cacheKey string
 }
 
 func NewOpenAI(ctx context.Context, conf *Config) (*OpenAI, error) {
-	cli := openai.NewClient()
-	openai := &OpenAI{
-		ctx:  ctx,
-		conf: conf,
-		cli:  &cli,
+	baseURL := conf.BaseURL
+	if baseURL == "" {
+		baseURL = os.Getenv("OPENAI_BASE_URL")
 	}
-	return openai, nil
+	if baseURL == "" {
+		baseURL = defaultBaseURL
+	}
+	u, err := url.Parse(baseURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return nil, fmt.Errorf("OpenAI base URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	apiKey := conf.APIKey
+	if apiKey == "" {
+		keyEnv := conf.APIKeyEnv
+		if keyEnv == "" {
+			keyEnv = "OPENAI_API_KEY"
+		}
+		apiKey = os.Getenv(keyEnv)
+		if apiKey == "" && conf.APIKeyEnv != "" {
+			return nil, fmt.Errorf("OpenAI API key environment variable %s is not set", keyEnv)
+		}
+	}
+
+	opts := []option.RequestOption{
+		option.WithBaseURL(baseURL),
+		option.WithAPIKey(apiKey),
+		option.WithRequestTimeout(300 * time.Second),
+	}
+	if apiKey == "" {
+		opts = append(opts, option.WithHeaderDel("Authorization"))
+	}
+	var organization, project string
+	if u.Scheme == "https" && strings.EqualFold(u.Hostname(), "api.openai.com") && (u.Port() == "" || u.Port() == "443") {
+		organization = os.Getenv("OPENAI_ORG_ID")
+		project = os.Getenv("OPENAI_PROJECT_ID")
+	} else {
+		// OpenAI account metadata is not intended for third-party endpoints.
+		opts = append(opts, option.WithHeaderDel("OpenAI-Organization"), option.WithHeaderDel("OpenAI-Project"))
+	}
+	cli := openai.NewClient(opts...)
+	// Include account identity without persisting credentials or endpoint URLs.
+	identity := sha256.New()
+	for _, value := range []string{baseURL, apiKey, organization, project} {
+		fmt.Fprintf(identity, "%d:%s", len(value), value)
+	}
+	return &OpenAI{
+		ctx:      ctx,
+		conf:     conf,
+		cli:      &cli,
+		cacheKey: fmt.Sprintf("openai-text-chat-v1:%x", identity.Sum(nil)),
+	}, nil
+}
+
+// CacheKey identifies the effective endpoint, account, and model-list format.
+func (c *OpenAI) CacheKey() string {
+	return c.cacheKey
+}
+
+type modelInfo struct {
+	ID                     string   `json:"id"`
+	Object                 string   `json:"object"`
+	Type                   string   `json:"type"`
+	Endpoint               string   `json:"endpoint"`
+	SupportedEndpoints     []string `json:"supported_endpoints"`
+	SupportedEndpointTypes []string `json:"supported_endpoint_types"`
+	Architecture           struct {
+		InputModalities  []string `json:"input_modalities"`
+		OutputModalities []string `json:"output_modalities"`
+	} `json:"architecture"`
+}
+
+func isChatEndpoint(endpoint string) bool {
+	return endpoint == "/v1/chat/completions" || endpoint == "/chat/completions"
+}
+
+func (m modelInfo) canListForTextChat() bool {
+	if m.ID == "" || strings.TrimSpace(m.ID) != m.ID || (m.Object != "" && m.Object != "model") {
+		return false
+	}
+	// These extensions are optional. Plain OpenAI model entries contain no
+	// capability information, so unknown capabilities remain selectable.
+	switch m.Type {
+	case "image", "video", "audio", "embedding", "embeddings", "moderation", "rerank":
+		return false
+	}
+	if m.SupportedEndpoints != nil {
+		if !slices.ContainsFunc(m.SupportedEndpoints, isChatEndpoint) {
+			return false
+		}
+	} else if m.Endpoint != "" && !isChatEndpoint(m.Endpoint) {
+		return false
+	}
+	return (m.SupportedEndpointTypes == nil || slices.Contains(m.SupportedEndpointTypes, "openai")) &&
+		(m.Architecture.InputModalities == nil || slices.Contains(m.Architecture.InputModalities, "text")) &&
+		(m.Architecture.OutputModalities == nil || slices.Contains(m.Architecture.OutputModalities, "text"))
 }
 
 func (c *OpenAI) Models() (map[string]string, error) {
@@ -44,8 +149,8 @@ func (c *OpenAI) Models() (map[string]string, error) {
 }
 
 func (c *OpenAI) SetModel(model string) error {
-	if _, ok := c.models[model]; !ok {
-		return fmt.Errorf("model '%s' not found", model)
+	if strings.TrimSpace(model) == "" {
+		return fmt.Errorf("no model specified")
 	}
 	c.conf.Model = model
 	return nil
@@ -58,44 +163,27 @@ func (c *OpenAI) SetModels(models map[string]string) (map[string]string, error) 
 
 // Verify checks that the current model configuration is valid
 func (c *OpenAI) Verify() error {
-	if c.conf.Model == "" {
+	if strings.TrimSpace(c.conf.Model) == "" {
 		return fmt.Errorf("no model specified")
-	}
-	if len(c.models) == 0 {
-		if _, err := c.Models(); err != nil {
-			return fmt.Errorf("failed to fetch models: %v", err)
-		}
-	}
-	modelID, ok := c.models[c.conf.Model]
-	if !ok {
-		// Model not found in cache, try refreshing the models list
-		c.models = make(map[string]string) // Clear cache to force refresh
-		if _, err := c.Models(); err != nil {
-			return fmt.Errorf("failed to fetch models: %v", err)
-		}
-		// Check again after refresh
-		modelID, ok = c.models[c.conf.Model]
-		if !ok {
-			return fmt.Errorf("model '%s' not found in available models", c.conf.Model)
-		}
-	}
-	if modelID == "" {
-		return fmt.Errorf("model '%s' has empty ID", c.conf.Model)
 	}
 	return nil
 }
 
 func (c *OpenAI) getModels() error {
-	models, err := c.cli.Models.List(c.ctx)
-	if err != nil {
+	var models struct {
+		Data []modelInfo `json:"data"`
+	}
+	if err := c.cli.Get(c.ctx, "models", nil, &models); err != nil {
 		return fmt.Errorf("failed to list models: %w", err)
 	}
 	c.models = make(map[string]string)
 	for _, model := range models.Data {
-		c.models[model.ID] = model.ID
+		if model.canListForTextChat() {
+			c.models[model.ID] = model.ID
+		}
 	}
 	if len(c.models) == 0 {
-		return fmt.Errorf("no models found")
+		return fmt.Errorf("no text chat models found; use --dec-model with an explicit model ID")
 	}
 	return nil
 }
@@ -106,14 +194,19 @@ func (c *OpenAI) Chat() (string, error) {
 		return "", fmt.Errorf("invalid model configuration: %w", err)
 	}
 
-	message, err := c.cli.Chat.Completions.New(c.ctx, openai.ChatCompletionNewParams{
+	params := openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(c.conf.Prompt),
 		},
-		Model:       c.models[c.conf.Model],
-		Temperature: openai.Float(c.conf.Temperature),
-		TopP:        openai.Float(c.conf.TopP),
-	})
+		Model: c.conf.Model,
+	}
+	if c.conf.TemperatureSet {
+		params.Temperature = openai.Float(c.conf.Temperature)
+	}
+	if c.conf.TopPSet {
+		params.TopP = openai.Float(c.conf.TopP)
+	}
+	message, err := c.cli.Chat.Completions.New(c.ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to create message: %w", err)
 	}
