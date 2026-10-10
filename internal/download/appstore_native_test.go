@@ -225,6 +225,17 @@ func TestNativeAppStoreUnavailableFallsBack(t *testing.T) {
 			t.Fatalf("hard failure retried: requests=%d err=%v", requests, err)
 		}
 	}
+	failure := errors.New("synthetic transport failure")
+	as = newTestAppStore(t, func(req *http.Request) (*http.Response, error) {
+		if req.Method == http.MethodGet {
+			return nativeTestBag(req, ""), nil
+		}
+		return nil, failure
+	})
+	err = as.authenticateWithFallback("synthetic@example.invalid", "synthetic-password", storeauth.ErrGrandSlamUnavailable)
+	if !errors.Is(err, failure) || !strings.Contains(err.Error(), "signed login currently requires a supported macOS build") {
+		t.Fatalf("fallback lost its cause or platform guidance: %v", err)
+	}
 }
 
 type fakeGrandSlam struct {

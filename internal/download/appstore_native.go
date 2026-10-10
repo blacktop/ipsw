@@ -68,15 +68,22 @@ func (as *AppStore) authenticate(username, password string) error {
 		return fmt.Errorf("initialize native App Store signing: %w", err)
 	}
 	if !storeauth.NativeSupported() {
-		return as.signIn(username, password, "", 1, "", nil)
+		return as.authenticateWithFallback(username, password, storeauth.ErrGrandSlamUnavailable)
 	}
 	return as.authenticateWithFallback(username, password, as.authenticateNative(username, password))
 }
 
 func (as *AppStore) authenticateWithFallback(username, password string, err error) error {
-	if errors.Is(err, storeauth.ErrGrandSlamUnavailable) && as.config.Context.Err() == nil {
+	if errors.Is(err, storeauth.ErrGrandSlamUnavailable) {
+		if contextErr := as.config.Context.Err(); contextErr != nil {
+			return contextErr
+		}
 		log.WithError(err).Debug("Native App Store authentication unavailable; trying existing login")
-		return as.signIn(username, password, "", 1, "", nil)
+		log.Warn("Signed App Store login is unavailable on this system; trying legacy login. A supported macOS build is currently required for signed login")
+		if err := as.signIn(username, password, "", 1, "", nil); err != nil {
+			return fmt.Errorf("legacy App Store login failed (signed login currently requires a supported macOS build): %w", err)
+		}
+		return nil
 	}
 	return err
 }
