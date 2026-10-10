@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -14,8 +15,6 @@ import (
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
-
-const defaultBaseURL = "https://api.openai.com/v1"
 
 type Config struct {
 	BaseURL        string  `json:"base_url"`
@@ -39,13 +38,7 @@ type OpenAI struct {
 }
 
 func NewOpenAI(ctx context.Context, conf *Config) (*OpenAI, error) {
-	baseURL := conf.BaseURL
-	if baseURL == "" {
-		baseURL = os.Getenv("OPENAI_BASE_URL")
-	}
-	if baseURL == "" {
-		baseURL = defaultBaseURL
-	}
+	baseURL := cmp.Or(conf.BaseURL, os.Getenv("OPENAI_BASE_URL"), "https://api.openai.com/v1")
 	u, err := url.Parse(baseURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return nil, fmt.Errorf("OpenAI base URL must be an absolute HTTP(S) URL without credentials, query, or fragment")
@@ -54,10 +47,7 @@ func NewOpenAI(ctx context.Context, conf *Config) (*OpenAI, error) {
 
 	apiKey := conf.APIKey
 	if apiKey == "" {
-		keyEnv := conf.APIKeyEnv
-		if keyEnv == "" {
-			keyEnv = "OPENAI_API_KEY"
-		}
+		keyEnv := cmp.Or(conf.APIKeyEnv, "OPENAI_API_KEY")
 		apiKey = os.Getenv(keyEnv)
 		if apiKey == "" && conf.APIKeyEnv != "" {
 			return nil, fmt.Errorf("OpenAI API key environment variable %s is not set", keyEnv)

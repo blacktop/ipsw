@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -117,10 +118,7 @@ func modelsCacheKeyForProvider(provider string) string {
 }
 
 func (c *CachingAI) Chat() (string, error) {
-	providerKey := c.chatCacheKey
-	if providerKey == "" {
-		providerKey = c.config.Provider
-	}
+	providerKey := cmp.Or(c.chatCacheKey, c.config.Provider)
 	if c.cache != nil && !c.config.DisableCache && !c.config.Stream {
 		chat, err := c.cache.Get(c.config.UUID, providerKey, c.config.Model, c.config.Prompt, c.config.Temperature, c.config.TopP)
 		if err == nil && chat != nil {
@@ -404,9 +402,7 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create base AI provider %s: %w", cfg.Provider, err)
 	}
-	if modelsCacheKey == "" {
-		modelsCacheKey = modelsCacheKeyForProvider(cfg.Provider)
-	}
+	modelsCacheKey = cmp.Or(modelsCacheKey, modelsCacheKeyForProvider(cfg.Provider))
 	if !cfg.DisableCache && !cfg.Stream {
 		cache, err = db.NewCacheDB(cfg.Verbose)
 		if err != nil {
