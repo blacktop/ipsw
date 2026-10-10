@@ -598,6 +598,12 @@ func NewAppStore(config *AppStoreConfig) *AppStore {
 		Client: &http.Client{
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) > 0 {
+					// net/http forwards these custom credentials and can replay a
+					// POST body. Store requests must use the selected endpoint.
+					headers := via[0].Header
+					if headers.Get("X-Token") != "" || headers.Get("X-Dsid") != "" || headers.Get("iCloud-DSID") != "" {
+						return http.ErrUseLastResponse
+					}
 					last := via[len(via)-1].URL
 					// Don't auto-follow redirects on auth POSTs (legacy MZFinance
 					// path or the native auth.itunes.apple.com host); signIn handles
@@ -605,6 +611,9 @@ func NewAppStore(config *AppStoreConfig) *AppStore {
 					if last.Path == appStoreAuthPath || last.Host == appStoreAuthHost {
 						return http.ErrUseLastResponse
 					}
+				}
+				if len(via) >= 10 {
+					return errors.New("stopped after 10 redirects")
 				}
 				return nil
 			},

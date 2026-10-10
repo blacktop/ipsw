@@ -53,6 +53,112 @@ func appStoreTestResponse(req *http.Request, status int, contentType, body strin
 	}
 }
 
+func TestAppStoreCredentialRedirect(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, location string
+		status               int
+		headers              []string
+	}{
+		{"same-origin", appStoreDownloadPath, appStoreURL(appStoreBuyHost, "/redirect-control"), http.StatusTemporaryRedirect, []string{"X-Token", "X-Dsid", "iCloud-DSID"}},
+		{"cross-origin", appStoreDownloadPath, "https://credential-canary.invalid/collect", http.StatusFound, []string{"X-Token", "X-Dsid", "iCloud-DSID"}},
+		{"downgrade", appStoreDownloadPath, "http://credential-canary.invalid/collect", http.StatusTemporaryRedirect, []string{"X-Token", "X-Dsid", "iCloud-DSID"}},
+		{"purchase", appStorePurchasePath, "https://credential-canary.invalid/collect", http.StatusPermanentRedirect, []string{"X-Token", "X-Dsid", "iCloud-DSID"}},
+		{"token-only", appStoreDownloadPath, "/redirect-control", http.StatusMovedPermanently, []string{"X-Token"}},
+		{"dsid-only", appStorePurchasePath, "/redirect-control", http.StatusFound, []string{"X-Dsid"}},
+		{"icloud-only", appStoreDownloadPath, "/redirect-control", http.StatusSeeOther, []string{"iCloud-DSID"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			as := newTestAppStore(t, func(req *http.Request) (*http.Response, error) {
+				calls++
+				if calls != 1 {
+					t.Fatal("credential-bearing redirect was dispatched")
+				}
+				for _, name := range tc.headers {
+					if req.Header.Get(name) != "synthetic-credential" {
+						t.Errorf("initial request is missing %s", name)
+					}
+				}
+				body, err := io.ReadAll(req.Body)
+				if err != nil || string(body) != "synthetic-body" {
+					t.Fatalf("initial body = %q, err = %v", body, err)
+				}
+				res := appStoreTestResponse(req, tc.status, "text/html", "redirect")
+				res.Header.Set("Location", tc.location)
+				return res, nil
+			})
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, appStoreURL(appStoreBuyHost, tc.path), strings.NewReader("synthetic-body"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range tc.headers {
+				req.Header.Set(name, "synthetic-credential")
+			}
+			res, err := as.Client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			if calls != 1 || res.StatusCode != tc.status {
+				t.Errorf("calls=%d status=%d, want one request and status %d", calls, res.StatusCode, tc.status)
+			}
+		})
+	}
+}
+
+func TestAppStorePublicRedirect(t *testing.T) {
+	for _, location := range []string{"/redirect-control", "https://cdn.example.invalid/app.ipa"} {
+		t.Run(location, func(t *testing.T) {
+			calls := 0
+			as := newTestAppStore(t, func(req *http.Request) (*http.Response, error) {
+				calls++
+				body, err := io.ReadAll(req.Body)
+				if err != nil || string(body) != "synthetic-body" || req.Method != http.MethodPost {
+					t.Fatalf("public request did not preserve its method and body: %v", err)
+				}
+				if calls == 1 {
+					res := appStoreTestResponse(req, http.StatusTemporaryRedirect, "text/html", "redirect")
+					res.Header.Set("Location", location)
+					return res, nil
+				}
+				return appStoreTestResponse(req, http.StatusOK, "application/octet-stream", "synthetic-data"), nil
+			})
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, appStoreURL(appStoreBuyHost, "/public-control"), strings.NewReader("synthetic-body"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err := as.Client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			if calls != 2 || res.StatusCode != http.StatusOK {
+				t.Errorf("calls=%d status=%d, want two requests and status 200", calls, res.StatusCode)
+			}
+		})
+	}
+}
+
+func TestAppStorePublicRedirectLimit(t *testing.T) {
+	calls := 0
+	as := newTestAppStore(t, func(req *http.Request) (*http.Response, error) {
+		calls++
+		if calls > 10 {
+			t.Fatal("public redirect loop exceeded its request limit")
+		}
+		res := appStoreTestResponse(req, http.StatusFound, "text/html", "redirect")
+		res.Header.Set("Location", "/redirect-loop")
+		return res, nil
+	})
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, appStoreURL(appStoreBuyHost, "/public-control"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := as.Client.Do(req); err == nil || !strings.Contains(err.Error(), "stopped after 10 redirects") || calls != 10 {
+		t.Errorf("calls=%d err=%v, want 10 requests and a redirect limit error", calls, err)
+	}
+}
+
 func TestAppStoreLoginRedirect(t *testing.T) {
 	for _, status := range []int{http.StatusMovedPermanently, http.StatusFound, http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
 		for _, location := range []string{"/auth/v1/native/finish", "https://p42-buy.itunes.apple.com" + appStoreAuthPath} {
