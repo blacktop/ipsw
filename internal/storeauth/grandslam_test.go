@@ -135,6 +135,18 @@ func TestGrandSlamCancellationNeverAllowsFallback(t *testing.T) {
 	}
 }
 
+func TestGrandSlamSMSChallenge(t *testing.T) {
+	server := newGrandSlamTestServer(t, "s2k", "sms")
+	client, err := NewGrandSlamClient(&http.Client{Transport: server}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := client.Login(t.Context(), "synthetic@example.test", "synthetic-password")
+	if session != nil || !errors.Is(err, ErrGrandSlamSMSRequired) || errors.Is(err, ErrGrandSlamUnavailable) || server.requests != 2 {
+		t.Fatalf("SMS challenge was not classified after authentication: session=%v requests=%d err=%v", session != nil, server.requests, err)
+	}
+}
+
 func TestGrandSlamTrustedDeviceChallengeAndValidation(t *testing.T) {
 	server := newGrandSlamTestServer(t, "s2k", "2fa")
 	client, err := NewGrandSlamClient(&http.Client{Transport: server}, nil)
@@ -361,12 +373,13 @@ func newGrandSlamTestServer(t *testing.T, protocol, mode string) *grandSlamTestS
 	g := big.NewInt(2)
 	salt := []byte("synthetic-salt")
 	digest := sha256.Sum256([]byte("synthetic-password"))
-	password, err := pbkdf2.Key(sha256.New, string(digest[:]), salt, 17, sha256.Size)
+	input := string(digest[:])
+	if protocol == "s2k_fo" {
+		input = hex.EncodeToString(digest[:])
+	}
+	password, err := pbkdf2.Key(sha256.New, input, salt, 17, sha256.Size)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if protocol == "s2k_fo" {
-		password = []byte(hex.EncodeToString(password))
 	}
 	x := new(big.Int).SetBytes(grandSlamHash(salt, grandSlamHash([]byte(":"), password)))
 	v := new(big.Int).Exp(g, x, n)
@@ -446,6 +459,10 @@ func (s *grandSlamTestServer) RoundTrip(request *http.Request) (*http.Response, 
 		status := map[string]any{"ec": 0}
 		if s.mode == "2fa" {
 			status["au"] = "trustedDeviceSecondaryAuth"
+			delete(spd, "t")
+		}
+		if s.mode == "sms" {
+			status["au"] = "secondaryAuth"
 			delete(spd, "t")
 		}
 		if s.mode == "missing-pet" {

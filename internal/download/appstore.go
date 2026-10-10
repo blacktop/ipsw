@@ -48,6 +48,7 @@ const (
 	appStoreLookupURL      = "https://itunes.apple.com/lookup"
 	maxSAPLoginRedirects   = 4
 	maxSAPRequestAttempts  = 3
+	maxSAPRetryDelay       = time.Minute
 
 	// AppStoreSearchLimit is the maximum number of results returned by the App Store search API
 	AppStoreSearchLimit = 200
@@ -499,8 +500,27 @@ func resolveSAPAuthRedirect(base *url.URL, location string) (*url.URL, error) {
 	return parseSAPAuthEndpoint(base.ResolveReference(reference).String())
 }
 
-func waitAppStoreAuthRetry(ctx context.Context, retries int) error {
-	timer := time.NewTimer(time.Second << retries)
+func waitAppStoreAuthRetry(ctx context.Context, retries int, retryAfter string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	delay := time.Second << retries
+	retryAfter = strings.TrimSpace(retryAfter)
+	if seconds, err := strconv.ParseUint(retryAfter, 10, 64); err == nil {
+		if seconds > uint64(maxSAPRetryDelay/time.Second) {
+			delay = maxSAPRetryDelay + time.Second
+		} else {
+			delay = max(time.Second, time.Duration(seconds)*time.Second)
+		}
+	} else if errors.Is(err, strconv.ErrRange) {
+		delay = maxSAPRetryDelay + time.Second
+	} else if date, err := http.ParseTime(retryAfter); err == nil {
+		delay = max(time.Second, time.Until(date))
+	}
+	if delay > maxSAPRetryDelay {
+		return fmt.Errorf("App Store requested an authentication retry after more than %s; try again later", maxSAPRetryDelay)
+	}
+	timer := time.NewTimer(delay)
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
@@ -915,8 +935,8 @@ func (as *AppStore) signInAttempt(username, password, code string, attempt int, 
 		}
 		log.WithField("status", res.StatusCode).Debug("Retrying signed App Store request")
 		res.Body.Close()
-		if err := waitAppStoreAuthRetry(as.config.Context, requestRetries); err != nil {
-			return err
+		if err := waitAppStoreAuthRetry(as.config.Context, requestRetries, res.Header.Get("Retry-After")); err != nil {
+			return fmt.Errorf("App Store authentication retry (HTTP %d): %w", res.StatusCode, err)
 		}
 		return as.signInAttempt(username, password, code, attempt, as.pod, endpoint, triedFallback, readCode, sign, redirects, requestRetries+1, guid)
 	}

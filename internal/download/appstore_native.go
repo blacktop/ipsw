@@ -74,13 +74,21 @@ func (as *AppStore) authenticate(username, password string) error {
 }
 
 func (as *AppStore) authenticateWithFallback(username, password string, err error) error {
-	if errors.Is(err, storeauth.ErrGrandSlamUnavailable) {
+	smsRequired := errors.Is(err, storeauth.ErrGrandSlamSMSRequired)
+	if errors.Is(err, storeauth.ErrGrandSlamUnavailable) || smsRequired {
 		if contextErr := as.config.Context.Err(); contextErr != nil {
 			return contextErr
 		}
-		log.WithError(err).Debug("Native App Store authentication unavailable; trying existing login")
-		log.Warn("Signed App Store login is unavailable on this system; trying legacy login. A supported macOS build is currently required for signed login")
+		if smsRequired {
+			log.Warn("GrandSlam requires SMS verification; trying legacy App Store login")
+		} else {
+			log.WithError(err).Debug("Native App Store authentication unavailable; trying existing login")
+			log.Warn("Signed App Store login is unavailable on this system; trying legacy login. A supported macOS build is currently required for signed login")
+		}
 		if err := as.signIn(username, password, "", 1, "", nil); err != nil {
+			if smsRequired {
+				return fmt.Errorf("legacy App Store login after SMS challenge failed: %w", err)
+			}
 			return fmt.Errorf("legacy App Store login failed (signed login currently requires a supported macOS build): %w", err)
 		}
 		return nil
@@ -216,8 +224,10 @@ func resolveNativeAuthRedirect(base *url.URL, location string) (*url.URL, error)
 }
 
 func nativeStorefront(country string) string {
-	prefix := "143441-1"
+	var prefix string
 	switch strings.ToUpper(country) {
+	case "US":
+		prefix = "143441-1"
 	case "GB", "UK":
 		prefix = "143444"
 	case "DE":
@@ -236,6 +246,8 @@ func nativeStorefront(country string) string {
 		prefix = "143450-7"
 	case "ES":
 		prefix = "143454-8"
+	default:
+		return ""
 	}
 	return prefix + ",34"
 }
@@ -281,7 +293,9 @@ func (as *AppStore) bridgeNativeSession(username, guid string, session *storeaut
 			dsid := strconv.FormatInt(session.DSID, 10)
 			req.Header.Set("X-DSID", dsid)
 			req.Header.Set("iCloud-DSID", dsid)
-			req.Header.Set("X-Apple-Store-Front", storefront)
+			if storefront != "" {
+				req.Header.Set("X-Apple-Store-Front", storefront)
+			}
 		}
 		for _, name := range appStoreAnisetteHeaders {
 			if value := headers.Get(name); value != "" {

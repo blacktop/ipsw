@@ -98,6 +98,42 @@ func TestNativeAppStoreBridge(t *testing.T) {
 	}
 }
 
+func TestNativeAppStoreUnknownStorefront(t *testing.T) {
+	for _, tc := range []struct {
+		country, response string
+	}{
+		{"IN", ""},
+		{"NL", "143452-1,34"},
+		{"", ""},
+	} {
+		t.Run(tc.country, func(t *testing.T) {
+			as := newTestAppStore(t, func(req *http.Request) (*http.Response, error) {
+				if req.Method == http.MethodGet {
+					return nativeTestBag(req, ""), nil
+				}
+				if _, present := req.Header["X-Apple-Store-Front"]; present {
+					t.Error("unknown account country sent an inferred storefront")
+				}
+				res := appStoreTestResponse(req, 200, "text/xml", syntheticAppStoreLogin)
+				res.Header.Set("X-Set-Apple-Store-Front", tc.response)
+				return res, nil
+			})
+			session := nativeTestSession()
+			session.StorefrontCountry = tc.country
+			if err := as.bridgeNativeSession("synthetic@example.invalid", "020000000001", session, nativeTestHeaders(), syntheticNativeSigner); err != nil {
+				t.Fatal(err)
+			}
+			as.storeFront = "stale"
+			if err := as.loadSession(); err != nil {
+				t.Fatal(err)
+			}
+			if as.storeFront != tc.response {
+				t.Fatalf("saved storefront = %q, want %q", as.storeFront, tc.response)
+			}
+		})
+	}
+}
+
 func TestNativeAppStoreRedirect(t *testing.T) {
 	for _, status := range []int{301, 302, 307, 308} {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
@@ -214,9 +250,12 @@ func TestNativeAppStoreUnavailableFallsBack(t *testing.T) {
 		}
 		return appStoreTestResponse(req, 200, "text/xml", syntheticAppStoreLogin), nil
 	})
-	err := as.authenticateWithFallback("synthetic@example.invalid", "synthetic-password", fmt.Errorf("native headers: %w", storeauth.ErrGrandSlamUnavailable))
-	if err != nil || requests != 2 || as.token != "synthetic-token" {
-		t.Fatalf("fallback requests=%d err=%v", requests, err)
+	for _, cause := range []error{fmt.Errorf("native headers: %w", storeauth.ErrGrandSlamUnavailable), storeauth.ErrGrandSlamSMSRequired} {
+		requests = 0
+		err := as.authenticateWithFallback("synthetic@example.invalid", "synthetic-password", cause)
+		if err != nil || requests != 2 || as.token != "synthetic-token" {
+			t.Fatalf("fallback requests=%d err=%v", requests, err)
+		}
 	}
 	for _, failure := range []error{context.Canceled, context.DeadlineExceeded, storeauth.ErrGrandSlamInvalidCredentials, storeauth.ErrInvalidTwoFactorCode, errors.New("signed Store login rejected")} {
 		requests = 0
@@ -232,9 +271,13 @@ func TestNativeAppStoreUnavailableFallsBack(t *testing.T) {
 		}
 		return nil, failure
 	})
-	err = as.authenticateWithFallback("synthetic@example.invalid", "synthetic-password", storeauth.ErrGrandSlamUnavailable)
+	err := as.authenticateWithFallback("synthetic@example.invalid", "synthetic-password", storeauth.ErrGrandSlamUnavailable)
 	if !errors.Is(err, failure) || !strings.Contains(err.Error(), "signed login currently requires a supported macOS build") {
 		t.Fatalf("fallback lost its cause or platform guidance: %v", err)
+	}
+	err = as.authenticateWithFallback("synthetic@example.invalid", "synthetic-password", storeauth.ErrGrandSlamSMSRequired)
+	if !errors.Is(err, failure) || !strings.Contains(err.Error(), "SMS challenge") || strings.Contains(err.Error(), "requires a supported macOS build") {
+		t.Fatalf("SMS fallback lost its cause or reported the wrong limitation: %v", err)
 	}
 }
 

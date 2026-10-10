@@ -15,6 +15,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/99designs/keyring"
 	"github.com/blacktop/ipsw/internal/storeauth"
@@ -252,6 +254,81 @@ func TestSignedAppStoreLogin(t *testing.T) {
 	if posts != 4 || signs != 4 || prompts != 1 || as.token != "synthetic-token" {
 		t.Errorf("posts=%d signs=%d prompts=%d", posts, signs, prompts)
 	}
+}
+
+func TestSignedAppStoreRetryAfter(t *testing.T) {
+	for _, tc := range []struct {
+		name, header string
+		status       int
+		wait         time.Duration
+		tooLong      bool
+	}{
+		{"seconds", "7", 429, 7 * time.Second, false},
+		{"date", "Sat, 01 Jan 2000 00:00:09 GMT", 503, 9 * time.Second, false},
+		{"invalid", "later", 429, time.Second, false},
+		{"zero", "0", 429, time.Second, false},
+		{"past", "Fri, 31 Dec 1999 23:59:59 GMT", 429, time.Second, false},
+		{"at limit", "60", 429, maxSAPRetryDelay, false},
+		{"over limit", "61", 429, 0, true},
+		{"date over limit", "Sat, 01 Jan 2000 00:01:01 GMT", 429, 0, true},
+		{"overflow", "18446744073709551616", 429, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				start := time.Now()
+				posts := 0
+				as := newTestAppStore(t, func(req *http.Request) (*http.Response, error) {
+					posts++
+					if posts == 1 {
+						res := appStoreTestResponse(req, tc.status, "text/html", "")
+						res.Header.Set("Retry-After", tc.header)
+						return res, nil
+					}
+					return appStoreTestResponse(req, 200, "text/xml", syntheticAppStoreLogin), nil
+				})
+				err := as.signInAttempt("synthetic@example.invalid", "synthetic-password", "", 1, "", appStoreURL(appStoreBuyHost, appStoreAuthPath), false, nil, syntheticNativeSigner, 0, 0, "020000000001")
+				if tc.tooLong {
+					if err == nil || !strings.Contains(err.Error(), "try again later") || posts != 1 {
+						t.Fatalf("retried before the server deadline: posts=%d err=%v", posts, err)
+					}
+				} else if err != nil || posts != 2 || as.token != "synthetic-token" {
+					t.Fatalf("retry failed: posts=%d err=%v", posts, err)
+				}
+				if elapsed := time.Since(start); elapsed != tc.wait {
+					t.Fatalf("waited %s, want %s", elapsed, tc.wait)
+				}
+			})
+		})
+	}
+	t.Run("canceled", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			start := time.Now()
+			if err := waitAppStoreAuthRetry(ctx, 0, "30"); !errors.Is(err, context.DeadlineExceeded) || time.Since(start) != 3*time.Second {
+				t.Fatalf("retry wait ignored cancellation: %v", err)
+			}
+			if err := waitAppStoreAuthRetry(ctx, 0, "61"); !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("server delay hid an existing cancellation: %v", err)
+			}
+		})
+	})
+	t.Run("exhausted", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			start := time.Now()
+			posts := 0
+			as := newTestAppStore(t, func(req *http.Request) (*http.Response, error) {
+				posts++
+				res := appStoreTestResponse(req, 429, "text/html", "")
+				res.Header.Set("Retry-After", "2")
+				return res, nil
+			})
+			err := as.signInAttempt("synthetic@example.invalid", "synthetic-password", "", 1, "", appStoreURL(appStoreBuyHost, appStoreAuthPath), false, nil, syntheticNativeSigner, 0, 0, "020000000001")
+			if err == nil || posts != maxSAPRequestAttempts || time.Since(start) != 4*time.Second {
+				t.Fatalf("retry limit changed: posts=%d elapsed=%s err=%v", posts, time.Since(start), err)
+			}
+		})
+	})
 }
 
 func TestSignedAppStoreLoginStopsBeforeDispatch(t *testing.T) {

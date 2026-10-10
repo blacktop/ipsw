@@ -43,6 +43,7 @@ var (
 	// credentials. The caller may attempt its legacy authentication path.
 	ErrGrandSlamUnavailable        = errors.New("GrandSlam authentication is unavailable")
 	ErrGrandSlamInvalidCredentials = errors.New("invalid GrandSlam credentials")
+	ErrGrandSlamSMSRequired        = errors.New("GrandSlam SMS verification is required")
 )
 
 // GrandSlamSession contains only the tokens and account facts needed by the
@@ -186,6 +187,10 @@ func (c *GrandSlamClient) Login(ctx context.Context, email, password string) (se
 	if err != nil {
 		return nil, err
 	}
+	status, _ := complete["Status"].(map[string]any)
+	if status["au"] == "secondaryAuth" {
+		return nil, ErrGrandSlamSMSRequired
+	}
 	adsid, err := grandSlamString(spd, "adsid")
 	if err != nil {
 		return nil, err
@@ -194,7 +199,7 @@ func (c *GrandSlamClient) Login(ctx context.Context, email, password string) (se
 	if err != nil {
 		return nil, err
 	}
-	if status, ok := complete["Status"].(map[string]any); ok && status["au"] == "trustedDeviceSecondaryAuth" {
+	if status["au"] == "trustedDeviceSecondaryAuth" {
 		return nil, &GrandSlamChallenge{ADSID: adsid, IDMSToken: idms}
 	}
 	tokens, _ := spd["t"].(map[string]any)

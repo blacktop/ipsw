@@ -6,12 +6,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
-
-	"golang.org/x/crypto/pbkdf2"
 )
 
 const (
@@ -139,13 +136,5 @@ func deriveGrandSlamPassword(protocol PasswordProtocol, password string, salt []
 		return nil, errors.New("srp: unsupported GrandSlam password protocol")
 	}
 
-	digest := sha256.Sum256([]byte(password))
-	derived := pbkdf2.Key(digest[:], salt, iterations, sha256.Size, sha256.New)
-	if protocol == ProtocolS2KFO {
-		encoded := make([]byte, hex.EncodedLen(len(derived)))
-		hex.Encode(encoded, derived)
-		clear(derived)
-		return encoded, nil
-	}
-	return derived, nil
+	return derivePassword(protocol, []byte(password), salt, iterations)
 }

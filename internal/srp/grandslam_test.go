@@ -17,16 +17,15 @@ const (
 )
 
 func TestGrandSlamPasswordVectors(t *testing.T) {
-	// Independently computed with Python hashlib.pbkdf2_hmac("sha256",
-	// sha256(password).digest(), salt, 17, 32).
-	const raw = "7e45a9b84ecc792912c1eebbefb2ba11ed372d6fc501a7c2f096b1c7866a6419"
+	// Independently computed with Python hashlib.pbkdf2_hmac. s2k_fo
+	// supplies sha256(password).hexdigest().encode() as its password.
 	salt := decodeGrandSlamHex(t, grandSlamTestSalt)
 	for _, tc := range []struct {
 		protocol PasswordProtocol
 		want     []byte
 	}{
-		{ProtocolS2K, decodeGrandSlamHex(t, raw)},
-		{ProtocolS2KFO, []byte(raw)},
+		{ProtocolS2K, decodeGrandSlamHex(t, "7e45a9b84ecc792912c1eebbefb2ba11ed372d6fc501a7c2f096b1c7866a6419")},
+		{ProtocolS2KFO, decodeGrandSlamHex(t, "50278ff04f769bcd5230ef32224212eb98224c5142a50ef78fd98372201519a0")},
 	} {
 		t.Run(string(tc.protocol), func(t *testing.T) {
 			got, err := deriveGrandSlamPassword(tc.protocol, grandSlamTestPassword, salt, grandSlamTestRounds)
@@ -42,7 +41,7 @@ func TestGrandSlamPasswordVectors(t *testing.T) {
 
 func TestGrandSlamShortPublicValueVectors(t *testing.T) {
 	// Python hashlib and modular pow computed these independently from the
-	// frozen Rust GrandSlam formulas. a=1 produces A=2, and B=3, so using the
+	// GrandSlam formulas. a=1 produces A=2, and B=3, so using the
 	// IDMSA padded scrambling hash changes every expected result.
 	for _, tc := range []struct {
 		protocol PasswordProtocol
@@ -57,9 +56,9 @@ func TestGrandSlamShortPublicValueVectors(t *testing.T) {
 		},
 		{
 			ProtocolS2KFO,
-			"1ff428a8f8cffcc4409e6030b97ee40e61501ea11979e31fd4c481af9a04416f",
-			"53a7ad8658be9c96d78503f66a0337b9adb6a5f32a877244c6692071f8bdaeb4",
-			"8ae8558d04109b85ced369b54fea246f1917ca68994321549885dc81fe0320cf",
+			"8851b00fb4f2a2d5dbf9fdf4abf7cbe528fd11de3b001681569d07e008a97ab2",
+			"3edd05101984381a14f5fffde6b6fbbc0136408953d95366a8f4a1ef761e278f",
+			"e17917f5e2258f0cd846ef0d80f35915e085528dd47a55543a23a8c2d3448962",
 		},
 	} {
 		t.Run(string(tc.protocol), func(t *testing.T) {
@@ -97,10 +96,10 @@ func TestGrandSlamServerDerivedVectors(t *testing.T) {
 		},
 		{
 			ProtocolS2KFO,
-			"8c663131b3ac0a491d0697697972873209d4c98e3feb134603b9a6469f1ea604a755ed5baf789177ea758b3652d02f3e9509f694617f1363876b7e1b8f024c238e85e9e2807d4b4f0a14c6ed31e7941af4c4e02b6bb2b876d59c07c9d82dc9c9e0f323e442e968e7de3729a29a6b34aff178734cfc554b7790d1e02fad4e7a48a5247598bb6b6b101a652aa92c7dd6f82a0da4a28d1a78561e6559fef93b15b195145ecdc1852e776d9b1ea0b7a2d27134091ee8fb93627e2beb4a00acf4003a2bcbfb19e35a657998c3383d937fd0ccbc58ada4e290bea276355a3c4cfc90964d06aba4b4b6562d1231a54e4a8bc4edce6eb69a827bb0234821eb172b5e7d89",
-			"0ebec1b9628bef3f3081b28318a4647335bf8c7c1551c5a138980e593d916f2b",
-			"d74b67ab46c45a7889e61348c35b4277baa70d10bf37ffa8a0534322317a003d",
-			"a62cb1b29a3e5fbecbeb41513297409dd4f40b2ba70822ffd90467896fe32d55",
+			"ab43b93df26226c3703117ffae4660b1604a9d08c1db377c998979a78aeb37e1de9c856b50a9b45a2191d8c5a543d4bff0c670c5f7c43cb4e4e1cb549bd024e8f9c254545308831b283b1bea81def76564a23050637c3a355841f26f793602a390465fc59b463a689730027dadb9c8d53eb9d717a32a7454f7360c0d43a89a06a54b52fc44b882ad25313314e7a74fd4b424405cf9864cd1af87bc70506442ab5528bc03f7705ad53ed4fd5bd211e20eb2f936b70d8ca622fd517042b69e61be4e8610339fb600e2343e8c3e953432ed1a56e781dd2db6f5833af108b6c039397d4c7c00258e76b51e5f440b3855cbbb0bf849ee3885ba8271d6865ada8874ca",
+			"bb85b54c7def0b751196bed8af941cbd86e76f9ef2f82581125aebd9af5735be",
+			"99f08b235b445c1f6f52a8e06ba3a197bc5f6931284a1e0e341be76ce3d98086",
+			"814c68e4f5ed11cddc04ebfbcafd412977d4f29b72534c709ea7014066909741",
 		},
 	} {
 		t.Run(string(tc.protocol), func(t *testing.T) {
