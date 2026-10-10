@@ -43,9 +43,9 @@ ipsw dyld disass <DSC> [flags]
       --cache string                 Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint                   Number of instructions to disassemble
   -D, --dec                          Decompile assembly
-      --dec-lang string              Language to decompile to (C, ObjC or Swift)
       --dec-api-key-env string       Environment variable holding the OpenAI-compatible API key (defaults to OPENAI_API_KEY)
       --dec-base-url string          OpenAI-compatible API base URL (defaults to OPENAI_BASE_URL)
+      --dec-lang string              Language to decompile to (C, ObjC or Swift)
       --dec-llm string               LLM provider to use for decompilation
       --dec-model string             LLM model to use for decompilation
       --dec-nocache                  Do not use decompilation cache
