@@ -332,8 +332,7 @@ func (as *AppStore) bridgeNativeSession(username, guid string, session *storeaut
 }
 
 func redactAppStoreTransportError(err error) error {
-	var wrapped *url.Error
-	if errors.As(err, &wrapped) {
+	if wrapped, ok := errors.AsType[*url.Error](err); ok {
 		return wrapped.Err
 	}
 	return err

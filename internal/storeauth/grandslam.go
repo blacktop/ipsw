@@ -221,8 +221,7 @@ func grandSlamPreProofError(err error) error {
 	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrGrandSlamInvalidCredentials) || errors.Is(err, ErrInvalidTwoFactorCode) {
 		return err
 	}
-	var challenge *GrandSlamChallenge
-	if errors.As(err, &challenge) {
+	if _, ok := errors.AsType[*GrandSlamChallenge](err); ok {
 		return err
 	}
 	return fmt.Errorf("%w: %w", ErrGrandSlamUnavailable, err)
