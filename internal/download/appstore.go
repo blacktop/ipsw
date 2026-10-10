@@ -290,21 +290,50 @@ func appStoreHostForPod(pod string) string {
 	return "p" + pod + "-" + appStoreBuyHost
 }
 
-func resolveRedirectEndpoint(base *url.URL, location string) (string, error) {
+func isAppStoreBuyHost(host string) bool {
+	host = strings.ToLower(host)
+	if host == appStoreBuyHost {
+		return true
+	}
+	pod, ok := strings.CutPrefix(host, "p")
+	if !ok {
+		return false
+	}
+	pod, ok = strings.CutSuffix(pod, "-"+appStoreBuyHost)
+	if !ok || len(pod) == 0 || len(pod) > 58 {
+		return false
+	}
+	for _, c := range pod {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isAppStoreAuthURL(endpoint *url.URL) bool {
+	return endpoint != nil && endpoint.Scheme == "https" && endpoint.User == nil &&
+		endpoint.Opaque == "" && endpoint.Fragment == "" &&
+		(endpoint.Port() == "" || endpoint.Port() == "443") &&
+		(strings.EqualFold(endpoint.Hostname(), appStoreAuthHost) || isAppStoreBuyHost(endpoint.Hostname()))
+}
+
+func resolveRedirectEndpoint(base *url.URL, location string) (*url.URL, error) {
 	parsedLocation, err := url.Parse(strings.TrimSpace(location))
 	if err != nil {
-		return "", fmt.Errorf("failed to parse redirect location: %w", err)
+		return nil, errors.New("failed to parse App Store redirect location")
 	}
 
-	if parsedLocation.IsAbs() {
-		return parsedLocation.String(), nil
+	if !parsedLocation.IsAbs() {
+		if base == nil {
+			return nil, errors.New("failed to resolve relative redirect location: missing base URL")
+		}
+		parsedLocation = base.ResolveReference(parsedLocation)
 	}
-
-	if base == nil {
-		return "", fmt.Errorf("failed to resolve relative redirect location: missing base URL")
+	if !isAppStoreAuthURL(parsedLocation) {
+		return nil, errors.New("App Store authentication redirect is not a trusted HTTPS endpoint")
 	}
-
-	return base.ResolveReference(parsedLocation).String(), nil
+	return parsedLocation, nil
 }
 
 func decodePlistResponse(body []byte, out any) error {
@@ -404,24 +433,20 @@ func (as *AppStore) getBagAuthEndpoint(guid string) (string, error) {
 	return normalizeAuthEndpoint(endpoint), nil
 }
 
-// normalizeAuthEndpoint pins the native auth.itunes.apple.com endpoint to the
-// /fast/ path, trailing slash included. After 26HOTFIX24 (June 2026) the bag
-// advertises ".../auth/v1/native"; posting to that, or to /fast without the
-// slash, draws a 301 to an HTML body, so the plist decode dies with "unexpected
-// hex digit 'h'" and the passwordToken Apple returns is later refused by
-// buyProduct (failureType 2034). Only the /fast/ form sent with the Configurator
-// User-Agent yields a token the purchase flow will accept.
+// normalizeAuthEndpoint selects the native /fast/ entry point for bags that
+// advertise the native root. Redirects returned by that endpoint are followed
+// separately, without rewriting their paths.
 func normalizeAuthEndpoint(endpoint string) string {
-	if !strings.Contains(endpoint, appStoreAuthHost) {
+	parsed, err := url.Parse(endpoint)
+	if err != nil || !strings.EqualFold(parsed.Hostname(), appStoreAuthHost) {
 		return endpoint
 	}
-	if !strings.HasSuffix(endpoint, "/fast") && !strings.HasSuffix(endpoint, "/fast/") {
-		endpoint += "/fast"
+	switch parsed.Path {
+	case "/auth/v1/native", "/auth/v1/native/", "/auth/v1/native/fast", appStoreAuthNativePath:
+		parsed.Path = appStoreAuthNativePath
+		parsed.RawPath = ""
 	}
-	if !strings.HasSuffix(endpoint, "/") {
-		endpoint += "/"
-	}
-	return endpoint
+	return parsed.String()
 }
 
 func (as *AppStore) resolveAuthEndpoint(guid string) string {
@@ -641,6 +666,10 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 	if attempt > 4 {
 		return errors.New("too many authentication attempts")
 	}
+	parsedEndpoint, err := url.Parse(endpoint)
+	if err != nil || !isAppStoreAuthURL(parsedEndpoint) {
+		return errors.New("App Store authentication URL is not a trusted HTTPS endpoint")
+	}
 
 	mac, err := getMacAddress()
 	if err != nil {
@@ -671,7 +700,13 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("User-Agent", userAgent)
 
-	res, err := as.Client.Do(req)
+	// Handle every auth redirect here so credentials, 2FA codes, and the retry
+	// budget survive each hop. Other App Store requests keep normal HTTP behavior.
+	client := *as.Client
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -688,21 +723,22 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 		as.storeFront = responseStoreFront
 	}
 
-	if res.StatusCode == http.StatusFound {
-		nextEndpoint := endpoint
+	missingRedirectLocation := false
+	switch res.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
 		if loc := strings.TrimSpace(res.Header.Get("Location")); loc != "" {
 			resolvedEndpoint, err := resolveRedirectEndpoint(req.URL, loc)
 			if err != nil {
 				return err
 			}
-			nextEndpoint = resolvedEndpoint
+			log.WithFields(log.Fields{
+				"status":   res.StatusCode,
+				"location": resolvedEndpoint.Host + resolvedEndpoint.EscapedPath(),
+			}).Debug("Following App Store authentication redirect")
+			res.Body.Close()
+			return as.signInWithEndpoint(username, password, code, attempt+1, as.pod, resolvedEndpoint.String(), triedFallback)
 		}
-		nextPod := responsePod
-		if nextPod == "" {
-			nextPod = pod
-		}
-
-		return as.signInWithEndpoint(username, password, "", attempt+1, nextPod, nextEndpoint, triedFallback)
+		missingRedirectLocation = true
 	}
 
 	body, err := io.ReadAll(res.Body)
@@ -712,31 +748,26 @@ func (as *AppStore) signInWithEndpoint(username, password, code string, attempt 
 
 	logHTTPResponseMetadata("POST Login", res.StatusCode, len(body))
 
-	// os.WriteFile("login.xml", body, 0644)
-
-	if res.StatusCode == http.StatusForbidden && !triedFallback {
-		fallbackEndpoint := appStoreURL(appStoreBuyHost, appStoreAuthPath)
-		if endpoint == fallbackEndpoint {
-			fallbackEndpoint = as.resolveAuthEndpoint(lr.GuID)
-		} else if strings.Contains(endpoint, appStoreAuthHost) {
-			// Already pointed at the native endpoint; retrying against the legacy
-			// MZFinance URL would walk back into the 26HOTFIX24 breakage (its token
-			// is refused by buyProduct as failureType 2034), so don't downgrade.
-			fallbackEndpoint = ""
-		}
-		if fallbackEndpoint != "" && fallbackEndpoint != endpoint {
-			log.WithFields(log.Fields{
-				"status":   res.StatusCode,
-				"from":     endpoint,
-				"fallback": fallbackEndpoint,
-			}).Debug("Retrying App Store login with fallback auth endpoint")
-			return as.signInWithEndpoint(username, password, code, attempt+1, as.pod, fallbackEndpoint, true)
-		}
-	}
-
 	var login loginResponse
-	if err := decodePlistResponse(body, &login); err != nil {
-		return fmt.Errorf("failed to decode login response: %v", err)
+	decodeErr := decodePlistResponse(body, &login)
+	legacyEndpoint := isAppStoreBuyHost(req.URL.Hostname()) && req.URL.Path == appStoreAuthPath
+	// A valid 404 plist can be a 2FA challenge. Only a malformed 404 response
+	// establishes that the legacy endpoint is unavailable.
+	if !triedFallback && legacyEndpoint && (res.StatusCode == http.StatusForbidden ||
+		(res.StatusCode == http.StatusNotFound && decodeErr != nil) || missingRedirectLocation) {
+		fallbackEndpoint := appStoreURL(appStoreAuthHost, appStoreAuthNativePath)
+		log.WithFields(log.Fields{
+			"status":   res.StatusCode,
+			"fallback": fallbackEndpoint,
+		}).Debug("Retrying App Store login with fallback auth endpoint")
+		res.Body.Close()
+		return as.signInWithEndpoint(username, password, code, attempt+1, as.pod, fallbackEndpoint, true)
+	}
+	if missingRedirectLocation {
+		return fmt.Errorf("App Store login failed: HTTP %d %s (Content-Type: %q): missing redirect Location", res.StatusCode, http.StatusText(res.StatusCode), res.Header.Get("Content-Type"))
+	}
+	if decodeErr != nil {
+		return fmt.Errorf("App Store login failed: HTTP %d %s (Content-Type: %q): response is not a valid plist", res.StatusCode, http.StatusText(res.StatusCode), res.Header.Get("Content-Type"))
 	}
 
 	if attempt == 1 && login.FailureType == FailureTypeInvalidCredentials {
