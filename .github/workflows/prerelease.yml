@@ -6,7 +6,7 @@ on:
     paths-ignore:
       - "www/**"
       - "docs/**"
-      - ".github/workflows/docs.yml"
+      - ".github/workflows/**"
       - "*.md"
       - "LICENSE"
   workflow_dispatch:
