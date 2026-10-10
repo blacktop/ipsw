@@ -96,6 +96,37 @@ func TestCompatibleExplicitModelSkipsCatalog(t *testing.T) {
 	}
 }
 
+func TestCompatibleConfigDoesNotBlockOtherProviders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/tags" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"models":[{"name":"test-local-model","model":"test-local-model"}]}`)
+	}))
+	defer server.Close()
+	t.Setenv("OLLAMA_HOST", server.URL)
+	client, err := NewAI(context.Background(), &Config{
+		Provider:     "ollama",
+		BaseURL:      server.URL + "/unused/v1",
+		APIKey:       "unused-key",
+		APIKeyEnv:    "UNUSED_API_KEY",
+		Prompt:       "test prompt",
+		Model:        "test-local-model",
+		DisableCache: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	models, err := client.Models()
+	if err != nil || models["test-local-model"] != "test-local-model" {
+		t.Fatalf("Models() = %v, %v", models, err)
+	}
+}
+
 func TestCopilotProviderAvailable(t *testing.T) {
 	if !IsValidProvider("copilot") {
 		t.Fatal("copilot must be exposed as a supported provider")

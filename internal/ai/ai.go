@@ -262,9 +262,6 @@ func NewAI(ctx context.Context, cfg *Config) (AI, error) {
 	var chatCacheKey, modelsCacheKey string
 
 	cfg.Provider = NormalizeProvider(cfg.Provider)
-	if cfg.Provider != "openai" && (cfg.BaseURL != "" || cfg.APIKey != "" || cfg.APIKeyEnv != "") {
-		return nil, fmt.Errorf("custom API endpoint and key options require the openai or openai-compatible provider")
-	}
 
 	// Set default values for retry-related fields if not specified
 	if cfg.MaxRetries <= 0 {
