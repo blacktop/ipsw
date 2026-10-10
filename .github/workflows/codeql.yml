@@ -13,8 +13,18 @@ name: "CodeQL"
 
 on:
   pull_request:
+    paths-ignore:
+      - "www/**"
+      - "docs/**"
+      - "*.md"
+      - "LICENSE"
   push:
     branches: [master]
+    paths-ignore:
+      - "www/**"
+      - "docs/**"
+      - "*.md"
+      - "LICENSE"
 
 jobs:
   analyze:

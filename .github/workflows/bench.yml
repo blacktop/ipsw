@@ -2,8 +2,20 @@ name: Benchmarks
 
 on:
   pull_request:
+    paths-ignore:
+      - "www/**"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+      - "*.md"
+      - "LICENSE"
   push:
     branches: [master]
+    paths-ignore:
+      - "www/**"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+      - "*.md"
+      - "LICENSE"
   workflow_dispatch:
 
 permissions:
