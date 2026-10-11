@@ -1,6 +1,7 @@
 package syms
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"os"
@@ -30,6 +31,61 @@ func componentMachoData(cpu types.CPU, subtype types.CPUSubtype, uuid byte) []by
 		data = binary.LittleEndian.AppendUint32(data, word)
 	}
 	return append(data, uuid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+
+func componentDscData(t *testing.T, platform types.Platform, uuid, symbolsUUID byte) []byte {
+	t.Helper()
+	var header dyld.CacheHeader
+	copy(header.Magic[:], "dyld_v1arm64ex1")
+	header.UUID[0], header.Platform = uuid, platform
+	header.SymbolFileUUID[0] = symbolsUUID
+	header.MappingOffset = uint32(binary.Size(header))
+	header.ImagesOffset = header.MappingOffset
+	header.DylibsTrieAddr = 0x1000
+	header.CodeSignatureOffset = uint64(header.MappingOffset)
+	header.CodeSignatureSize = 12
+	var data bytes.Buffer
+	if err := binary.Write(&data, binary.LittleEndian, header); err != nil {
+		t.Fatal(err)
+	}
+	if err := binary.Write(&data, binary.BigEndian, []uint32{0xfade0cc0, 12, 0}); err != nil {
+		t.Fatal(err)
+	}
+	return data.Bytes()
+}
+
+func TestComponentDSCDiscoveryCompletion(t *testing.T) {
+	root := t.TempDir()
+	driver := filepath.Join(root, "System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e")
+	system := filepath.Join(root, "unrecognized/location/system.cache")
+	writeComponentFile(t, driver, componentDscData(t, types.Platform_Driverkit, 1, 0))
+	writeComponentFile(t, system, componentDscData(t, types.Platform_macOS, 2, 0))
+	p := prepareTestComponent(t, "Cryptex1,SystemOS", "system.dmg", "", "dsc")
+	var wire bytes.Buffer
+	if err := p.scan(&wire, func(visit func(string, *scanImage) error) error {
+		return p.scanMountedComponent(root, visit)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	assertComponentCompletion(t, wire.Bytes(), 2, 2, 0, 0)
+	if err := os.Remove(system); err != nil {
+		t.Fatal(err)
+	}
+	wire.Reset()
+	err := p.scan(&wire, func(visit func(string, *scanImage) error) error {
+		return p.scanMountedComponent(root, visit)
+	})
+	if !errors.Is(err, dyld.ErrNoDscFound) || bytes.Contains(wire.Bytes(), []byte(`symbols_component_complete`)) {
+		t.Fatalf("DriverKit-only component certified: err=%v wire=%s", err, &wire)
+	}
+	writeComponentFile(t, system, componentDscData(t, types.Platform_macOS, 2, 3))
+	wire.Reset()
+	err = p.scan(&wire, func(visit func(string, *scanImage) error) error {
+		return p.scanMountedComponent(root, visit)
+	})
+	if !errors.Is(err, os.ErrNotExist) || !strings.Contains(err.Error(), ".symbols") || bytes.Contains(wire.Bytes(), []byte(`symbols_component_complete`)) {
+		t.Fatalf("missing DSC resource certified: err=%v wire=%s", err, &wire)
+	}
 }
 
 func TestComponentDSCRequiredIdentities(t *testing.T) {

@@ -429,12 +429,10 @@ func scanDSCsInMountMode(mountPoint string, visit scanVisitor, facts scanFactsVi
 		// than silently emitting zero dylib symbols.
 		log.Warnf("no dyld_shared_cache found in %s", mountPoint)
 	}
-	mainCaches := 0
 	for _, dscPath := range dscPaths {
-		if len(filepath.Ext(dscPath)) != 0 {
+		if !strict && len(filepath.Ext(dscPath)) != 0 {
 			continue // skip subcaches/.symbols; dyld.Open pulls them in
 		}
-		mainCaches++
 		f, err := dyld.Open(dscPath)
 		if err != nil {
 			return fmt.Errorf("failed to open DSC %s: %w", dscPath, err)
@@ -445,9 +443,6 @@ func scanDSCsInMountMode(mountPoint string, visit scanVisitor, facts scanFactsVi
 		if err := f.Close(); err != nil {
 			return err
 		}
-	}
-	if strict && mainCaches == 0 {
-		return fmt.Errorf("no main dyld_shared_cache found in %s: %w", mountPoint, dyld.ErrNoDscFound)
 	}
 	return nil
 }

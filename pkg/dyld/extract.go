@@ -2,6 +2,7 @@ package dyld
 
 import (
 	"archive/zip"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -84,24 +86,192 @@ func IsDscNotFound(err error) bool {
 }
 
 func GetDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error) {
-	return getDscPathsInMount(mountPoint, driverKit, all, false)
+	return getDscPathsInMount(mountPoint, driverKit, all)
 }
 
-// GetDscPathsInMountStrict finds caches without suppressing filesystem errors.
-// Exact-component scans use it when a successful scan must prove coverage.
+// GetDscPathsInMountStrict returns the main caches in a complete, validated
+// cache-file inventory. Names and locations do not determine cache identity.
 func GetDscPathsInMountStrict(mountPoint string, driverKit, all bool) ([]string, error) {
-	return getDscPathsInMount(mountPoint, driverKit, all, true)
+	const maxCacheFiles = 4096
+	mountPoint = utils.MountedFilesystemRoot(mountPoint)
+	headers := make(map[string]CacheHeader)
+	uuids := make(map[types.UUID]string)
+	var paths []string
+	if err := filepath.Walk(mountPoint, func(name string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		header, err := readStrictDscHeader(name)
+		if err != nil {
+			return fmt.Errorf("cache discovery %s: %w", strictDscPath(mountPoint, name), err)
+		}
+		if header == nil {
+			return nil
+		}
+		if len(paths) == maxCacheFiles {
+			return fmt.Errorf("cache inventory exceeds %d files at %s", maxCacheFiles, strictDscPath(mountPoint, name))
+		}
+		if prior, exists := uuids[header.UUID]; exists {
+			return fmt.Errorf("cache %s duplicates UUID of %s", strictDscPath(mountPoint, name), strictDscPath(mountPoint, prior))
+		}
+		headers[name], uuids[header.UUID] = *header, name
+		paths = append(paths, name)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	var mains []string
+	referenced := make(map[string]bool)
+	for _, name := range paths {
+		header := headers[name]
+		if !strictDscMainHeader(header) {
+			continue
+		}
+		if uint64(header.SubCacheArrayCount) > uint64(len(paths)) {
+			return nil, fmt.Errorf("cache %s declares more subcaches than the mounted inventory", strictDscPath(mountPoint, name))
+		}
+		refs, err := strictDscReferences(name)
+		if err != nil {
+			return nil, fmt.Errorf("cache %s: %w", strictDscPath(mountPoint, name), err)
+		}
+		seen := map[types.UUID]bool{header.UUID: true}
+		for _, ref := range refs {
+			if !strings.HasPrefix(ref.Extention, ".") || strings.ContainsAny(ref.Extention, "/\\\x00") {
+				return nil, fmt.Errorf("cache %s has unsupported member suffix %q", strictDscPath(mountPoint, name), ref.Extention)
+			}
+			member := name + ref.Extention
+			got, exists := headers[member]
+			if !exists {
+				return nil, fmt.Errorf("cache %s requires missing or non-regular member %s: %w", strictDscPath(mountPoint, name), strictDscPath(mountPoint, member), os.ErrNotExist)
+			}
+			if ref.UUID.IsNull() || got.UUID != ref.UUID || seen[ref.UUID] {
+				return nil, fmt.Errorf("cache %s has a mismatched or duplicate member UUID at %s", strictDscPath(mountPoint, name), strictDscPath(mountPoint, member))
+			}
+			if strictDscMainHeader(got) {
+				return nil, fmt.Errorf("cache %s references another main cache %s", strictDscPath(mountPoint, name), strictDscPath(mountPoint, member))
+			}
+			seen[ref.UUID], referenced[member] = true, true
+		}
+		mains = append(mains, name)
+	}
+	for _, name := range paths {
+		if !strictDscMainHeader(headers[name]) && !referenced[name] {
+			return nil, fmt.Errorf("orphaned or unsupported dyld cache %s", strictDscPath(mountPoint, name))
+		}
+	}
+
+	var matches []string
+	systemCaches := 0
+	for _, name := range mains {
+		header := headers[name]
+		isDriverKit := header.Platform == types.Platform_Driverkit
+		switch header.Platform {
+		case types.Platform_macOS, types.Platform_iOS, types.Platform_tvOS, types.Platform_watchOS, types.Platform_bridgeOS, types.Platform_visionOS:
+			systemCaches++
+		case types.Platform_Driverkit:
+		default:
+			return nil, fmt.Errorf("cache %s has unsupported platform %s", strictDscPath(mountPoint, name), header.Platform)
+		}
+		if header.FormatVersion.IsSimulator() {
+			return nil, fmt.Errorf("cache %s is a simulator cache", strictDscPath(mountPoint, name))
+		}
+		// Reuse Open's complete member parsing, UUID checks, and cleanup.
+		f, err := Open(name)
+		if err != nil {
+			return nil, fmt.Errorf("cache %s: %w", strictDscPath(mountPoint, name), err)
+		}
+		if err := f.Close(); err != nil {
+			return nil, fmt.Errorf("close cache %s: %w", strictDscPath(mountPoint, name), err)
+		}
+		if (driverKit && isDriverKit) || (!driverKit && (all || !isDriverKit)) {
+			matches = append(matches, name)
+		}
+	}
+	if !driverKit && systemCaches == 0 {
+		return nil, fmt.Errorf("no system main dyld_shared_cache in %s: %w", mountPoint, ErrNoDscFound)
+	}
+	return matches, nil
 }
 
-func getDscPathsInMount(mountPoint string, driverKit, all, strict bool) ([]string, error) {
+func strictDscPath(root, name string) string {
+	rel, err := filepath.Rel(root, name)
+	if err != nil {
+		return name
+	}
+	return "/" + filepath.ToSlash(rel)
+}
+
+func readStrictDscHeader(name string) (header *CacheHeader, retErr error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, f.Close()) }()
+	var magic [16]byte
+	n, err := io.ReadFull(f, magic[:])
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, err
+	}
+	if !strings.HasPrefix(string(magic[:n]), "dyld_v") {
+		return nil, nil
+	}
+	if !slices.Contains(knownMagic, strings.Trim(string(magic[:]), "\x00")) {
+		return nil, fmt.Errorf("unsupported dyld cache magic %q", magic[:n])
+	}
+	header = new(CacheHeader)
+	if err := binary.Read(io.NewSectionReader(f, 0, int64(binary.Size(*header))), binary.LittleEndian, header); err != nil {
+		return nil, fmt.Errorf("read dyld cache header: %w", err)
+	}
+	if header.UUID.IsNull() || header.CacheType > CacheTypeUniversal {
+		return nil, errors.New("invalid dyld cache UUID or cache type")
+	}
+	return header, nil
+}
+
+func strictDscMainHeader(header CacheHeader) bool {
+	// Modern x86 subcaches can also have image tables. The trie, dyld address,
+	// and family references are primary-only metadata; legacy caches use the
+	// original image-table field. An ambiguous modern file remains an error.
+	return header.ImagesOffsetOld != 0 || (header.ImagesOffset != 0 &&
+		(header.DylibsTrieAddr != 0 || header.AccelerateInfoAddrUnusedOrDyldAddr != 0 ||
+			header.SubCacheArrayCount != 0 || !header.SymbolFileUUID.IsNull()))
+}
+
+func strictDscReferences(name string) (refs []SubcacheEntry, retErr error) {
+	r, closer, _, err := openCacheFile(name)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, closer.Close()) }()
+	f, err := NewFile(r)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, f.Close()) }()
+	header := f.Headers[f.UUID]
+	if !f.IsDyld4 && (len(f.SubCacheInfo) != 0 || !header.SymbolFileUUID.IsNull()) {
+		return nil, errors.New("legacy cache declares unsupported backing resources")
+	}
+	for i, info := range f.SubCacheInfo {
+		info.Extention = subCacheSuffix(info, i)
+		refs = append(refs, info)
+	}
+	if !header.SymbolFileUUID.IsNull() {
+		refs = append(refs, SubcacheEntry{UUID: header.SymbolFileUUID, Extention: ".symbols"})
+	}
+	return refs, nil
+}
+
+func getDscPathsInMount(mountPoint string, driverKit, all bool) ([]string, error) {
 	var matches []string
 	var re *regexp.Regexp
 
 	mountPoint = utils.MountedFilesystemRoot(mountPoint)
 	rootPattern := mountPoint
-	if strict {
-		rootPattern = regexp.QuoteMeta(rootPattern)
-	}
 
 	if driverKit {
 		re = regexp.MustCompile(filepath.Join(rootPattern, DriverKitCacheRegex))
@@ -113,13 +283,10 @@ func getDscPathsInMount(mountPoint string, driverKit, all, strict bool) ([]strin
 
 	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
-			if strict {
-				return err
-			}
 			utils.Indent(log.Warn, 3)(fmt.Sprintf("failed to walk %s: %v", path, err))
 			return nil
 		}
-		if info.IsDir() || (strict && !info.Mode().IsRegular()) {
+		if info.IsDir() {
 			return nil
 		}
 		if re.MatchString(path) {

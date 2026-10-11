@@ -2,13 +2,17 @@ package dyld
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -23,11 +27,119 @@ func TestGetDscPathsInMountStrict(t *testing.T) {
 		t.Fatalf("strict discovery suppressed a walk error: %v", err)
 	}
 	root := filepath.Join(t.TempDir(), "root[1]")
-	main := writeDscFixture(t, root, "System/Library/dyld/dyld_shared_cache_arm64e", "cache")
-	sub := writeDscFixture(t, root, "System/Library/dyld/dyld_shared_cache_arm64e.01", "subcache")
+	main := filepath.Join(root, "unrecognized/location/system.cache")
+	writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
+	writeSyntheticMember(t, main+".01", 2, nil)
+	driver := filepath.Join(root, "System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e")
+	writeStrictDscPrimary(t, driver, layoutSelfContained, types.Platform_Driverkit, 3)
 	got, err := GetDscPathsInMountStrict(root, false, true)
-	if err != nil || !slices.Equal(got, []string{main, sub}) {
+	if err != nil || !slices.Equal(got, []string{driver, main}) {
 		t.Fatalf("strict discovery paths=%v err=%v", got, err)
+	}
+	if got, err := GetDscPathsInMountStrict(root, false, false); err != nil || !slices.Equal(got, []string{main}) {
+		t.Fatalf("strict system selection paths=%v err=%v", got, err)
+	}
+	if got, err := GetDscPathsInMount(root, false, true); err != nil || len(got) != 0 {
+		t.Fatalf("legacy path selection changed: paths=%v err=%v", got, err)
+	}
+	t.Run("symbols resource", func(t *testing.T) {
+		root := t.TempDir()
+		main := filepath.Join(root, "system")
+		writeStrictDscPrimary(t, main, layoutWithSymbols, types.Platform_macOS, 1)
+		writeSyntheticMember(t, main+".symbols", 3, nil)
+		if got, err := GetDscPathsInMountStrict(root, false, true); err != nil || !slices.Equal(got, []string{main}) {
+			t.Fatalf("strict symbols discovery paths=%v err=%v", got, err)
+		}
+	})
+}
+
+func writeStrictDscPrimary(t *testing.T, name string, layout syntheticLayout, platform types.Platform, id byte) {
+	t.Helper()
+	data := syntheticPrimaryBytes(t, layout)
+	var header CacheHeader
+	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &header); err != nil {
+		t.Fatal(err)
+	}
+	header.UUID[0], header.Platform = id, platform
+	header.ImagesOffset = uint32(binary.Size(header))
+	header.DylibsTrieAddr = 0x1000
+	var encoded bytes.Buffer
+	if err := binary.Write(&encoded, binary.LittleEndian, header); err != nil {
+		t.Fatal(err)
+	}
+	copy(data, encoded.Bytes())
+	if err := os.MkdirAll(filepath.Dir(name), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(name, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetDscPathsInMountStrictFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name, want string
+		setup      func(*testing.T, string)
+	}{
+		{"DriverKit only", "no system main", func(t *testing.T, root string) {
+			writeStrictDscPrimary(t, filepath.Join(root, "driver"), layoutSelfContained, types.Platform_Driverkit, 1)
+		}},
+		{"unsupported magic", "unsupported dyld cache magic", func(t *testing.T, root string) {
+			writeDscFixture(t, root, "unexpected", "dyld_v2 arm64e")
+		}},
+		{"truncated header", "read dyld cache header", func(t *testing.T, root string) {
+			writeDscFixture(t, root, "unexpected", "dyld_v1arm64ex1\x00\x00")
+		}},
+		{"orphan", "orphaned or unsupported", func(t *testing.T, root string) {
+			writeSyntheticMember(t, filepath.Join(root, "unreferenced"), 2, nil)
+		}},
+		{"ambiguous image table", "orphaned or unsupported", func(t *testing.T, root string) {
+			writeSyntheticMember(t, filepath.Join(root, "unreferenced"), 2, func(h *CacheHeader) { h.ImagesOffset = h.MappingOffset })
+		}},
+		{"duplicate UUID", "duplicates UUID", func(t *testing.T, root string) {
+			writeStrictDscPrimary(t, filepath.Join(root, "first"), layoutSelfContained, types.Platform_macOS, 1)
+			writeStrictDscPrimary(t, filepath.Join(root, "second"), layoutSelfContained, types.Platform_macOS, 1)
+		}},
+		{"missing subcache", "requires missing", func(t *testing.T, root string) {
+			writeStrictDscPrimary(t, filepath.Join(root, "main"), layoutOneSubcache, types.Platform_macOS, 1)
+		}},
+		{"malformed subcache", "failed to parse cache", func(t *testing.T, root string) {
+			main := filepath.Join(root, "main")
+			writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
+			writeSyntheticMember(t, main+".01", 2, declareMissingMapping)
+		}},
+		{"mismatched subcache", "mismatched or duplicate member UUID", func(t *testing.T, root string) {
+			main := filepath.Join(root, "main")
+			writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
+			writeSyntheticMember(t, main+".01", 9, nil)
+		}},
+		{"unreadable subcache", "permission denied", func(t *testing.T, root string) {
+			main := filepath.Join(root, "main")
+			writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
+			writeSyntheticMember(t, main+".01", 2, nil)
+			if err := os.Chmod(main+".01", 0); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(main+".01", 0o600) })
+			if f, err := os.Open(main + ".01"); err == nil {
+				_ = f.Close()
+				t.Skip("test process can read mode-000 files")
+			}
+		}},
+		{"missing symbols", ".symbols", func(t *testing.T, root string) {
+			writeStrictDscPrimary(t, filepath.Join(root, "main"), layoutWithSymbols, types.Platform_macOS, 1)
+		}},
+		{"unsupported platform", "unsupported platform", func(t *testing.T, root string) {
+			writeStrictDscPrimary(t, filepath.Join(root, "main"), layoutSelfContained, types.Platform_Firmware, 1)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			tc.setup(t, root)
+			if _, err := GetDscPathsInMountStrict(root, false, true); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("strict discovery error=%v, want %q", err, tc.want)
+			}
+		})
 	}
 }
 

@@ -34,8 +34,14 @@ ipsw symbols --json --dyld \
 `--signatures` and `--pem-db` retain their existing meanings. Disk scanners fail
 closed on cache-discovery and filesystem-walk errors, unreadable regular files,
 recognized Mach-O parse failures, and missing required image identities. A
-requested `dsc` operation requires at least one main cache; subcache files alone
-are insufficient. Absent optional DSC local symbols retain their existing
+requested `dsc` operation inventories cache-format files throughout the exact
+mounted member, independently of their locations and names. It requires a
+supported physical-system main cache; DriverKit alone is insufficient. Main
+cache headers and declared UUID/suffix references must account for every
+recognized cache file. Unsupported or orphaned cache files, ambiguous identities,
+and missing, unreadable, malformed, or mismatched backing resources fail the
+operation. All discovered supported main caches are processed in path order.
+Absent optional DSC local symbols retain their existing
 fallback behavior. Filesystem coverage visits regular files at their real
 mount-relative paths; symlink aliases are skipped because their in-root targets
 are already in the complete walk. FAT symbols use the existing last-slice
@@ -156,7 +162,8 @@ The complete record contains:
 | `operations` | One entry per requested family, in start order, with `component_key`, `family`, `status: successful`, and the same four count fields |
 
 An empty successful operation is explicitly included with four zero counts.
-An effective-SystemOS `dsc` operation cannot succeed without a main cache.
+An effective-SystemOS `dsc` operation cannot succeed without the complete
+validated cache inventory and a physical-system main cache.
 The digest for no data records is SHA-256 of the empty byte string. Operation
 counts must sum to the complete record's counts, and the operation inventory
 must equal the start's requested families exactly.
