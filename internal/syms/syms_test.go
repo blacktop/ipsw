@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ func componentMachoData(cpu types.CPU, subtype types.CPUSubtype, uuid byte) []by
 	return append(data, uuid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
 
-func componentDscData(t *testing.T, platform types.Platform, uuid, symbolsUUID byte) []byte {
+func componentDscData(t *testing.T, platform types.Platform, uuid, symbolsUUID byte, mutate ...func(*dyld.CacheHeader)) []byte {
 	t.Helper()
 	var header dyld.CacheHeader
 	copy(header.Magic[:], "dyld_v1arm64ex1")
@@ -44,6 +45,9 @@ func componentDscData(t *testing.T, platform types.Platform, uuid, symbolsUUID b
 	header.DylibsTrieAddr = 0x1000
 	header.CodeSignatureOffset = uint64(header.MappingOffset)
 	header.CodeSignatureSize = 12
+	for _, fn := range mutate {
+		fn(&header)
+	}
 	var data bytes.Buffer
 	if err := binary.Write(&data, binary.LittleEndian, header); err != nil {
 		t.Fatal(err)
@@ -52,6 +56,68 @@ func componentDscData(t *testing.T, platform types.Platform, uuid, symbolsUUID b
 		t.Fatal(err)
 	}
 	return data.Bytes()
+}
+
+func componentDscFamilyMain(t *testing.T, uuid byte) []byte {
+	t.Helper()
+	data := bytes.NewBuffer(componentDscData(t, types.Platform_macOS, uuid, 3, func(h *dyld.CacheHeader) {
+		h.CacheType = dyld.CacheTypeUniversal
+		h.SubCacheArrayOffset = uint32(binary.Size(*h)) + 12
+		h.SubCacheArrayCount = 1
+	}))
+	entry := struct {
+		UUID          types.UUID
+		CacheVMOffset uint64
+		FileSuffix    [32]byte
+	}{UUID: types.UUID{2}}
+	copy(entry.FileSuffix[:], ".01")
+	if err := binary.Write(data, binary.LittleEndian, entry); err != nil {
+		t.Fatal(err)
+	}
+	return data.Bytes()
+}
+
+func TestComponentDSCMemberRoleCompletion(t *testing.T) {
+	for _, symbolsUUID := range []byte{0, 9} {
+		t.Run(fmt.Sprintf("symbols UUID %d", symbolsUUID), func(t *testing.T) {
+			root := t.TempDir()
+			main := filepath.Join(root, "system")
+			writeComponentFile(t, main, componentDscFamilyMain(t, 1))
+			member := func(h *dyld.CacheHeader) { h.ImagesOffset, h.DylibsTrieAddr = 0, 0 }
+			writeComponentFile(t, main+".symbols", componentDscData(t, types.Platform_macOS, 3, 0, member))
+			writeComponentFile(t, main+".01", componentDscData(t, types.Platform_macOS, 2, symbolsUUID, member, func(h *dyld.CacheHeader) {
+				if symbolsUUID == 0 {
+					h.SubCacheArrayCount, h.SubCacheArrayOffset = 7, 1
+				}
+			}))
+			p := prepareTestComponent(t, "Cryptex1,SystemOS", "system.dmg", "", "dsc")
+			var wire bytes.Buffer
+			err := p.scan(&wire, func(visit func(string, *scanImage) error) error {
+				return p.scanMountedComponent(root, visit)
+			})
+			if err == nil || !strings.Contains(err.Error(), "primary-only cache family metadata") || bytes.Contains(wire.Bytes(), []byte(`symbols_component_complete`)) {
+				t.Fatalf("malformed DSC member certified: err=%v wire=%s", err, &wire)
+			}
+		})
+	}
+}
+
+func TestComponentDSCUniversalFamilyCompletion(t *testing.T) {
+	root := t.TempDir()
+	main := filepath.Join(root, "system")
+	writeComponentFile(t, main, componentDscFamilyMain(t, 4))
+	writeComponentFile(t, main+".development", componentDscFamilyMain(t, 5))
+	member := func(h *dyld.CacheHeader) { h.ImagesOffset, h.DylibsTrieAddr = 0, 0 }
+	writeComponentFile(t, main+".01", componentDscData(t, types.Platform_macOS, 2, 0, member))
+	writeComponentFile(t, main+".symbols", componentDscData(t, types.Platform_macOS, 3, 0, member))
+	p := prepareTestComponent(t, "Cryptex1,SystemOS", "system.dmg", "", "dsc")
+	var wire bytes.Buffer
+	if err := p.scan(&wire, func(visit func(string, *scanImage) error) error {
+		return p.scanMountedComponent(root, visit)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	assertComponentCompletion(t, wire.Bytes(), 2, 2, 0, 0)
 }
 
 func TestComponentDSCDiscoveryCompletion(t *testing.T) {

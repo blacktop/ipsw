@@ -236,7 +236,7 @@ func Open(name string) (*File, error) {
 func (f *File) openSubCaches(name string) error {
 	hdr := f.Headers[f.UUID]
 	for i, info := range f.SubCacheInfo {
-		subSize, err := f.openCacheMember(name+subCacheSuffix(info, i), info.UUID)
+		subSize, err := f.openCacheMember(cacheMemberPath(name, hdr, subCacheSuffix(info, i)), info.UUID)
 		if err != nil {
 			return err
 		}
@@ -246,11 +246,21 @@ func (f *File) openSubCaches(name string) error {
 		return nil
 	}
 	// Size() reports the mapped runtime cache; .symbols is not part of it.
-	if _, err := f.openCacheMember(name+".symbols", hdr.SymbolFileUUID); err != nil {
+	if _, err := f.openCacheMember(cacheMemberPath(name, hdr, ".symbols"), hdr.SymbolFileUUID); err != nil {
 		return err
 	}
 	f.symUUID = hdr.SymbolFileUUID
 	return nil
+}
+
+// cacheMemberPath follows dyld's recorded-suffix rule for modern universal
+// caches. Their development main shares the family base (and symbols file)
+// with the customer main. Older numbered members use the full primary name.
+func cacheMemberPath(name string, header CacheHeader, suffix string) string {
+	if header.MappingOffset >= 0x200 && header.CacheType == CacheTypeUniversal {
+		name = strings.TrimSuffix(name, ".development")
+	}
+	return name + suffix
 }
 
 // subCacheSuffix is the filename suffix of the idx-th subcache entry: the

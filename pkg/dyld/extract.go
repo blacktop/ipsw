@@ -143,13 +143,16 @@ func GetDscPathsInMountStrict(mountPoint string, driverKit, all bool) ([]string,
 			if !strings.HasPrefix(ref.Extention, ".") || strings.ContainsAny(ref.Extention, "/\\\x00") {
 				return nil, fmt.Errorf("cache %s has unsupported member suffix %q", strictDscPath(mountPoint, name), ref.Extention)
 			}
-			member := name + ref.Extention
+			member := cacheMemberPath(name, header, ref.Extention)
 			got, exists := headers[member]
 			if !exists {
 				return nil, fmt.Errorf("cache %s requires missing or non-regular member %s: %w", strictDscPath(mountPoint, name), strictDscPath(mountPoint, member), os.ErrNotExist)
 			}
 			if ref.UUID.IsNull() || got.UUID != ref.UUID || seen[ref.UUID] {
 				return nil, fmt.Errorf("cache %s has a mismatched or duplicate member UUID at %s", strictDscPath(mountPoint, name), strictDscPath(mountPoint, member))
+			}
+			if got.SubCacheArrayCount != 0 || !got.SymbolFileUUID.IsNull() {
+				return nil, fmt.Errorf("cache %s member %s declares primary-only cache family metadata", strictDscPath(mountPoint, name), strictDscPath(mountPoint, member))
 			}
 			if strictDscMainHeader(got) {
 				return nil, fmt.Errorf("cache %s references another main cache %s", strictDscPath(mountPoint, name), strictDscPath(mountPoint, member))

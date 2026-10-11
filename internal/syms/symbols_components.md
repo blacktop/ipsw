@@ -38,7 +38,10 @@ requested `dsc` operation inventories cache-format files throughout the exact
 mounted member, independently of their locations and names. It requires a
 supported physical-system main cache; DriverKit alone is insufficient. Main
 cache headers and declared UUID/suffix references must account for every
-recognized cache file. Unsupported or orphaned cache files, ambiguous identities,
+recognized cache file. Backing members cannot declare another cache family or
+symbols resource. Modern universal customer/development mains resolve recorded
+suffixes and symbols from their shared family base; older numbered members use
+the full main filename. Unsupported or orphaned cache files, ambiguous identities,
 and missing, unreadable, malformed, or mismatched backing resources fail the
 operation. All discovered supported main caches are processed in path order.
 Absent optional DSC local symbols retain their existing

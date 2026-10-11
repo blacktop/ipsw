@@ -29,7 +29,12 @@ func TestGetDscPathsInMountStrict(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "root[1]")
 	main := filepath.Join(root, "unrecognized/location/system.cache")
 	writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
-	writeSyntheticMember(t, main+".01", 2, nil)
+	writeSyntheticMember(t, main+".01", 2, func(h *CacheHeader) {
+		// x86 members may have an image table and a zero-count array offset.
+		copy(h.Magic[:], "dyld_v1  x86_64\x00\x00")
+		h.ImagesOffset = h.MappingOffset
+		h.SubCacheArrayOffset = 1
+	})
 	driver := filepath.Join(root, "System/DriverKit/System/Library/dyld/dyld_shared_cache_arm64e")
 	writeStrictDscPrimary(t, driver, layoutSelfContained, types.Platform_Driverkit, 3)
 	got, err := GetDscPathsInMountStrict(root, false, true)
@@ -51,6 +56,14 @@ func TestGetDscPathsInMountStrict(t *testing.T) {
 			t.Fatalf("strict symbols discovery paths=%v err=%v", got, err)
 		}
 	})
+}
+
+func TestGetDscPathsInMountStrictUniversalFamily(t *testing.T) {
+	root := t.TempDir()
+	want := writeSyntheticUniversalFamily(t, root)
+	if got, err := GetDscPathsInMountStrict(root, false, true); err != nil || !slices.Equal(got, want) {
+		t.Fatalf("strict universal discovery paths=%v err=%v, want %v", got, err, want)
+	}
 }
 
 func writeStrictDscPrimary(t *testing.T, name string, layout syntheticLayout, platform types.Platform, id byte) {
@@ -112,6 +125,18 @@ func TestGetDscPathsInMountStrictFailures(t *testing.T) {
 			main := filepath.Join(root, "main")
 			writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
 			writeSyntheticMember(t, main+".01", 9, nil)
+		}},
+		{"member family array", "primary-only cache family metadata", func(t *testing.T, root string) {
+			main := filepath.Join(root, "main")
+			writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
+			writeSyntheticMember(t, main+".01", 2, func(h *CacheHeader) {
+				h.SubCacheArrayCount, h.SubCacheArrayOffset = 7, 1
+			})
+		}},
+		{"member symbols UUID", "primary-only cache family metadata", func(t *testing.T, root string) {
+			main := filepath.Join(root, "main")
+			writeStrictDscPrimary(t, main, layoutOneSubcache, types.Platform_macOS, 1)
+			writeSyntheticMember(t, main+".01", 2, func(h *CacheHeader) { h.SymbolFileUUID[0] = 3 })
 		}},
 		{"unreadable subcache", "permission denied", func(t *testing.T, root string) {
 			main := filepath.Join(root, "main")
