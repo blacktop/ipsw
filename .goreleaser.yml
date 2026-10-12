@@ -523,6 +523,8 @@ homebrew_casks:
     homepage: https://github.com/blacktop/ipsw
     description: iOS/macOS Research Swiss Army Knife
     license: MIT
+    custom_block: |
+      depends_on :macos
     conflicts:
       - cask: ipsw-frida
     manpages:
