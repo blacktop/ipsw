@@ -734,7 +734,7 @@ func ParseStubsForMachO(m *macho.File) (map[uint64]uint64, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to get offset for %s.%s section: %v", sec.Seg, sec.Name, err)
 				}
-				dat := make([]byte, sec.Size)
+				dat = make([]byte, sec.Size)
 				if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
 					return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
 				}

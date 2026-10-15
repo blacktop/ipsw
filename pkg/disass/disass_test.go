@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -122,6 +123,27 @@ func TestParseStubsForMachOChainedOffsets(t *testing.T) {
 				t.Fatalf("unexpected stubs: %#v", stubs)
 			}
 		})
+	}
+}
+
+func TestParseStubsForMachOFallbackReader(t *testing.T) {
+	f, err := macho.NewFile(bytes.NewReader(chainedPointerFixture(t, fixupchains.DYLD_CHAINED_PTR_64_OFFSET)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	sec := f.Section("__TEXT", "__stubs")
+	if sec == nil {
+		t.Fatal("missing synthetic stubs section")
+	}
+	empty := bytes.NewReader(nil)
+	sec.SetReaders(empty, io.NewSectionReader(empty, 0, 0))
+	stubs, err := ParseStubsForMachO(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target := stubs[chainedTestBase+0x400]; len(stubs) != 1 || target != chainedTestBase+0x460 {
+		t.Fatalf("unexpected fallback stubs: %#v", stubs)
 	}
 }
 
