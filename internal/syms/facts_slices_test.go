@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/testutil"
 )
@@ -199,8 +198,8 @@ func syntheticSlice(cpu types.CPU, subCPU types.CPUSubtype, entitlements string,
 	m := &macho.File{}
 	m.CPU = cpu
 	m.SubCPU = subCPU
-	m.Loads = append(m.Loads, &macho.CodeSignature{CodeSignature: codesign.CodeSignature{Entitlements: entitlements}})
+	m.Loads = append(m.Loads, &macho.CodeSignature{Entitlements: entitlements})
 	uuid := types.UUID{uuidByte}
-	m.Loads = append(m.Loads, &macho.UUID{UUIDCmd: types.UUIDCmd{LoadCmd: types.LC_UUID, Len: 24, UUID: uuid}})
+	m.Loads = append(m.Loads, &macho.UUID{LoadCmd: types.LC_UUID, Len: 24, UUID: uuid})
 	return m
 }

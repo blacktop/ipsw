@@ -231,9 +231,9 @@ func TestUniquePCCReleasesKeepsLatestIndexPerHash(t *testing.T) {
 	t.Parallel()
 
 	releases := []*PCCRelease{
-		{Index: 10, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseDigest: []byte{0xaa}}},
-		{Index: 12, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseDigest: []byte{0xbb}}},
-		{Index: 15, ReleaseMetadata: pcc.ReleaseMetadata{ReleaseDigest: []byte{0xaa}}},
+		{Index: 10, ReleaseDigest: []byte{0xaa}},
+		{Index: 12, ReleaseDigest: []byte{0xbb}},
+		{Index: 15, ReleaseDigest: []byte{0xaa}},
 	}
 
 	unique := UniquePCCReleases(releases)
@@ -276,11 +276,10 @@ func TestPCCReleaseCreationTimeHandlesMissingTimestamp(t *testing.T) {
 func TestCloudOSInfoUsesReleaseMetadataFallbackFields(t *testing.T) {
 	t.Parallel()
 
-	release := &PCCRelease{ReleaseMetadata: pcc.ReleaseMetadata{
+	release := &PCCRelease{
 		DarwinInit:   &structpb.Struct{},
 		Application:  &pcc.ReleaseMetadata_Application{Name: "TIE Proxy"},
-		BuildVersion: "5F123",
-	}}
+		BuildVersion: "5F123"}
 
 	build, train, app := release.CloudOSInfo()
 	if build != "5F123" {
@@ -315,11 +314,10 @@ func TestCloudOSInfoPrefersDarwinInitOverReleaseMetadataFallbackFields(t *testin
 		t.Fatalf("failed to create DarwinInit struct: %v", err)
 	}
 
-	release := &PCCRelease{ReleaseMetadata: pcc.ReleaseMetadata{
+	release := &PCCRelease{
 		DarwinInit:   darwinInit,
 		Application:  &pcc.ReleaseMetadata_Application{Name: "TIE Proxy"},
-		BuildVersion: "5F123",
-	}}
+		BuildVersion: "5F123"}
 
 	build, _, app := release.CloudOSInfo()
 	if build != "5E290" {
@@ -378,12 +376,10 @@ func TestResolvePCCVersionsRefetchesCachedVersionWithoutBuild(t *testing.T) {
 
 	release := &PCCRelease{
 		Version: &PCCVersion{Version: "26.4"},
-		ReleaseMetadata: pcc.ReleaseMetadata{
-			Assets: []*pcc.ReleaseMetadata_Asset{{
-				Type: pcc.ReleaseMetadata_ASSET_TYPE_OS,
-				Url:  "https://example.test/os-digest",
-			}},
-		},
+		Assets: []*pcc.ReleaseMetadata_Asset{{
+			Type: pcc.ReleaseMetadata_ASSET_TYPE_OS,
+			Url:  "https://example.test/os-digest",
+		}},
 	}
 
 	var calls int

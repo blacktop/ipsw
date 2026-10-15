@@ -10,7 +10,6 @@ import (
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/text"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/testutil"
 )
@@ -21,7 +20,7 @@ func fakeSlice(cpu types.CPU, sub types.CPUSubtype, entitlements string) *macho.
 	m.SubCPU = sub
 	if entitlements != "" {
 		m.Loads = append(m.Loads, &macho.CodeSignature{
-			CodeSignature: codesign.CodeSignature{Entitlements: entitlements},
+			Entitlements: entitlements,
 		})
 	}
 	return m

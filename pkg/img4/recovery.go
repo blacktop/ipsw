@@ -117,9 +117,7 @@ func (r *RestoreInfo) Has(name string) bool {
 // NewWithBootNonce creates a new RestoreInfo with only a boot nonce
 func NewWithBootNonce(nonce uint64) *RestoreInfo {
 	return &RestoreInfo{
-		IM4R: IM4R{
-			Tag: "IM4R",
-		},
+		Tag:        "IM4R",
 		Properties: map[string]any{"BNCN": nonce},
 	}
 }
@@ -130,9 +128,7 @@ func New(properties map[string]any) *RestoreInfo {
 	props := make(map[string]any, len(properties))
 	maps.Copy(props, properties)
 	return &RestoreInfo{
-		IM4R: IM4R{
-			Tag: "IM4R",
-		},
+		Tag:        "IM4R",
 		Properties: props,
 	}
 }

@@ -210,11 +210,9 @@ func TestPCCVPhoneStateRoundTrip(t *testing.T) {
 func testPCCRelease(index uint64, digest string) *download.PCCRelease {
 	return &download.PCCRelease{
 		Index: index,
-		ReleaseMetadata: pcc.ReleaseMetadata{
-			Assets: []*pcc.ReleaseMetadata_Asset{{
-				Type: pcc.ReleaseMetadata_ASSET_TYPE_OS,
-				Url:  "https://example.test/pcc/" + digest,
-			}},
-		},
+		Assets: []*pcc.ReleaseMetadata_Asset{{
+			Type: pcc.ReleaseMetadata_ASSET_TYPE_OS,
+			Url:  "https://example.test/pcc/" + digest,
+		}},
 	}
 }

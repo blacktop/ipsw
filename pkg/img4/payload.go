@@ -802,12 +802,10 @@ func CreatePayload(conf *CreatePayloadConfig) (*Payload, error) {
 	}
 
 	im4p := &Payload{
-		IM4P: IM4P{
-			Tag:     "IM4P",
-			Type:    conf.Type,
-			Version: conf.Version,
-			Data:    pdata,
-		},
+		Tag:     "IM4P",
+		Type:    conf.Type,
+		Version: conf.Version,
+		Data:    pdata,
 	}
 
 	// Only LZFSE payloads carry the ASN.1 compression record. LZSS payloads are

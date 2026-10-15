@@ -741,7 +741,7 @@ func ParseStubsForMachO(m *macho.File) (map[uint64]uint64, error) {
 			}
 
 			sb, err := ParseStubsASM(dat, sec.Addr, func(u uint64) (uint64, error) {
-				return m.GetPointerAtAddress(m.SlidePointer(u))
+				return m.GetSlidPointerAtAddress(u)
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse %s.%s section stubs data: %v", sec.Seg, sec.Name, err)

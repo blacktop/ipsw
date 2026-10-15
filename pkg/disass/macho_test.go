@@ -5,7 +5,54 @@ import (
 	"encoding/binary"
 	"maps"
 	"testing"
+
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
 )
+
+func TestMachoDisassChainedPointerConsumers(t *testing.T) {
+	for _, format := range []fixupchains.DCPtrKind{
+		fixupchains.DYLD_CHAINED_PTR_64_OFFSET,
+		fixupchains.DYLD_CHAINED_PTR_ARM64E_USERLAND24,
+	} {
+		t.Run(format.String(), func(t *testing.T) {
+			data := chainedPointerFixture(t, format)
+			f, err := macho.NewFile(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			d := NewMachoDisass(f, &Config{Data: data[0x400:0x408], StartAddress: chainedTestBase + 0x400})
+			if target, err := d.ReadAddr(chainedTestBase + 0x1100); err != nil || target != chainedTestBase+0x460 {
+				t.Errorf("ReadAddr = %#x, %v", target, err)
+			}
+			if err := d.Triage(); err != nil {
+				t.Fatal(err)
+			}
+			if ok, detail := d.IsPointer(chainedTestBase + 0x1100); !ok || detail.Pointer != chainedTestBase+0x460 {
+				t.Errorf("missing triaged pointer: %v", detail)
+			}
+			if err := d.parseObjC(); err != nil {
+				t.Fatal(err)
+			}
+			for offset, want := range map[uint64]string{
+				0x480: "perform:", 0x1108: "sel_perform:",
+				0x1110: "class_ProbeClass", 0x1300: "ProbeClass",
+				0x1118: "proto_ProbeProtocol", 0x1480: "ProbeProtocol",
+				0x420: `j__objc_msgSend(x0, "perform:")`,
+			} {
+				if got, ok := d.FindSymbol(chainedTestBase + offset); !ok || got != want {
+					t.Errorf("symbol at %#x = %q, %v; want %q", chainedTestBase+offset, got, ok, want)
+				}
+			}
+			for _, offset := range []uint64{0x480, 0x1300, 0x1480} {
+				if name, ok := d.FindSymbol(2*chainedTestBase + offset); ok {
+					t.Errorf("false alias at %#x: %s", 2*chainedTestBase+offset, name)
+				}
+			}
+		})
+	}
+}
 
 func movz(rd, hw, imm uint32) uint32 { return 0xd2800000 | hw<<21 | imm<<5 | rd }
 func movk(rd, hw, imm uint32) uint32 { return 0xf2800000 | hw<<21 | imm<<5 | rd }

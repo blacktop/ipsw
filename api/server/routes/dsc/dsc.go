@@ -302,13 +302,12 @@ func dscSlideInfo(c *gin.Context) {
 
 	for uuid := range f.Mappings {
 		if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
-			mapping := &dyld.CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: dyld.CacheMappingAndSlideInfo{
+			mapping := &dyld.CacheMappingWithSlideInfo{
 				Address:         f.Mappings[uuid][1].Address,
 				Size:            f.Mappings[uuid][1].Size,
 				FileOffset:      f.Mappings[uuid][1].FileOffset,
 				SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
-				SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
-			}, Name: "__DATA"}
+				SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused, Name: "__DATA"}
 			if mapping.SlideInfoSize > 0 {
 				rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
 				if err != nil {

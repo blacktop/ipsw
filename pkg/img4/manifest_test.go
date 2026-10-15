@@ -102,17 +102,13 @@ func BenchmarkManifestParsing(b *testing.B) {
 func createTestManifestData(t testing.TB) []byte {
 	// Create a manifest with a few properties programmatically
 	manifest := Manifest{
-		IM4M: IM4M{
-			Tag:     "IM4M",
-			Version: 1,
-		},
-		ManifestBody: ManifestBody{
-			Properties: []Property{
-				{Name: "CHIP", Value: 0x8010},
-				{Name: "BORD", Value: 0x01},
-				{Name: "ECID", Value: uint64(0x1234567890ABCDEF)},
-				{Name: "CPRO", Value: true},
-			},
+		Tag:     "IM4M",
+		Version: 1,
+		Properties: []Property{
+			{Name: "CHIP", Value: 0x8010},
+			{Name: "BORD", Value: 0x01},
+			{Name: "ECID", Value: uint64(0x1234567890ABCDEF)},
+			{Name: "CPRO", Value: true},
 		},
 	}
 
@@ -379,28 +375,24 @@ func TestVerifyManifestDigests(t *testing.T) {
 
 	// Create test IM4M manifest with matching properties and images
 	testManifest := &Manifest{
-		IM4M: IM4M{
-			Tag:     "IM4M",
-			Version: 1,
+		Tag:     "IM4M",
+		Version: 1,
+		Properties: []Property{
+			{Name: "CHIP", Value: 0x8010},
+			{Name: "BORD", Value: 0x01},
+			{Name: "ECID", Value: uint64(0x1234567890ABCDEF)},
 		},
-		ManifestBody: ManifestBody{
-			Properties: []Property{
-				{Name: "CHIP", Value: 0x8010},
-				{Name: "BORD", Value: 0x01},
-				{Name: "ECID", Value: uint64(0x1234567890ABCDEF)},
-			},
-			Images: []ManifestImage{
-				{
-					Name: "krnl",
-					Properties: []Property{
-						{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
-					},
+		Images: []ManifestImage{
+			{
+				Name: "krnl",
+				Properties: []Property{
+					{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
 				},
-				{
-					Name: "dtre",
-					Properties: []Property{
-						{Name: "DGST", Value: []byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34}},
-					},
+			},
+			{
+				Name: "dtre",
+				Properties: []Property{
+					{Name: "DGST", Value: []byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34}},
 				},
 			},
 		},
@@ -438,24 +430,20 @@ func TestVerifyManifestDigests(t *testing.T) {
 	t.Run("missing component digest - non-strict mode", func(t *testing.T) {
 		// Create manifest missing one digest
 		incompleteManifest := &Manifest{
-			IM4M: IM4M{
-				Tag:     "IM4M",
-				Version: 1,
+			Tag:     "IM4M",
+			Version: 1,
+			Properties: []Property{
+				{Name: "CHIP", Value: 0x8010},
+				{Name: "BORD", Value: 0x01},
 			},
-			ManifestBody: ManifestBody{
-				Properties: []Property{
-					{Name: "CHIP", Value: 0x8010},
-					{Name: "BORD", Value: 0x01},
-				},
-				Images: []ManifestImage{
-					{
-						Name: "krnl",
-						Properties: []Property{
-							{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
-						},
+			Images: []ManifestImage{
+				{
+					Name: "krnl",
+					Properties: []Property{
+						{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
 					},
-					// Missing DeviceTree digest
 				},
+				// Missing DeviceTree digest
 			},
 		}
 
@@ -481,24 +469,20 @@ func TestVerifyManifestDigests(t *testing.T) {
 	t.Run("missing component digest - strict mode", func(t *testing.T) {
 		// Create manifest missing one digest
 		incompleteManifest := &Manifest{
-			IM4M: IM4M{
-				Tag:     "IM4M",
-				Version: 1,
+			Tag:     "IM4M",
+			Version: 1,
+			Properties: []Property{
+				{Name: "CHIP", Value: 0x8010},
+				{Name: "BORD", Value: 0x01},
 			},
-			ManifestBody: ManifestBody{
-				Properties: []Property{
-					{Name: "CHIP", Value: 0x8010},
-					{Name: "BORD", Value: 0x01},
-				},
-				Images: []ManifestImage{
-					{
-						Name: "krnl",
-						Properties: []Property{
-							{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
-						},
+			Images: []ManifestImage{
+				{
+					Name: "krnl",
+					Properties: []Property{
+						{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
 					},
-					// Missing DeviceTree digest
 				},
+				// Missing DeviceTree digest
 			},
 		}
 
@@ -524,15 +508,11 @@ func TestVerifyManifestDigests(t *testing.T) {
 	t.Run("no matching build identity", func(t *testing.T) {
 		// Create manifest with different board/chip IDs
 		noMatchManifest := &Manifest{
-			IM4M: IM4M{
-				Tag:     "IM4M",
-				Version: 1,
-			},
-			ManifestBody: ManifestBody{
-				Properties: []Property{
-					{Name: "CHIP", Value: 0x9999}, // Different chip ID
-					{Name: "BORD", Value: 0x99},   // Different board ID
-				},
+			Tag:     "IM4M",
+			Version: 1,
+			Properties: []Property{
+				{Name: "CHIP", Value: 0x9999}, // Different chip ID
+				{Name: "BORD", Value: 0x99},   // Different board ID
 			},
 		}
 
@@ -550,14 +530,10 @@ func TestVerifyManifestDigests(t *testing.T) {
 	t.Run("missing required properties", func(t *testing.T) {
 		// Test manifest missing CHIP property
 		missingChipManifest := &Manifest{
-			IM4M: IM4M{
-				Tag:     "IM4M",
-				Version: 1,
-			},
-			ManifestBody: ManifestBody{
-				Properties: []Property{
-					{Name: "BORD", Value: 0x01},
-				},
+			Tag:     "IM4M",
+			Version: 1,
+			Properties: []Property{
+				{Name: "BORD", Value: 0x01},
 			},
 		}
 
@@ -573,14 +549,10 @@ func TestVerifyManifestDigests(t *testing.T) {
 
 		// Test manifest missing BORD property
 		missingBordManifest := &Manifest{
-			IM4M: IM4M{
-				Tag:     "IM4M",
-				Version: 1,
-			},
-			ManifestBody: ManifestBody{
-				Properties: []Property{
-					{Name: "CHIP", Value: 0x8010},
-				},
+			Tag:     "IM4M",
+			Version: 1,
+			Properties: []Property{
+				{Name: "CHIP", Value: 0x8010},
 			},
 		}
 
@@ -624,21 +596,17 @@ func TestVerifyManifestDigests(t *testing.T) {
 		}
 
 		testManifestMulti := &Manifest{
-			IM4M: IM4M{
-				Tag:     "IM4M",
-				Version: 1,
+			Tag:     "IM4M",
+			Version: 1,
+			Properties: []Property{
+				{Name: "CHIP", Value: 0x8010},
+				{Name: "BORD", Value: 0x01},
 			},
-			ManifestBody: ManifestBody{
-				Properties: []Property{
-					{Name: "CHIP", Value: 0x8010},
-					{Name: "BORD", Value: 0x01},
-				},
-				Images: []ManifestImage{
-					{
-						Name: "bsys",
-						Properties: []Property{
-							{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
-						},
+			Images: []ManifestImage{
+				{
+					Name: "bsys",
+					Properties: []Property{
+						{Name: "DGST", Value: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14}},
 					},
 				},
 			},

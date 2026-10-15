@@ -66,14 +66,14 @@ func TestPCCDownloadContextVerifiesSHA256(t *testing.T) {
 
 	release := &PCCRelease{
 		Index: 1,
-		ReleaseMetadata: pcc.ReleaseMetadata{Assets: []*pcc.ReleaseMetadata_Asset{{
+		Assets: []*pcc.ReleaseMetadata_Asset{{
 			Type: pcc.ReleaseMetadata_ASSET_TYPE_MODEL,
 			Url:  server.URL + "/model.aar",
 			Digest: &pcc.ReleaseMetadata_Digest{
 				DigestAlg: pcc.ReleaseMetadata_DIGEST_ALG_SHA256,
 				Value:     wrongDigest[:],
 			},
-		}}},
+		}},
 	}
 	output := t.TempDir()
 	err := release.DownloadContext(t.Context(), output, "", false, false, false)
@@ -99,14 +99,14 @@ func TestPCCDownloadContextHonorsSkipAndRestart(t *testing.T) {
 
 	release := &PCCRelease{
 		Index: 1,
-		ReleaseMetadata: pcc.ReleaseMetadata{Assets: []*pcc.ReleaseMetadata_Asset{{
+		Assets: []*pcc.ReleaseMetadata_Asset{{
 			Type: pcc.ReleaseMetadata_ASSET_TYPE_MODEL,
 			Url:  server.URL + "/model.aar",
 			Digest: &pcc.ReleaseMetadata_Digest{
 				DigestAlg: pcc.ReleaseMetadata_DIGEST_ALG_SHA256,
 				Value:     bytes.Repeat([]byte{0x42}, 32),
 			},
-		}}},
+		}},
 	}
 	output := t.TempDir()
 	destName := filepath.Join(output, "MODEL.aar")

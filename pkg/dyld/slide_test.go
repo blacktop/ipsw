@@ -68,9 +68,8 @@ func slideCacheFixture(t *testing.T, version uint32) (*File, *CacheMappingWithSl
 	data := make([]byte, 0x3000)
 	copy(data[0x100:], info.Bytes())
 	binary.LittleEndian.PutUint64(data[0x2018:], 0x18000)
-	mapping := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
-		Address: 0x10000000, Size: 0x2000, FileOffset: 0x1000, SlideInfoOffset: 0x100, SlideInfoSize: uint64(info.Len()),
-	}}
+	mapping := &CacheMappingWithSlideInfo{
+		Address: 0x10000000, Size: 0x2000, FileOffset: 0x1000, SlideInfoOffset: 0x100, SlideInfoSize: uint64(info.Len())}
 	f := fileReading(data)
 	tracker := &slideReadTracker{data: data}
 	f.r[f.UUID] = tracker

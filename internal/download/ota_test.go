@@ -26,7 +26,7 @@ func TestQueryPublicXMLRecordsMESUEvidenceBeforeDedup(t *testing.T) {
 	beta.ReleaseType = "Beta"
 
 	o := &Ota{
-		ota:    ota{Assets: []types.Asset{release, beta}},
+		Assets: []types.Asset{release, beta},
 		Config: OtaConf{Platform: "ios", Version: wantedVersion, Build: "0"},
 	}
 	assets := o.QueryPublicXML()

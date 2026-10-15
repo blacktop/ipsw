@@ -370,14 +370,14 @@ var machoA2sCmd = &cobra.Command{
 			return nil
 		}
 
-		ptr, err := m.GetPointerAtAddress(addr)
+		ptr, err := m.GetSlidPointerAtAddress(addr)
 		if err != nil {
 			return err
 		}
 
-		utils.Indent(log.Error, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", addr, m.SlidePointer(ptr)))
+		utils.Indent(log.Error, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", addr, ptr))
 
-		addr = m.SlidePointer(ptr)
+		addr = ptr
 
 		secondAttempt = true
 

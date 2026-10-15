@@ -618,7 +618,7 @@ func TestSwitchRecordsAnnotateStructureInputReads(t *testing.T) {
 			1: {methodAddr: 0x1000, readsStructureInput: true, readsStructureInputSize: true},
 		},
 	}
-	records := (&analyzer{}).switchRecords(&classInfo{Class: cpp.Class{Name: "SwitchUserClient"}}, analysis)
+	records := (&analyzer{}).switchRecords(&classInfo{Name: "SwitchUserClient"}, analysis)
 	if len(records) != 2 {
 		t.Fatalf("records=%#v, want two", records)
 	}

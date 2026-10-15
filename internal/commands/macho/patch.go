@@ -58,27 +58,23 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 			return fmt.Errorf("failed to parse compatibility version: %v", err)
 		}
 		m.AddLoad(&macho.Dylib{
-			DylibCmd: types.DylibCmd{
-				LoadCmd:        lc,
-				Len:            pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[2]) + 1)),
-				NameOffset:     0x18,
-				Timestamp:      2, // TODO: I've only seen this value be 2
-				CurrentVersion: currVer,
-				CompatVersion:  compatVer,
-			},
-			Name: args[2],
+			LoadCmd:        lc,
+			Len:            pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[2]) + 1)),
+			NameOffset:     0x18,
+			Timestamp:      2, // TODO: I've only seen this value be 2
+			CurrentVersion: currVer,
+			CompatVersion:  compatVer,
+			Name:           args[2],
 		})
 	case "LC_RPATH":
 		if len(args) < 3 {
 			return fmt.Errorf("not enough arguments for adding %s; must supply PATH string", loadCommand)
 		}
 		m.AddLoad(&macho.Rpath{
-			RpathCmd: types.RpathCmd{
-				LoadCmd:    types.LC_RPATH,
-				Len:        pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[2]) + 1)),
-				PathOffset: 0xC,
-			},
-			Path: args[2],
+			LoadCmd:    types.LC_RPATH,
+			Len:        pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[2]) + 1)),
+			PathOffset: 0xC,
+			Path:       args[2],
 		})
 	case "LC_BUILD_VERSION":
 		if len(args) < 5 {
@@ -115,15 +111,13 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 			}
 		}
 		m.AddLoad(&macho.BuildVersion{
-			BuildVersionCmd: types.BuildVersionCmd{
-				LoadCmd:  types.LC_BUILD_VERSION,
-				Len:      uint32(binary.Size(types.BuildVersionCmd{}) + len(tools)*binary.Size(types.BuildVersionTool{})),
-				Platform: platform,
-				Minos:    minos,
-				Sdk:      sdk,
-				NumTools: uint32(len(tools)),
-			},
-			Tools: tools,
+			LoadCmd:  types.LC_BUILD_VERSION,
+			Len:      uint32(binary.Size(types.BuildVersionCmd{}) + len(tools)*binary.Size(types.BuildVersionTool{})),
+			Platform: platform,
+			Minos:    minos,
+			Sdk:      sdk,
+			NumTools: uint32(len(tools)),
+			Tools:    tools,
 		})
 	case "LC_VERSION_MIN_MACOSX", "LC_VERSION_MIN_IPHONEOS", "LC_VERSION_MIN_TVOS", "LC_VERSION_MIN_WATCHOS":
 		if len(args) < 4 {
@@ -140,39 +134,31 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 		switch loadCommand {
 		case "LC_VERSION_MIN_MACOSX":
 			m.AddLoad(&macho.VersionMin{
-				VersionMinCmd: types.VersionMinCmd{
-					LoadCmd: types.LC_VERSION_MIN_MACOSX,
-					Len:     uint32(binary.Size(types.VersionMinMacOSCmd{})),
-					Version: version,
-					Sdk:     sdk,
-				},
+				LoadCmd: types.LC_VERSION_MIN_MACOSX,
+				Len:     uint32(binary.Size(types.VersionMinMacOSCmd{})),
+				Version: version,
+				Sdk:     sdk,
 			})
 		case "LC_VERSION_MIN_IPHONEOS":
 			m.AddLoad(&macho.VersionMin{
-				VersionMinCmd: types.VersionMinCmd{
-					LoadCmd: types.LC_VERSION_MIN_IPHONEOS,
-					Len:     uint32(binary.Size(types.VersionMinIPhoneOSCmd{})),
-					Version: version,
-					Sdk:     sdk,
-				},
+				LoadCmd: types.LC_VERSION_MIN_IPHONEOS,
+				Len:     uint32(binary.Size(types.VersionMinIPhoneOSCmd{})),
+				Version: version,
+				Sdk:     sdk,
 			})
 		case "LC_VERSION_MIN_TVOS":
 			m.AddLoad(&macho.VersionMin{
-				VersionMinCmd: types.VersionMinCmd{
-					LoadCmd: types.LC_VERSION_MIN_TVOS,
-					Len:     uint32(binary.Size(types.VersionMinTvOSCmd{})),
-					Version: version,
-					Sdk:     sdk,
-				},
+				LoadCmd: types.LC_VERSION_MIN_TVOS,
+				Len:     uint32(binary.Size(types.VersionMinTvOSCmd{})),
+				Version: version,
+				Sdk:     sdk,
 			})
 		case "LC_VERSION_MIN_WATCHOS":
 			m.AddLoad(&macho.VersionMin{
-				VersionMinCmd: types.VersionMinCmd{
-					LoadCmd: types.LC_VERSION_MIN_WATCHOS,
-					Len:     uint32(binary.Size(types.VersionMinWatchOSCmd{})),
-					Version: version,
-					Sdk:     sdk,
-				},
+				LoadCmd: types.LC_VERSION_MIN_WATCHOS,
+				Len:     uint32(binary.Size(types.VersionMinWatchOSCmd{})),
+				Version: version,
+				Sdk:     sdk,
 			})
 		}
 	case "LC_ID_DYLINKER", "LC_LOAD_DYLINKER", "LC_DYLD_ENVIRONMENT":
@@ -202,12 +188,10 @@ func PatchMachoAdd(m *macho.File, machoPath, loadCommand string, args []string) 
 			name = args[2] + "=" + args[3]
 		}
 		m.AddLoad(&macho.Dylinker{
-			DylinkerCmd: types.DylinkerCmd{
-				LoadCmd:    lc,
-				Len:        pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(name) + 1)),
-				NameOffset: 0xc,
-			},
-			Name: name,
+			LoadCmd:    lc,
+			Len:        pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(name) + 1)),
+			NameOffset: 0xc,
+			Name:       name,
 		})
 	default:
 		return fmt.Errorf("unsupported load command: %s", loadCommand)

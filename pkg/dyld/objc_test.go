@@ -104,13 +104,11 @@ func objcSectionImage(t *testing.T, name, section string, payload []byte, size u
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{
-		Name: "__TEXT", Addr: 0x100000000, Memsz: uint64(len(data)), Filesz: uint64(len(data)),
-	}})
+	m.Loads = append(m.Loads, &macho.Segment{
+		Name: "__TEXT", Addr: 0x100000000, Memsz: uint64(len(data)), Filesz: uint64(len(data))})
 	if section != "" {
-		m.Sections = append(m.Sections, &types.Section{SectionHeader: types.SectionHeader{
-			Seg: "__TEXT", Name: section, Addr: 0x100000100, Offset: 0x100, Size: size,
-		}})
+		m.Sections = append(m.Sections, &types.Section{
+			Seg: "__TEXT", Name: section, Addr: 0x100000100, Offset: 0x100, Size: size})
 	}
 	return &CacheImage{Name: name, m: m}
 }
@@ -163,11 +161,11 @@ func libObjCFixture(t *testing.T, name string) *File {
 	f := fileWithSharedRegionStart(base)
 	f.ByteOrder = binary.LittleEndian
 	f.Mappings = map[types.UUID]cacheMappings{
-		f.UUID: {{CacheMappingInfo: CacheMappingInfo{Address: base, Size: uint64(len(data))}}},
+		f.UUID: {{Address: base, Size: uint64(len(data))}},
 	}
 	f.r = map[types.UUID]io.ReaderAt{f.UUID: bytes.NewReader(data)}
 	f.Images = cacheImages{{Name: name, cache: f, cuuid: f.UUID,
-		CacheImageTextInfo: CacheImageTextInfo{LoadAddress: base, TextSegmentSize: uint32(len(data))},
+		LoadAddress: base, TextSegmentSize: uint32(len(data)),
 	}}
 	return f
 }
@@ -193,7 +191,7 @@ func TestOffsetsToMapReadsEachNameAtItsOffset(t *testing.T) {
 	f := &File{
 		UUID: uuid,
 		MappingsWithSlideInfo: map[types.UUID]cacheMappingsWithSlideInfo{uuid: {
-			&CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: base, Size: uint64(len(data))}},
+			&CacheMappingWithSlideInfo{Address: base, Size: uint64(len(data))},
 		}},
 		AddressToSymbol: NewA2STable(0),
 		r:               map[types.UUID]io.ReaderAt{uuid: bytes.NewReader(data)},

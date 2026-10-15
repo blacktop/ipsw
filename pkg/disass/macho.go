@@ -60,11 +60,7 @@ func (d MachoDisass) Middle() uint64 {
 	return d.cfg.Middle
 }
 func (d MachoDisass) ReadAddr(addr uint64) (uint64, error) {
-	ptr, err := d.f.GetPointerAtAddress(addr)
-	if err != nil {
-		return 0, err
-	}
-	return d.f.SlidePointer(ptr), nil
+	return d.f.GetSlidPointerAtAddress(addr)
 }
 
 // Triage walks a function and analyzes all immediates
@@ -162,8 +158,7 @@ func (d *MachoDisass) Triage() error {
 					Flags:   c.Flags,
 				}
 			} else {
-				ptr, _ := d.f.GetPointerAtAddress(imm)
-				ptr = d.f.SlidePointer(ptr)
+				ptr, _ := d.f.GetSlidPointerAtAddress(imm)
 				if c := d.f.FindSectionForVMAddr(ptr); c != nil {
 					d.tr.Details[imm] = AddrDetails{
 						Segment: c.Seg,
@@ -527,7 +522,7 @@ func (d *MachoDisass) parseObjC() error {
 		if selRefs, err := d.f.GetObjCSelectorReferences(); err == nil {
 			for off, sel := range selRefs {
 				d.a2s[off] = fmt.Sprintf("sel_%s", sel.Name)
-				d.a2s[d.f.GetBaseAddress()+sel.VMAddr] = sel.Name
+				d.a2s[sel.VMAddr] = sel.Name
 			}
 		}
 		if classes, err := d.f.GetObjCClasses(); err == nil {
@@ -549,7 +544,9 @@ func (d *MachoDisass) parseObjC() error {
 		if classRefs, err := d.f.GetObjCClassReferences(); err == nil {
 			for off, class := range classRefs {
 				d.a2s[off] = fmt.Sprintf("class_%s", class.Name)
-				d.a2s[d.f.GetBaseAddress()+class.ClassPtr] = class.Name
+				if class.ClassPtr != 0 {
+					d.a2s[class.ClassPtr] = class.Name
+				}
 			}
 		}
 		if superRefs, err := d.f.GetObjCSuperReferences(); err == nil {
@@ -562,22 +559,18 @@ func (d *MachoDisass) parseObjC() error {
 		if protoRefs, err := d.f.GetObjCProtoReferences(); err == nil {
 			for off, proto := range protoRefs {
 				d.a2s[off] = fmt.Sprintf("proto_%s", proto.Name)
-				d.a2s[d.f.GetBaseAddress()+proto.Ptr] = proto.Name
+				d.a2s[proto.Ptr] = proto.Name
 			}
 		}
 		if objcStubs, err := d.f.GetObjCStubs(func(addr uint64, data []byte) (map[uint64]*objc.Stub, error) {
 			stubs := make(map[uint64]*objc.Stub)
 			addr2sel, err := ParseStubsASM(data, addr, func(u uint64) (uint64, error) {
-				ptr, err := d.f.GetPointerAtAddress(u)
+				ptr, err := d.f.GetSlidPointerAtAddress(u)
 				if err != nil {
 					return 0, err
 				}
 				if name, err := d.f.GetBindName(ptr); err == nil && name == "_objc_msgSend" {
 					return 0, nil
-				}
-				ptr = d.f.SlidePointer(ptr)
-				if ptr < d.f.GetBaseAddress() {
-					return ptr + d.f.GetBaseAddress(), nil
 				}
 				return ptr, nil
 			})

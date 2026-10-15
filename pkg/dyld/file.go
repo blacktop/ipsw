@@ -453,13 +453,12 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	 ***********************/
 	if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
 		for _, m := range f.Mappings[uuid] {
-			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
+			cm := &CacheMappingWithSlideInfo{
 				Address:    m.Address,
 				Size:       m.Size,
 				FileOffset: m.FileOffset,
 				MaxProt:    m.MaxProt,
-				InitProt:   m.InitProt,
-			}, Name: m.Name}
+				InitProt:   m.InitProt, Name: m.Name}
 			if m.Name == "__DATA" {
 				cm.SlideInfoOffset = f.Headers[uuid].SlideInfoOffsetUnused
 				cm.SlideInfoSize = f.Headers[uuid].SlideInfoSizeUnused

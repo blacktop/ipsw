@@ -299,9 +299,7 @@ func Create(conf *CreateConfig) (*Image, error) {
 	}
 
 	img := Image{
-		IMG4: IMG4{
-			Tag: "IMG4",
-		},
+		Tag: "IMG4",
 	}
 
 	if len(conf.InputData) > 0 {
@@ -509,9 +507,7 @@ func Personalize(conf *PersonalizeConfig) (*Image, error) {
 	}
 
 	img := Image{
-		IMG4: IMG4{
-			Tag: "IMG4",
-		},
+		Tag: "IMG4",
 	}
 
 	img.Payload, err = ParsePayload(conf.PayloadData)
@@ -596,9 +592,7 @@ func Personalize(conf *PersonalizeConfig) (*Image, error) {
 		}
 
 		img.RestoreInfo = &RestoreInfo{
-			IM4R: IM4R{
-				Tag: "IM4R",
-			},
+			Tag:        "IM4R",
 			Properties: props,
 		}
 	}

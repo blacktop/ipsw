@@ -53,9 +53,8 @@ func TestFactsEmitterPreservesDistinctVolumeOccurrences(t *testing.T) {
 
 	var buf bytes.Buffer
 	em := newJSONLEmitter(&buf)
-	source := &gomacho.File{FileTOC: gomacho.FileTOC{FileHeader: types.FileHeader{
-		CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E,
-	}}}
+	source := &gomacho.File{
+		CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E}
 	image := func(volume string) *scanImage {
 		return &scanImage{
 			Kind:        "macho",
@@ -300,7 +299,7 @@ func TestFactsCoverageDistinguishesAbsentAliasAndUnselected(t *testing.T) {
 func TestFactsCompletionReconcilesExactFramedRecords(t *testing.T) {
 	var body bytes.Buffer
 	em := newJSONLEmitter(&body)
-	source := &gomacho.File{FileTOC: gomacho.FileTOC{FileHeader: types.FileHeader{CPU: types.CPUArm64}}}
+	source := &gomacho.File{CPU: types.CPUArm64}
 	images := []*scanImage{
 		{Kind: "kernel", Macho: &model.Macho{UUID: "KERNEL"}},
 		{Kind: "kext", KernelUUID: "KERNEL", Macho: &model.Macho{UUID: "KEXT"}},
@@ -341,7 +340,7 @@ func TestFactsCompletionReconcilesExactFramedRecords(t *testing.T) {
 func TestFactsKernelComponentsRemainIndependent(t *testing.T) {
 	var body bytes.Buffer
 	emitter := newJSONLEmitter(&body)
-	source := &gomacho.File{FileTOC: gomacho.FileTOC{FileHeader: types.FileHeader{CPU: types.CPUArm64}}}
+	source := &gomacho.File{CPU: types.CPUArm64}
 	paths := []string{"kernelcache.release.iphone17", "kernelcache.research.iphone17"}
 	collection := &factsCollection{start: factsCollectionStartLine{CollectionSchemaVersion: 3},
 		coverage: []factsCoverage{

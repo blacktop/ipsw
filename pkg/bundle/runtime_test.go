@@ -76,7 +76,7 @@ func synthBundle(hdr, textBytes, dataBytes []byte) *Bundle {
 	t4.Ranges[0] = mkRange("rtxt", rtxtOff, uint64(len(textBytes)))
 	t4.Ranges[1] = mkRange("rdat", rdatOff, uint64(len(dataBytes)))
 	t4.Ranges[2] = mkRange("nold", noldOff, uint64(len(hdr)))
-	return &Bundle{Header: Header{Type: 4}, TypeHeader: t4, r: bytes.NewReader(blob)}
+	return &Bundle{Type: 4, TypeHeader: t4, r: bytes.NewReader(blob)}
 }
 
 func allBytesEqual(b []byte, v byte) bool {

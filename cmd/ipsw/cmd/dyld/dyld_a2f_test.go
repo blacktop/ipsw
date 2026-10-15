@@ -8,10 +8,10 @@ import (
 )
 
 func TestLookupFunctionKeepsBoundariesWithoutName(t *testing.T) {
-	m := &macho.File{FileTOC: macho.FileTOC{Loads: []macho.Load{
-		&macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__TEXT", Addr: 0x1000}},
+	m := &macho.File{Loads: []macho.Load{
+		&macho.Segment{Name: "__TEXT", Addr: 0x1000},
 		&macho.FunctionStarts{},
-	}}}
+	}}
 	// Two synthetic function starts: 0x1020 and 0x1040.
 	m.GetFunctions(0x20, 0x20, 0)
 	for _, name := range []string{"", "_synthetic"} {

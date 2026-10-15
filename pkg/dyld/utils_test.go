@@ -15,10 +15,10 @@ func TestCacheOffsets(t *testing.T) {
 		symUUID: symbols,
 		Mappings: map[types.UUID]cacheMappings{
 			primary: {
-				{CacheMappingInfo: CacheMappingInfo{Address: base, Size: 0x1000}},
-				{CacheMappingInfo: CacheMappingInfo{Address: base + 0x3000, Size: 0x1000, FileOffset: 0x1000}},
+				{Address: base, Size: 0x1000},
+				{Address: base + 0x3000, Size: 0x1000, FileOffset: 0x1000},
 			},
-			symbols: {{CacheMappingInfo: CacheMappingInfo{Address: base + 0xa000, Size: 0x1000}}},
+			symbols: {{Address: base + 0xa000, Size: 0x1000}},
 		},
 	}
 
@@ -51,14 +51,14 @@ func TestCacheOffsets(t *testing.T) {
 		check(t, 0xa000, types.UUID{}, 0, true)
 		check(t, math.MaxUint64, types.UUID{}, 0, true)
 		// An overflowing addition must not wrap into an otherwise valid mapping
-		f.Mappings[types.UUID{4}] = cacheMappings{{CacheMappingInfo: CacheMappingInfo{Address: 0, Size: 0x1000}}}
+		f.Mappings[types.UUID{4}] = cacheMappings{{Address: 0, Size: 0x1000}}
 		check(t, math.MaxUint64-base+1, types.UUID{}, 0, true)
 	})
 
 	f.SubCacheInfo = []SubcacheEntry{{UUID: subcache, CacheVMOffset: 0x6000}}
 	f.Mappings[subcache] = cacheMappings{
-		{CacheMappingInfo: CacheMappingInfo{Address: base + 0x6000, Size: 0x1000}},
-		{CacheMappingInfo: CacheMappingInfo{Address: base + 0x8000, Size: 0x1000, FileOffset: 0x1000}},
+		{Address: base + 0x6000, Size: 0x1000},
+		{Address: base + 0x8000, Size: 0x1000, FileOffset: 0x1000},
 	}
 	t.Run("split cache", func(t *testing.T) {
 		check(t, 0x3123, primary, 0x1123, false)
@@ -69,7 +69,7 @@ func TestCacheOffsets(t *testing.T) {
 	})
 	t.Run("mapping outside subcache offset interval", func(t *testing.T) {
 		f.Mappings[primary] = append(f.Mappings[primary], &CacheMapping{
-			CacheMappingInfo: CacheMappingInfo{Address: base + 0xb000, Size: 0x1000, FileOffset: 0x2000},
+			Address: base + 0xb000, Size: 0x1000, FileOffset: 0x2000,
 		})
 		check(t, 0xb123, primary, 0x2123, false)
 	})

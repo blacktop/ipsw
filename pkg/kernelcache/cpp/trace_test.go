@@ -27,7 +27,7 @@ func TestResolvePointerAtReasonAggregatesForwardHitsAndOwnerIndexHits(t *testing
 	root := &macho.File{}
 	owner := &macho.File{}
 	owner.Sections = []*types.Section{
-		{SectionHeader: types.SectionHeader{Name: "__data", Seg: "__DATA", Addr: 0x2000, Size: 0x100}},
+		{Name: "__data", Seg: "__DATA", Addr: 0x2000, Size: 0x100},
 	}
 
 	scanner := &Scanner{

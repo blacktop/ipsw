@@ -37,17 +37,13 @@ func TestSortAndLimitPCCReleasesSelectsNewestRelease(t *testing.T) {
 
 	releases := []*internaldownload.PCCRelease{
 		{
-			Index: 1,
-			ReleaseMetadata: pcc.ReleaseMetadata{
-				ReleaseCreation: timestamppb.New(time.Date(2025, time.November, 4, 0, 0, 0, 0, time.UTC)),
-			},
+			Index:           1,
+			ReleaseCreation: timestamppb.New(time.Date(2025, time.November, 4, 0, 0, 0, 0, time.UTC)),
 		},
 		{Index: 2},
 		{
-			Index: 3,
-			ReleaseMetadata: pcc.ReleaseMetadata{
-				ReleaseCreation: timestamppb.New(time.Date(2026, time.January, 7, 0, 0, 0, 0, time.UTC)),
-			},
+			Index:           3,
+			ReleaseCreation: timestamppb.New(time.Date(2026, time.January, 7, 0, 0, 0, 0, time.UTC)),
 		},
 	}
 
@@ -93,16 +89,14 @@ func TestPCCURLSummaryIncludesReleaseIdentityAndLabeledAssets(t *testing.T) {
 	}
 
 	release := &internaldownload.PCCRelease{
-		Index:   29605,
-		Version: &internaldownload.PCCVersion{Version: "26.1", Build: "23B83"},
-		ReleaseMetadata: pcc.ReleaseMetadata{
-			ReleaseCreation: timestamppb.New(time.Date(2025, time.November, 4, 0, 26, 50, 0, time.UTC)),
-			DarwinInit:      darwinInit,
-			Assets: []*pcc.ReleaseMetadata_Asset{
-				{Type: pcc.ReleaseMetadata_ASSET_TYPE_OS, Url: "https://example.test/os"},
-				{Type: pcc.ReleaseMetadata_ASSET_TYPE_PCS, Url: "https://example.test/pcs"},
-				{Type: pcc.ReleaseMetadata_ASSET_TYPE_MODEL},
-			},
+		Index:           29605,
+		Version:         &internaldownload.PCCVersion{Version: "26.1", Build: "23B83"},
+		ReleaseCreation: timestamppb.New(time.Date(2025, time.November, 4, 0, 26, 50, 0, time.UTC)),
+		DarwinInit:      darwinInit,
+		Assets: []*pcc.ReleaseMetadata_Asset{
+			{Type: pcc.ReleaseMetadata_ASSET_TYPE_OS, Url: "https://example.test/os"},
+			{Type: pcc.ReleaseMetadata_ASSET_TYPE_PCS, Url: "https://example.test/pcs"},
+			{Type: pcc.ReleaseMetadata_ASSET_TYPE_MODEL},
 		},
 	}
 
@@ -126,11 +120,9 @@ func TestPCCURLSummaryMarksUnresolvedOSVersion(t *testing.T) {
 	t.Parallel()
 
 	release := &internaldownload.PCCRelease{
-		Index: 27,
-		ReleaseMetadata: pcc.ReleaseMetadata{
-			BuildVersion: "3B5602c.2",
-			Application:  &pcc.ReleaseMetadata_Application{Name: "TIE Proxy"},
-		},
+		Index:        27,
+		BuildVersion: "3B5602c.2",
+		Application:  &pcc.ReleaseMetadata_Application{Name: "TIE Proxy"},
 	}
 
 	if got, want := pcccmd.ReleaseURLSummary(release), "00027) ?  3B5602c.2  TIE Proxy  ????-??-??"; got != want {

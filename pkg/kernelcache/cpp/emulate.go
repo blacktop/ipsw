@@ -207,17 +207,15 @@ func (s *Scanner) extractClassesFromCtor(path ctorPath) ([]discoveredClass, erro
 			className = fmt.Sprintf("UnknownClass_%#x", pending.metaPtr)
 		}
 		classes = append(classes, discoveredClass{
-			Class: Class{
-				Name:           className,
-				Bundle:         path.entryID,
-				Size:           uint32(pending.size),
-				Ctor:           pending.ctor,
-				MetaPtr:        pending.metaPtr,
-				SuperMeta:      pending.superMeta,
-				SuperIndex:     -1,
-				MetaVtableAddr: pending.metaVtableAddr,
-			},
-			file: path.owner,
+			Name:           className,
+			Bundle:         path.entryID,
+			Size:           uint32(pending.size),
+			Ctor:           pending.ctor,
+			MetaPtr:        pending.metaPtr,
+			SuperMeta:      pending.superMeta,
+			SuperIndex:     -1,
+			MetaVtableAddr: pending.metaVtableAddr,
+			file:           path.owner,
 		})
 		pending = nil
 	}
@@ -476,17 +474,15 @@ func (s *Scanner) recoverStaticAnchorClasses(path ctorPath, plan microPlan, clas
 			className = fmt.Sprintf("UnknownClass_%#x", metaPtr)
 		}
 		candidate := discoveredClass{
-			Class: Class{
-				Name:           className,
-				Bundle:         path.entryID,
-				Size:           uint32(size),
-				Ctor:           pc,
-				MetaPtr:        metaPtr,
-				SuperMeta:      superMeta,
-				SuperIndex:     -1,
-				MetaVtableAddr: metaVtable,
-			},
-			file: path.owner,
+			Name:           className,
+			Bundle:         path.entryID,
+			Size:           uint32(size),
+			Ctor:           pc,
+			MetaPtr:        metaPtr,
+			SuperMeta:      superMeta,
+			SuperIndex:     -1,
+			MetaVtableAddr: metaVtable,
+			file:           path.owner,
 		}
 		if recoveredClassNameScore(candidate.Name) < 2 && !hasStrongClassEvidence(candidate) {
 			continue

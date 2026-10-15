@@ -14,7 +14,7 @@ func TestStringBinaryTags(t *testing.T) {
 			data := bytes.Repeat([]byte{0xff}, 4097)
 			var tagMagic [4]byte
 			copy(tagMagic[:], reverseBytes([]byte(magic)))
-			img := Img3{Tags: []Tag{{TagHeader: TagHeader{Magic: tagMagic}, Data: data}}}
+			img := Img3{Tags: []Tag{{Magic: tagMagic, Data: data}}}
 			out := img.String()
 			rows := 0
 			for line := range strings.SplitSeq(out, "\n") {
@@ -42,8 +42,8 @@ func TestStringDataPreview(t *testing.T) {
 	for _, size := range []int{0, 1, 15, 16, 17, 4096} {
 		t.Run(fmt.Sprint(size), func(t *testing.T) {
 			img := Img3{Tags: []Tag{{
-				TagHeader: TagHeader{Magic: [4]byte{'A', 'T', 'A', 'D'}},
-				Data:      bytes.Repeat([]byte{0xab}, size),
+				Magic: [4]byte{'A', 'T', 'A', 'D'},
+				Data:  bytes.Repeat([]byte{0xab}, size),
 			}}}
 			want := fmt.Sprintf("DATA: %s (length: %d)\n", strings.Repeat("ab", min(size, 16)), size)
 			if out := img.String(); !strings.HasSuffix(out, want) {
@@ -56,8 +56,8 @@ func TestStringDataPreview(t *testing.T) {
 func TestStringDoesNotMutateType(t *testing.T) {
 	data := []byte("tobi")
 	img := Img3{Tags: []Tag{{
-		TagHeader: TagHeader{Magic: [4]byte{'E', 'P', 'Y', 'T'}},
-		Data:      data,
+		Magic: [4]byte{'E', 'P', 'Y', 'T'},
+		Data:  data,
 	}}}
 	first := img.String()
 	if !strings.Contains(first, "TYPE: ibot\n") {
@@ -78,8 +78,8 @@ func TestStringScalarTags(t *testing.T) {
 				var tagMagic [4]byte
 				copy(tagMagic[:], reverseBytes([]byte(magic)))
 				img := Img3{Tags: []Tag{{
-					TagHeader: TagHeader{Magic: tagMagic},
-					Data:      []byte{0x34, 0x12, 0, 0}[:size],
+					Magic: tagMagic,
+					Data:  []byte{0x34, 0x12, 0, 0}[:size],
 				}}}
 				out := img.String()
 				want := fmt.Sprintf("%s: (length: %d, invalid uint32)\n", magic, size)

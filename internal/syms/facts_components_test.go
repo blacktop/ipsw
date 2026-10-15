@@ -68,7 +68,7 @@ func TestFactsComponentsScanExactSelectedUnionOnce(t *testing.T) {
 			}
 			var wire bytes.Buffer
 			emitter := newJSONLEmitter(&wire)
-			m := &macho.File{FileTOC: macho.FileTOC{FileHeader: types.FileHeader{CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E}}}
+			m := &macho.File{CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E}
 			kernelCalls, mountCalls, dscCalls, walkCalls := map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}
 			ops := factsScanOperations{
 				kernel: func(one *factsCollection) error {

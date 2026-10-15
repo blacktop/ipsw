@@ -780,18 +780,16 @@ func parseCertificateFromChain(certChainData []byte) (*x509.Certificate, error) 
 func CreateManifest() (*Manifest, error) {
 	// Create an empty manifest with default values
 	manifest := &Manifest{
-		IM4M: IM4M{
-			Tag:     "IM4M",
-			Version: 1,
-			Body: asn1.RawValue{
-				Class: 3,
-				Tag:   tagMANB,
-				// Bytes: asn1.RawValue{
-				// 	Class: 3,        // Private class
-				// 	Tag:   tagMANP,  // MANB - Manifest Body
-				// 	Bytes: []byte{}, // Will be filled later
-				// },
-			},
+		Tag:     "IM4M",
+		Version: 1,
+		Body: asn1.RawValue{
+			Class: 3,
+			Tag:   tagMANB,
+			// Bytes: asn1.RawValue{
+			// 	Class: 3,        // Private class
+			// 	Tag:   tagMANP,  // MANB - Manifest Body
+			// 	Bytes: []byte{}, // Will be filled later
+			// },
 		},
 	}
 

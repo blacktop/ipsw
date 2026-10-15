@@ -31,9 +31,8 @@ func newVtableInvariantFixture(t *testing.T) *vtableInvariantFixture {
 
 	owner := &macho.File{}
 	owner.Sections = []*types.Section{
-		{SectionHeader: types.SectionHeader{
-			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize,
-		}},
+		{
+			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize},
 	}
 
 	data := make([]byte, sectionSize)

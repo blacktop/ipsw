@@ -64,26 +64,22 @@ func TestDedupePrefersResolvedNamedClass(t *testing.T) {
 	s := &Scanner{}
 	in := []discoveredClass{
 		{
-			Class: Class{
-				Name:      "AppleSmartBattery",
-				Bundle:    "com.apple.driver.AppleSmartBatteryManagerEmbedded",
-				MetaPtr:   0xfffffe000761db30,
-				SuperMeta: 0xfffffe000b312ec0,
-				Size:      0x250,
-				Ctor:      0xfffffe0009bf7d48,
-			},
+			Name:      "AppleSmartBattery",
+			Bundle:    "com.apple.driver.AppleSmartBatteryManagerEmbedded",
+			MetaPtr:   0xfffffe000761db30,
+			SuperMeta: 0xfffffe000b312ec0,
+			Size:      0x250,
+			Ctor:      0xfffffe0009bf7d48,
 		},
 		{
-			Class: Class{
-				Name:           "AppleSmartBattery",
-				Bundle:         "com.apple.driver.AppleSmartBatteryManagerEmbedded",
-				MetaPtr:        0xfffffe000b4a7da0,
-				SuperMeta:      0xfffffe000b312ec0,
-				Size:           0x250,
-				Ctor:           0xfffffe0009bf76f8,
-				VtableAddr:     0xfffffe0007fb4ed0,
-				MetaVtableAddr: 0xfffffe0007fb5430,
-			},
+			Name:           "AppleSmartBattery",
+			Bundle:         "com.apple.driver.AppleSmartBatteryManagerEmbedded",
+			MetaPtr:        0xfffffe000b4a7da0,
+			SuperMeta:      0xfffffe000b312ec0,
+			Size:           0x250,
+			Ctor:           0xfffffe0009bf76f8,
+			VtableAddr:     0xfffffe0007fb4ed0,
+			MetaVtableAddr: 0xfffffe0007fb5430,
 		},
 	}
 

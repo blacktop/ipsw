@@ -149,7 +149,7 @@ func TestLocalSymbolsPointerWidth(t *testing.T) {
 			f.LocalSymInfo.StringsSize = uint32(len(strings))
 			img := &CacheImage{Name: "/usr/lib/libSynthetic.dylib", cache: f}
 			img.pm = &macho.File{}
-			img.pm.Sections = []*mtypes.Section{{SectionHeader: mtypes.SectionHeader{Addr: values[0], Size: 0x1000}}}
+			img.pm.Sections = []*mtypes.Section{{Addr: values[0], Size: 0x1000}}
 			img.NlistCount = uint32(len(values))
 			f.Images = cacheImages{img}
 
@@ -227,8 +227,8 @@ func TestLocalSymbolsSectionFilter(t *testing.T) {
 			}
 			img.pm = &macho.File{}
 			img.pm.Sections = []*mtypes.Section{
-				{SectionHeader: mtypes.SectionHeader{Name: "__objc_stubs", Seg: "__TEXT", Size: 0}},
-				{SectionHeader: mtypes.SectionHeader{Name: "__text", Seg: "__TEXT", Addr: 0x1010, Size: 0x100}},
+				{Name: "__objc_stubs", Seg: "__TEXT", Size: 0},
+				{Name: "__text", Seg: "__TEXT", Addr: 0x1010, Size: 0x100},
 			}
 			f.Images = cacheImages{img}
 
@@ -303,10 +303,9 @@ func TestSegmentRebases(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	mapping := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
+	mapping := &CacheMappingWithSlideInfo{
 		Address: hdr.ValueAdd, Size: 0x2000, FileOffset: 0x1000,
-		SlideInfoOffset: 0x100, SlideInfoSize: uint64(info.Len()),
-	}}
+		SlideInfoOffset: 0x100, SlideInfoSize: uint64(info.Len())}
 	data := make([]byte, 0x3000)
 	copy(data[mapping.SlideInfoOffset:], info.Bytes())
 	binary.LittleEndian.PutUint64(data[0x1018:], 0x1234|1<<52)
@@ -330,7 +329,7 @@ func TestSegmentRebases(t *testing.T) {
 		{name: "segment past its mapping", filesz: 0x3000, wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			seg := &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__DATA", Addr: mapping.Address, Filesz: tt.filesz}}
+			seg := &macho.Segment{Name: "__DATA", Addr: mapping.Address, Filesz: tt.filesz}
 			rebases, err := img.SegmentRebases(seg)
 			if tt.wantErr {
 				if err == nil {
@@ -371,7 +370,7 @@ func sharedPoolCache(t *testing.T, want [2][]string) (*countingReaderAt, [2]*Cac
 		UUID:      uuid,
 		ByteOrder: binary.LittleEndian,
 		Mappings: map[mtypes.UUID]cacheMappings{uuid: {
-			{CacheMappingInfo: CacheMappingInfo{Address: base, Size: fileSize}},
+			{Address: base, Size: fileSize},
 		}},
 		r: map[mtypes.UUID]io.ReaderAt{uuid: r},
 	}
@@ -401,7 +400,7 @@ func sharedPoolCache(t *testing.T, want [2][]string) (*countingReaderAt, [2]*Cac
 		buf.Reset()
 		for n, name := range names {
 			sym := mtypes.Nlist64{
-				Nlist: mtypes.Nlist{Name: uint32(strings.Index(pool, "\x00"+name+"\x00") + 1), Type: mtypes.N_SECT | mtypes.N_EXT, Sect: 1},
+				Name: uint32(strings.Index(pool, "\x00"+name+"\x00") + 1), Type: mtypes.N_SECT | mtypes.N_EXT, Sect: 1,
 				Value: base + hdrOff + uint64(0x10*n),
 			}
 			if err := binary.Write(&buf, binary.LittleEndian, sym); err != nil {
@@ -411,10 +410,10 @@ func sharedPoolCache(t *testing.T, want [2][]string) (*countingReaderAt, [2]*Cac
 		copy(data[symOff:], buf.Bytes())
 
 		images[k] = &CacheImage{
-			Name:               fmt.Sprintf("/usr/lib/libSynthetic%d.dylib", k),
-			CacheImageTextInfo: CacheImageTextInfo{LoadAddress: base + hdrOff, TextSegmentSize: 0x1000},
-			cache:              f,
-			cuuid:              uuid,
+			Name:        fmt.Sprintf("/usr/lib/libSynthetic%d.dylib", k),
+			LoadAddress: base + hdrOff, TextSegmentSize: 0x1000,
+			cache: f,
+			cuuid: uuid,
 		}
 		f.Images = append(f.Images, images[k])
 	}
@@ -462,7 +461,7 @@ func TestSlidePointerMappingBoundaries(t *testing.T) {
 	uuid := mtypes.UUID{1}
 	f := &File{
 		MappingsWithSlideInfo: map[mtypes.UUID]cacheMappingsWithSlideInfo{uuid: {
-			{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000, Size: 0x100}},
+			{Address: 0x1000, Size: 0x100},
 		}},
 		SlideInfo: CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000},
 	}
@@ -475,7 +474,7 @@ func TestSlidePointerMappingBoundaries(t *testing.T) {
 		}
 	}
 	// New subcache registration must remain visible without rebuilding an index.
-	f.MappingsWithSlideInfo[mtypes.UUID{2}] = cacheMappingsWithSlideInfo{{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1100, Size: 0x100}}}
+	f.MappingsWithSlideInfo[mtypes.UUID{2}] = cacheMappingsWithSlideInfo{{Address: 0x1100, Size: 0x100}}
 	if got := image.SlidePointer(0x1100); got != 0x1100 {
 		t.Fatalf("new mapping returned %#x", got)
 	}
@@ -490,8 +489,8 @@ func TestSlidePointerEncodedDoesNotAllocate(t *testing.T) {
 
 func TestSlidePointerMappingHint(t *testing.T) {
 	mappings := cacheMappingsWithSlideInfo{
-		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000, Size: 0x100}},
-		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x2000, Size: 0x100}},
+		{Address: 0x1000, Size: 0x100},
+		{Address: 0x2000, Size: 0x100},
 	}
 	image := &CacheImage{cache: &File{
 		MappingsWithSlideInfo: map[mtypes.UUID]cacheMappingsWithSlideInfo{{1}: mappings},
@@ -523,7 +522,7 @@ func TestSlidePointerConcurrentImages(t *testing.T) {
 		SlideInfo:             CacheSlideInfo2{ValueAdd: 0x100000, DeltaMask: 0xff00000000000000},
 	}
 	for n := range 4 {
-		f.MappingsWithSlideInfo[mtypes.UUID{byte(n + 1)}] = cacheMappingsWithSlideInfo{{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000 + uint64(n)*0x1000, Size: 0x100}}}
+		f.MappingsWithSlideInfo[mtypes.UUID{byte(n + 1)}] = cacheMappingsWithSlideInfo{{Address: 0x1000 + uint64(n)*0x1000, Size: 0x100}}
 	}
 	images := [2]*CacheImage{{cache: f}, {cache: f}}
 	start := make(chan struct{})
@@ -560,9 +559,9 @@ func TestSlidePointerConcurrentImages(t *testing.T) {
 
 func TestSlidePointerMappingAlternation(t *testing.T) {
 	mappings := cacheMappingsWithSlideInfo{
-		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x1000, Size: 0x100}},
-		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x2000, Size: 0x100}},
-		{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{Address: 0x3000, Size: 0x100}},
+		{Address: 0x1000, Size: 0x100},
+		{Address: 0x2000, Size: 0x100},
+		{Address: 0x3000, Size: 0x100},
 	}
 	for _, reverse := range []bool{false, true} {
 		t.Run(fmt.Sprintf("reverse=%v", reverse), func(t *testing.T) {
@@ -609,7 +608,7 @@ func TestSlidePointerMappingAlternation(t *testing.T) {
 func TestPublicSymbolsWithoutSymtab(t *testing.T) {
 	data := []byte{0, 1, '_', 's', 'y', 'n', 't', 'h', 'e', 't', 'i', 'c', 0, 14, 2, 0, 0x20, 0}
 	f := fileReading(data)
-	f.Mappings = map[mtypes.UUID]cacheMappings{f.UUID: {&CacheMapping{CacheMappingInfo: CacheMappingInfo{Address: 0x1000, Size: uint64(len(data))}}}}
+	f.Mappings = map[mtypes.UUID]cacheMappings{f.UUID: {&CacheMapping{Address: 0x1000, Size: uint64(len(data))}}}
 	img := objcSectionImage(t, "/usr/lib/libSynthetic.dylib", "", nil, 0)
 	img.cache, img.cuuid = f, f.UUID
 	img.LoadAddress = 0x100000000

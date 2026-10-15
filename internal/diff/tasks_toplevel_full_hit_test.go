@@ -175,8 +175,8 @@ func seedTopLevelScopes(t *testing.T, d *Diff, store storage.Store, oldInfo, new
 	t.Helper()
 
 	d.Kexts = &mcmd.MachoDiff{New: []string{"com.apple.seeded"}, Updated: make(map[string]string)}
-	d.Old.Kernel.Version = &kernelcache.Version{KernelVersion: kernelcache.KernelVersion{Darwin: "old"}}
-	d.New.Kernel.Version = &kernelcache.Version{KernelVersion: kernelcache.KernelVersion{Darwin: "new"}}
+	d.Old.Kernel.Version = &kernelcache.Version{Darwin: "old"}
+	d.New.Kernel.Version = &kernelcache.Version{Darwin: "new"}
 	d.KDKs = "## KDK struct diff\n```diff\n+ int x;\n```\n"
 	d.Firmwares = &mcmd.MachoDiff{New: []string{"Firmware/seeded.im4p"}, Updated: make(map[string]string)}
 	d.IBoot = &IBootDiff{

@@ -372,9 +372,9 @@ func writeDscFixture(t *testing.T, root, path, contents string) string {
 
 func testMountedDscDMG(kind DscDMGKind, root string, arches []string) mountedDscDMG {
 	return mountedDscDMG{
-		DscExtractionDMG: DscExtractionDMG{Kind: kind, Arches: arches},
-		mount:            utils.DMGMount{MountPoint: root, AlreadyMounted: true},
-		mountedRoot:      root,
+		Kind: kind, Arches: arches,
+		mount:       utils.DMGMount{MountPoint: root, AlreadyMounted: true},
+		mountedRoot: root,
 	}
 }
 
@@ -390,17 +390,17 @@ func testMacOSDscInfo() *info.Info {
 
 func TestRemoteCryptexFilesArchFiltering(t *testing.T) {
 	files := []*zip.File{
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e.xfoo"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e.x2.dmg"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e_x1"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e.x2"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e.x12"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e.x1"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-x86_64"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-x86_64h"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64_32"}},
+		{Name: "cryptex-system-arm64e.xfoo"},
+		{Name: "cryptex-system-arm64e.x2.dmg"},
+		{Name: "cryptex-system-arm64e_x1"},
+		{Name: "cryptex-system-arm64e.x2"},
+		{Name: "cryptex-system-arm64e.x12"},
+		{Name: "cryptex-system-arm64e.x1"},
+		{Name: "cryptex-system-arm64"},
+		{Name: "cryptex-system-arm64e"},
+		{Name: "cryptex-system-x86_64"},
+		{Name: "cryptex-system-x86_64h"},
+		{Name: "cryptex-system-arm64_32"},
 	}
 
 	tests := []struct {
@@ -663,10 +663,10 @@ func TestRemoteCryptexPatternDefaultCoversArm64_32(t *testing.T) {
 // can live in a cryptex named after another architecture.
 func TestRemoteCryptexCandidatesSweepCoversAllSystemCryptexes(t *testing.T) {
 	files := []*zip.File{
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-arm64e"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-x86_64"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-system-rosetta"}},
-		{FileHeader: zip.FileHeader{Name: "cryptex-app"}},
+		{Name: "cryptex-system-arm64e"},
+		{Name: "cryptex-system-x86_64"},
+		{Name: "cryptex-system-rosetta"},
+		{Name: "cryptex-app"},
 	}
 
 	candidateNames := func(arches []string, sweep bool) []string {

@@ -168,10 +168,8 @@ func TestSectionContentHashSkipsCodeSections(t *testing.T) {
 		types.SELF_MODIFYING_CODE,
 	} {
 		hash, ok := sectionContentHash(&types.Section{
-			SectionHeader: types.SectionHeader{
-				Size:  4,
-				Flags: flags,
-			},
+			Size:  4,
+			Flags: flags,
 		}, true)
 		if ok || hash != "" {
 			t.Fatalf("sectionContentHash(%s) = (%q, %t), want no hash", flags, hash, ok)
@@ -266,9 +264,8 @@ func TestSectionContentHashMode(t *testing.T) {
 		{seg: "__TEXT", name: "__entitlements", wantCache: hashVerbatim, wantAll: hashVerbatim},
 		{seg: "__DATA_CONST", name: "__objc_imageinfo", wantCache: hashVerbatim, wantAll: hashVerbatim},
 	} {
-		s := &types.Section{SectionHeader: types.SectionHeader{
-			Seg: tc.seg, Name: tc.name, Flags: tc.flags,
-		}}
+		s := &types.Section{
+			Seg: tc.seg, Name: tc.name, Flags: tc.flags}
 		if got := sectionContentHashMode(s, false); got != tc.wantCache {
 			t.Errorf("%s.%s (cache image): mode = %d, want %d", tc.seg, tc.name, got, tc.wantCache)
 		}
@@ -516,9 +513,8 @@ func newTestMachO(sections ...*types.Section) *gomacho.File {
 }
 
 func newTestSection(seg, name string, flags types.SectionFlag, data []byte) *types.Section {
-	s := &types.Section{SectionHeader: types.SectionHeader{
-		Seg: seg, Name: name, Size: uint64(len(data)), Flags: flags,
-	}}
+	s := &types.Section{
+		Seg: seg, Name: name, Size: uint64(len(data)), Flags: flags}
 	r := bytes.NewReader(data)
 	s.SetReaders(r, io.NewSectionReader(r, 0, int64(len(data))))
 	return s

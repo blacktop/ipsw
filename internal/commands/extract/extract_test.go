@@ -134,9 +134,9 @@ func TestExclaveSelectsBeforeExtractingAndCleansInfoStaging(t *testing.T) {
 
 func TestSelectExclaveBundlesDefault(t *testing.T) {
 	files := []*zip.File{
-		{FileHeader: zip.FileHeader{Name: "Firmware/exclavecore_bundle.restore.im4p"}},
-		{FileHeader: zip.FileHeader{Name: "Firmware/exclavecore_bundle.runtime.im4p"}},
-		{FileHeader: zip.FileHeader{Name: "Firmware/other.im4p"}},
+		{Name: "Firmware/exclavecore_bundle.restore.im4p"},
+		{Name: "Firmware/exclavecore_bundle.runtime.im4p"},
+		{Name: "Firmware/other.im4p"},
 	}
 	got, err := selectExclaveBundles(files, false)
 	if err != nil || !reflect.DeepEqual(got, []string{files[1].Name}) {

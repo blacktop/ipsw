@@ -85,9 +85,9 @@ func TestTrackStaticValueInstructionRespectsAddLoadAddrPropagationOption(t *test
 func TestPointerCacheCoversAddressSkipsTextAndBSS(t *testing.T) {
 	m := &macho.File{}
 	m.Sections = []*types.Section{
-		{SectionHeader: types.SectionHeader{Name: "__text", Seg: "__TEXT", Addr: 0x1000, Size: 0x100}},
-		{SectionHeader: types.SectionHeader{Name: "__data", Seg: "__DATA_CONST", Addr: 0x2000, Size: 0x100}},
-		{SectionHeader: types.SectionHeader{Name: "entry.__bss", Seg: "__DATA", Addr: 0x3000, Size: 0x100}},
+		{Name: "__text", Seg: "__TEXT", Addr: 0x1000, Size: 0x100},
+		{Name: "__data", Seg: "__DATA_CONST", Addr: 0x2000, Size: 0x100},
+		{Name: "entry.__bss", Seg: "__DATA", Addr: 0x3000, Size: 0x100},
 	}
 
 	if pointerCacheCoversAddress(m, 0x1010) {

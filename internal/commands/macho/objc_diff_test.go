@@ -149,7 +149,7 @@ func TestObjCDiffProperties(t *testing.T) {
 				}
 			}
 			prev := []objc.Property{{Name: "value", EncodedAttributes: "T{Pair=\"left,right\"ii},R,N,V_value"}}
-			next := []objc.Property{{Name: "value", EncodedAttributes: "V_value,N,T{Pair=\"left,right\"ii},R", PropertyT: objc.PropertyT{NameVMAddr: 0x1000}}}
+			next := []objc.Property{{Name: "value", EncodedAttributes: "V_value,N,T{Pair=\"left,right\"ii},R", NameVMAddr: 0x1000}}
 			if out := surface.diff(prev, next); !strings.Contains(out, "no changes") {
 				t.Fatalf("attribute reordering or address changed diff: %s", out)
 			}

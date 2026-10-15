@@ -193,7 +193,7 @@ func TestComponentFilesystemReferenceSlice(t *testing.T) {
 	if got == nil || got.Macho.UUID != intel.UUID().String() || got.Arch != "x86_64" {
 		t.Fatalf("component did not select the last FAT slice: %+v", got)
 	}
-	noUUID := &macho.File{FileTOC: macho.FileTOC{FileHeader: types.FileHeader{CPU: types.CPUArm64}}}
+	noUUID := &macho.File{CPU: types.CPUArm64}
 	for _, slices := range [][]*macho.File{nil, {nil}, {noUUID}, {arm, noUUID}, {syntheticSlice(types.CPUArm64, 0, "", 0)}} {
 		if err := scanComponentMachoSlices("/bad", "SystemOS", slices, func(*scanImage) error { return nil }); err == nil {
 			t.Fatalf("missing selected identity accepted: %+v", slices)
@@ -213,7 +213,7 @@ func TestExtractScanKernelsRequiresIPSWMetadata(t *testing.T) {
 }
 
 func seg(name string) *macho.Segment {
-	return &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: name, Addr: 0x1000, Filesz: 0x100}}
+	return &macho.Segment{Name: name, Addr: 0x1000, Filesz: 0x100}
 }
 
 func file(segs ...*macho.Segment) *macho.File {
@@ -221,7 +221,7 @@ func file(segs ...*macho.Segment) *macho.File {
 	for _, s := range segs {
 		loads = append(loads, s)
 	}
-	return &macho.File{FileTOC: macho.FileTOC{Loads: loads}}
+	return &macho.File{Loads: loads}
 }
 
 // TestKextTextSegment is the regression for the UniversalMac com.apple.kec.Libm

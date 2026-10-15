@@ -117,13 +117,12 @@ var SlideCmd = &cobra.Command{
 
 		for uuid := range f.Mappings {
 			if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
-				mapping := &dyld.CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: dyld.CacheMappingAndSlideInfo{
+				mapping := &dyld.CacheMappingWithSlideInfo{
 					Address:         f.Mappings[uuid][1].Address,    // __DATA
 					Size:            f.Mappings[uuid][1].Size,       // __DATA
 					FileOffset:      f.Mappings[uuid][1].FileOffset, // __DATA
 					SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
-					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
-				}, Name: "__DATA"}
+					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused, Name: "__DATA"}
 				if viper.GetBool("dyld.slide.json") {
 					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
 					if err != nil {

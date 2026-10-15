@@ -255,11 +255,10 @@ func filteredSegmentDigest(seg *macho.Segment, sections []*types.Section, conf *
 
 func TestFilteredSegmentDigestKeepsPageZeroSize(t *testing.T) {
 	conf := &DiffConfig{BlockList: []string{"__TEXT.__info_plist"}}
-	pageZero := &macho.Segment{SegmentHeader: macho.SegmentHeader{
+	pageZero := &macho.Segment{
 		LoadCmd: types.LC_SEGMENT_64,
 		Name:    "__PAGEZERO",
-		Memsz:   0x100000000,
-	}}
+		Memsz:   0x100000000}
 	want := filteredSegmentDigest(pageZero, nil, conf)
 	changed := *pageZero
 	changed.Memsz += 0x1000
@@ -270,19 +269,17 @@ func TestFilteredSegmentDigestKeepsPageZeroSize(t *testing.T) {
 
 func TestFilteredSegmentDigestKeepsIncludedSectionReserved1(t *testing.T) {
 	conf := &DiffConfig{AllowList: []string{"__TEXT.__stubs"}}
-	segment := &macho.Segment{SegmentHeader: macho.SegmentHeader{
+	segment := &macho.Segment{
 		LoadCmd: types.LC_SEGMENT_64,
 		Name:    "__TEXT",
-		Nsect:   1,
-	}}
-	section := &types.Section{SectionHeader: types.SectionHeader{
+		Nsect:   1}
+	section := &types.Section{
 		Name:      "__stubs",
 		Seg:       "__TEXT",
 		Size:      6,
 		Flags:     types.SymbolStubs,
 		Reserved1: 4,
-		Reserved2: 6,
-	}}
+		Reserved2: 6}
 
 	want := filteredSegmentDigest(segment, []*types.Section{section}, conf)
 	changed := *section

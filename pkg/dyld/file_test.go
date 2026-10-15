@@ -117,9 +117,8 @@ func TestSlideV4RebaseAddresses(t *testing.T) {
 		{name: "multiple chains", page: 1, extras: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			mapping := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
-				Address: 0x10000000, Size: 0x2000, FileOffset: 0x1000, SlideInfoOffset: 0x100,
-			}}
+			mapping := &CacheMappingWithSlideInfo{
+				Address: 0x10000000, Size: 0x2000, FileOffset: 0x1000, SlideInfoOffset: 0x100}
 			hdr := CacheSlideInfo4{
 				Version: 4, PageSize: 0x1000, PageStartsOffset: 40, PageStartsCount: 2,
 				PageExtrasOffset: 44, DeltaMask: 0xc0000000, ValueAdd: mapping.Address,
@@ -202,10 +201,9 @@ func TestSlideV5PointerTargets(t *testing.T) {
 			if err := binary.Write(&info, binary.LittleEndian, []uint16{0x18, DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE}); err != nil {
 				t.Fatal(err)
 			}
-			mapping := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
+			mapping := &CacheMappingWithSlideInfo{
 				Address: hdr.ValueAdd, Size: 0x2000, FileOffset: 0x1000,
-				SlideInfoOffset: 0x100, SlideInfoSize: uint64(info.Len()),
-			}}
+				SlideInfoOffset: 0x100, SlideInfoSize: uint64(info.Len())}
 			data := make([]byte, 0x3000)
 			copy(data[mapping.SlideInfoOffset:], info.Bytes())
 			// Both pointers have the same target; only the first has a next link

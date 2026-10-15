@@ -1,6 +1,7 @@
 package disass
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,121 @@ import (
 	"testing"
 
 	"github.com/blacktop/arm64-cgo/disassemble"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/types"
 )
+
+const chainedTestBase = uint64(0x100000000)
+
+// chainedPointerFixture models an executable whose instruction operands are
+// already VM addresses while its stored pointers are chained runtime offsets.
+func chainedPointerFixture(t *testing.T, format fixupchains.DCPtrKind) []byte {
+	t.Helper()
+	write := func(dst *bytes.Buffer, value any) {
+		t.Helper()
+		if err := binary.Write(dst, binary.LittleEndian, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var starts, chains, header bytes.Buffer
+	write(&starts, uint32(3))
+	write(&starts, [3]uint32{0, 16, 0})
+	write(&starts, fixupchains.DyldChainedStartsInSegment{
+		Size: 24, PageSize: 0x1000, PointerFormat: format,
+		SegmentOffset: 0x1000, PageCount: 1,
+	})
+	write(&starts, uint16(0x100))
+	end := uint32(28 + starts.Len())
+	write(&chains, fixupchains.DyldChainedFixupsHeader{
+		StartsOffset: 28, ImportsOffset: end, SymbolsOffset: end,
+		ImportsFormat: fixupchains.DC_IMPORT,
+	})
+	chains.Write(starts.Bytes())
+	write(&header, types.FileHeader{
+		Magic: types.Magic64, CPU: types.CPUArm64, Type: types.MH_EXECUTE,
+		NCommands: 4, SizeCommands: 3*72 + 7*80 + 16,
+	})
+	segment := func(name string, offset uint64, nsect uint32) {
+		s := types.Segment64{LoadCmd: types.LC_SEGMENT_64, Len: 72 + 80*nsect,
+			Addr: chainedTestBase + offset, Memsz: 0x1000, Offset: offset, Filesz: 0x1000, Nsect: nsect}
+		copy(s.Name[:], name)
+		write(&header, s)
+	}
+	section := func(seg, name string, offset uint32, size uint64, flags types.SectionFlag) {
+		s := types.Section64{Addr: chainedTestBase + uint64(offset), Size: size,
+			Offset: offset, Align: 2, Flags: flags}
+		if flags == types.SymbolStubs {
+			s.Reserve2 = 12
+		}
+		copy(s.Name[:], name)
+		copy(s.Seg[:], seg)
+		write(&header, s)
+	}
+	segment("__TEXT", 0, 4)
+	section("__TEXT", "__stubs", 0x400, 12, types.SymbolStubs)
+	section("__TEXT", "__objc_stubs", 0x420, 12, 0)
+	section("__TEXT", "__text", 0x460, 4, 0)
+	section("__TEXT", "__objc_methname", 0x480, 0x30, types.CstringLiterals)
+	segment("__DATA", 0x1000, 3)
+	section("__DATA", "__objc_selrefs", 0x1108, 8, 0)
+	section("__DATA", "__objc_classrefs", 0x1110, 8, 0)
+	section("__DATA", "__objc_protorefs", 0x1118, 8, 0)
+	segment("__LINKEDIT", 0x2000, 0)
+	write(&header, types.LinkEditDataCmd{LoadCmd: types.LC_DYLD_CHAINED_FIXUPS,
+		Len: 16, Offset: 0x2000, Size: uint32(chains.Len())})
+	data := make([]byte, 0x3000)
+	copy(data, header.Bytes())
+	copy(data[0x2000:], chains.Bytes())
+	copy(data[0x400:], encodeWords(0xb0000010, 0xf9408210, 0xd61f0200))
+	copy(data[0x420:], encodeWords(0xb0000010, 0xf9408610, 0xd61f0200))
+	copy(data[0x460:], encodeWords(0xd65f03c0))
+	copy(data[0x480:], "perform:\x00")
+	copy(data[0x490:], "ProbeClass\x00")
+	copy(data[0x4a0:], "ProbeProtocol\x00")
+	binary.LittleEndian.PutUint32(data[0x1380:], 2)  // RO_ROOT
+	binary.LittleEndian.PutUint32(data[0x13d0:], 3)  // RO_ROOT | RO_META
+	binary.LittleEndian.PutUint32(data[0x14c0:], 72) // protocol size
+	pointers := []struct{ offset, target uint64 }{
+		{0x1100, 0x460}, {0x1108, 0x480}, {0x1110, 0x1300}, {0x1118, 0x1480},
+		{0x1300, 0x1340}, {0x1320, 0x1380}, {0x1360, 0x13d0},
+		{0x1398, 0x490}, {0x13e8, 0x490}, {0x1488, 0x4a0},
+	}
+	stride, ok := fixupchains.Stride(format)
+	if !ok {
+		t.Fatalf("unsupported pointer format %v", format)
+	}
+	for i, ptr := range pointers {
+		raw := ptr.target
+		if i+1 < len(pointers) {
+			raw |= (pointers[i+1].offset - ptr.offset) / stride << 51
+		}
+		binary.LittleEndian.PutUint64(data[ptr.offset:], raw)
+	}
+	return data
+}
+
+func TestParseStubsForMachOChainedOffsets(t *testing.T) {
+	for _, format := range []fixupchains.DCPtrKind{
+		fixupchains.DYLD_CHAINED_PTR_64_OFFSET,
+		fixupchains.DYLD_CHAINED_PTR_ARM64E_USERLAND24,
+	} {
+		t.Run(format.String(), func(t *testing.T) {
+			f, err := macho.NewFile(bytes.NewReader(chainedPointerFixture(t, format)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			stubs, err := ParseStubsForMachO(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if target := stubs[chainedTestBase+0x400]; len(stubs) != 1 || target != chainedTestBase+0x460 {
+				t.Fatalf("unexpected stubs: %#v", stubs)
+			}
+		})
+	}
+}
 
 type stubDisass struct {
 	data      []byte

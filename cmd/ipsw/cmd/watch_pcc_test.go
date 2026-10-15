@@ -73,16 +73,14 @@ func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error)
 
 func notificationTestPCCRelease(index uint64, digest string) *download.PCCRelease {
 	return &download.PCCRelease{
-		Index:   index,
-		Version: &download.PCCVersion{Version: "26.1", Build: "23B83"},
-		ReleaseMetadata: pcc.ReleaseMetadata{
-			ReleaseCreation: timestamppb.New(time.Date(2025, time.November, 4, 3, 2, 1, 0, time.UTC)),
-			BuildVersion:    "5C235",
-			Application:     &pcc.ReleaseMetadata_Application{Name: "TIE"},
-			Assets: []*pcc.ReleaseMetadata_Asset{{
-				Type: pcc.ReleaseMetadata_ASSET_TYPE_OS,
-				Url:  "https://example.test/pcc/" + digest,
-			}},
-		},
+		Index:           index,
+		Version:         &download.PCCVersion{Version: "26.1", Build: "23B83"},
+		ReleaseCreation: timestamppb.New(time.Date(2025, time.November, 4, 3, 2, 1, 0, time.UTC)),
+		BuildVersion:    "5C235",
+		Application:     &pcc.ReleaseMetadata_Application{Name: "TIE"},
+		Assets: []*pcc.ReleaseMetadata_Asset{{
+			Type: pcc.ReleaseMetadata_ASSET_TYPE_OS,
+			Url:  "https://example.test/pcc/" + digest,
+		}},
 	}
 }

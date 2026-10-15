@@ -141,7 +141,7 @@ func trieTestFile(t testing.TB, paths map[string]uint64) (*File, *countingReader
 			DylibsTrieSize: uint64(len(trie)),
 		}},
 		Mappings: map[mtypes.UUID]cacheMappings{uuid: {
-			{CacheMappingInfo: CacheMappingInfo{Address: base, Size: uint64(len(data))}},
+			{Address: base, Size: uint64(len(data))},
 		}},
 		r:    map[mtypes.UUID]io.ReaderAt{uuid: r},
 		size: int64(len(data)),

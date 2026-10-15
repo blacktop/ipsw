@@ -27,11 +27,10 @@ func newSameKernelDiff(t *testing.T, kv *kernelcache.Version) *Diff {
 
 // testKernelVersion is a fixed parsed kernelcache version for render tests.
 func testKernelVersion() *kernelcache.Version {
-	return &kernelcache.Version{KernelVersion: kernelcache.KernelVersion{
+	return &kernelcache.Version{
 		Darwin: "25.6.0",
 		XNU:    "xnu-12377.160.19~1",
-		Date:   time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC),
-	}}
+		Date:   time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)}
 }
 
 // TestMarkdownUnchangedKernelSection covers an unchanged kernelcache

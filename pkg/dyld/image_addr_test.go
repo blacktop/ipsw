@@ -82,7 +82,7 @@ func BenchmarkGetImageContainingVMAddr(b *testing.B) {
 func TestImageContainingVMAddrSynthetic(t *testing.T) {
 	image := func(name string, start, size uint64) *CacheImage {
 		m := &macho.File{}
-		m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__DATA", Addr: start, Memsz: size}})
+		m.Loads = append(m.Loads, &macho.Segment{Name: "__DATA", Addr: start, Memsz: size})
 		return &CacheImage{Name: name, pm: m}
 	}
 	first := image("first", 200, 100)
@@ -129,7 +129,7 @@ func TestImageContainingVMAddrSynthetic(t *testing.T) {
 
 func TestImageContainingVMAddrTextUsesSegmentIndex(t *testing.T) {
 	m := &macho.File{}
-	m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__TEXT", Addr: 100, Memsz: 100}})
+	m.Loads = append(m.Loads, &macho.Segment{Name: "__TEXT", Addr: 100, Memsz: 100})
 	img := &CacheImage{pm: m}
 	img.LoadAddress, img.TextSegmentSize = 100, 100
 	f := &File{Images: cacheImages{img}, sortedImages: []*CacheImage{img}}
@@ -144,7 +144,7 @@ func TestImageContainingVMAddrTextUsesSegmentIndex(t *testing.T) {
 
 func TestImageContainingVMAddrParseError(t *testing.T) {
 	m := &macho.File{}
-	m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Addr: 100, Memsz: 10}})
+	m.Loads = append(m.Loads, &macho.Segment{Addr: 100, Memsz: 10})
 	good := &CacheImage{pm: m}
 	f := &File{Images: cacheImages{good}}
 	f.Images = append(f.Images, &CacheImage{cache: f}) // no mapping for this image
@@ -229,7 +229,7 @@ func TestImageContainingVMAddrRealCache(t *testing.T) {
 func TestImageContainingVMAddrTextPreservesLinearPrecedence(t *testing.T) {
 	makeImage := func(name string, start, size uint64) *CacheImage {
 		m := &macho.File{}
-		m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Name: "__TEXT", Addr: start, Memsz: size}})
+		m.Loads = append(m.Loads, &macho.Segment{Name: "__TEXT", Addr: start, Memsz: size})
 		image := &CacheImage{Name: name, pm: m}
 		image.LoadAddress = start
 		image.TextSegmentSize = uint32(size)
@@ -260,7 +260,7 @@ func TestImageContainingVMAddrTextPreservesLinearPrecedence(t *testing.T) {
 func TestImageContainingVMAddrIncrementalClose(t *testing.T) {
 	image := func(start uint64) *CacheImage {
 		m := &macho.File{}
-		m.Loads = append(m.Loads, &macho.Segment{SegmentHeader: macho.SegmentHeader{Addr: start, Memsz: 10}})
+		m.Loads = append(m.Loads, &macho.Segment{Addr: start, Memsz: 10})
 		return &CacheImage{pm: m}
 	}
 	first, second := image(200), image(100)

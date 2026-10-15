@@ -279,7 +279,7 @@ func TestScanFunctionClearsBothLoadPairDestinations(t *testing.T) {
 		encADDImm(1, 1, target&0xfff),
 	), base)
 	instrs = append(instrs,
-		Instruction{Inst: disassemble.Inst{
+		Instruction{
 			Address:   base + 8,
 			Operation: disassemble.ARM64_LDP,
 			NumOps:    3,
@@ -287,16 +287,14 @@ func TestScanFunctionClearsBothLoadPairDestinations(t *testing.T) {
 				regOp(disassemble.REG_X0),
 				regOp(disassemble.REG_X1),
 				regOp(disassemble.REG_SP),
-			},
-		}},
-		Instruction{Inst: disassemble.Inst{
+			}},
+		Instruction{
 			Address:   base + 12,
 			Operation: disassemble.ARM64_BLR,
 			NumOps:    1,
 			Operands: [disassemble.MAX_OPERANDS]disassemble.Op{
 				regOp(disassemble.REG_X1),
-			},
-		}},
+			}},
 	)
 
 	results := ScanInstructions(instrs, Options{

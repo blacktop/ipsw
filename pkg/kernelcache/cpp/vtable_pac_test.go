@@ -158,9 +158,8 @@ func newPACFixture(t *testing.T) *pacFixture {
 
 	owner := &macho.File{}
 	owner.Sections = []*types.Section{
-		{SectionHeader: types.SectionHeader{
-			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize,
-		}},
+		{
+			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize},
 	}
 
 	targets := []uint64{
@@ -312,9 +311,8 @@ func TestMethodTableNumMethodsCanExceedOldCap(t *testing.T) {
 
 	owner := &macho.File{}
 	owner.Sections = []*types.Section{
-		{SectionHeader: types.SectionHeader{
-			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize,
-		}},
+		{
+			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize},
 	}
 
 	s := NewScanner(owner, Config{})
@@ -348,9 +346,8 @@ func TestVtableMethodCountBoundedByMaxMethods(t *testing.T) {
 
 	owner := &macho.File{}
 	owner.Sections = []*types.Section{
-		{SectionHeader: types.SectionHeader{
-			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize,
-		}},
+		{
+			Name: "__const", Seg: "__DATA_CONST", Addr: sectionVM, Size: sectionSize},
 	}
 
 	s := NewScanner(owner, Config{})
