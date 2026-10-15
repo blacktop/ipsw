@@ -50,7 +50,5 @@ var machoDiffCmd = &cobra.Command{
 
 		// FIXME: implement
 		panic("ipsw macho diff - not implemented yet")
-
-		return nil
 	},
 }
