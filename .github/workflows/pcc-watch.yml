@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7.0.0
         with:
-          go-version: "1.26"
+          go-version-file: go.mod
       - name: Run ipsw watch PCC vphone600 firmware
         run: |
           go run ./cmd/ipsw/main.go watch pcc \
