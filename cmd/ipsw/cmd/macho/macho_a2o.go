@@ -82,7 +82,7 @@ var machoA2oCmd = &cobra.Command{
 
 		off, err := m.GetOffset(addr)
 		if err != nil {
-			log.Error(err.Error())
+			return err
 		} else {
 			if inDec {
 				fmt.Printf("%d\n", off)
