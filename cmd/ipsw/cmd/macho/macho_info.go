@@ -77,6 +77,40 @@ const (
 	onlyBitCode      = 1 << 11
 )
 
+func newFixupSectionFinder(m *macho.File) func(uint64) *types.Section {
+	if m.Type != types.MH_FILESET {
+		return m.FindSectionForVMAddr
+	}
+	entries := m.FileSets()
+	images := make([]*macho.File, len(entries))
+	return func(addr uint64) *types.Section {
+		for i, entry := range entries {
+			image := images[i]
+			if image == nil {
+				var err error
+				image, err = m.GetFileSetFileByName(entry.EntryID)
+				if err != nil {
+					continue
+				}
+				images[i] = image
+			}
+			if sec := image.FindSectionForVMAddr(addr); sec != nil {
+				// The uncached fileset lookup returns a fresh, qualified section.
+				// Preserve that identity because the dump uses it for headings.
+				section := *sec
+				section.Name = entry.EntryID + "." + sec.Name
+				return &section
+			}
+		}
+		for _, sec := range m.Sections {
+			if sec.Addr <= addr && addr < sec.Addr+sec.Size {
+				return sec
+			}
+		}
+		return nil
+	}
+}
+
 func init() {
 	MachoCmd.AddCommand(machoInfoCmd)
 
@@ -954,6 +988,7 @@ var machoInfoCmd = &cobra.Command{
 				if _, err := dcf.Parse(); err != nil {
 					return fmt.Errorf("failed to parse dyld chained fixups: %v", err)
 				}
+				findSection := newFixupSectionFinder(m)
 
 				for _, start := range dcf.Starts {
 					if start.PageStarts != nil {
@@ -968,7 +1003,7 @@ var machoInfoCmd = &cobra.Command{
 									addend = fmt.Sprintf(" + 0x%x", fullAddend)
 									addr += fullAddend
 								}
-								sec = m.FindSectionForVMAddr(addr)
+								sec = findSection(addr)
 								lib := m.LibraryOrdinalName(dcf.Imports[f.Ordinal()].LibOrdinal())
 								if sec != nil && sec != lastSec {
 									fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
@@ -976,7 +1011,7 @@ var machoInfoCmd = &cobra.Command{
 								fmt.Printf("%s\t%s/%s%s\n", fixupchains.Bind(f).String(m.GetBaseAddress()), lib, f.Name(), addend)
 							case fixupchains.Rebase:
 								addr := uint64(f.Offset()) + m.GetBaseAddress()
-								sec = m.FindSectionForVMAddr(addr)
+								sec = findSection(addr)
 								if sec != nil && sec != lastSec {
 									fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
 								}

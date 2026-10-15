@@ -83,31 +83,30 @@ var machoA2oCmd = &cobra.Command{
 		off, err := m.GetOffset(addr)
 		if err != nil {
 			return err
+		}
+		if inDec {
+			fmt.Printf("%d\n", off)
+		} else if inHex {
+			fmt.Printf("%#x\n", off)
 		} else {
-			if inDec {
-				fmt.Printf("%d\n", off)
-			} else if inHex {
-				fmt.Printf("%#x\n", off)
-			} else {
-				sec := m.FindSectionForVMAddr(addr)
-				if sec == nil {
-					seg := m.FindSegmentForVMAddr(addr)
-					if seg == nil {
-						return fmt.Errorf("failed to find a segment or section containing address %#x", addr)
-					}
-					log.WithFields(log.Fields{
-						"hex":     fmt.Sprintf("%#x", off),
-						"dec":     fmt.Sprintf("%d", off),
-						"segment": seg.Name,
-					}).Info("Offset")
-				} else {
-					log.WithFields(log.Fields{
-						"hex":     fmt.Sprintf("%#x", off),
-						"dec":     fmt.Sprintf("%d", off),
-						"segment": sec.Seg,
-						"section": sec.Name,
-					}).Info("Offset")
+			sec := m.FindSectionForVMAddr(addr)
+			if sec == nil {
+				seg := m.FindSegmentForVMAddr(addr)
+				if seg == nil {
+					return fmt.Errorf("failed to find a segment or section containing address %#x", addr)
 				}
+				log.WithFields(log.Fields{
+					"hex":     fmt.Sprintf("%#x", off),
+					"dec":     fmt.Sprintf("%d", off),
+					"segment": seg.Name,
+				}).Info("Offset")
+			} else {
+				log.WithFields(log.Fields{
+					"hex":     fmt.Sprintf("%#x", off),
+					"dec":     fmt.Sprintf("%d", off),
+					"segment": sec.Seg,
+					"section": sec.Name,
+				}).Info("Offset")
 			}
 		}
 
