@@ -1,14 +1,71 @@
 package macho
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 )
+
+func writeMachoTestIPA(t testing.TB, executable []byte) string {
+	t.Helper()
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	for name, data := range map[string][]byte{
+		"Payload/Test.app/Info.plist": []byte(`<plist version="1.0"><dict><key>CFBundleExecutable</key><string>Main</string></dict></plist>`),
+		"Payload/Test.app/Main":       executable,
+	} {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	name := filepath.Join(t.TempDir(), "repacked.ipa")
+	if err := os.WriteFile(name, archive.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return name
+}
+
+func TestMachoInfoIPA(t *testing.T) {
+	var executable bytes.Buffer
+	header := types.FileHeader{Magic: types.Magic64, CPU: types.CPUArm64, Type: types.MH_EXECUTE}
+	if err := binary.Write(&executable, binary.LittleEndian, header); err != nil {
+		t.Fatal(err)
+	}
+	name := writeMachoTestIPA(t, executable.Bytes())
+	output, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	stdout := os.Stdout
+	os.Stdout = output
+	defer func() { os.Stdout = stdout }()
+	if err := machoInfoCmd.RunE(machoInfoCmd, []string{name}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(output.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), header.String()) {
+		t.Fatalf("missing Mach-O header in output: %q", data)
+	}
+}
 
 func fixupFilesetFixture(t testing.TB, count int) (*macho.File, []uint64) {
 	t.Helper()

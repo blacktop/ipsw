@@ -185,9 +185,10 @@ func init() {
 
 // machoInfoCmd represents the macho command
 var machoInfoCmd = &cobra.Command{
-	Use:           "info <macho>",
+	Use:           "info <macho|app|ipa>",
 	Aliases:       []string{"i"},
 	Short:         "Explore a MachO file",
+	Long:          "Explore a MachO file, app bundle, or the main executable in an IPA archive.",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -261,6 +262,8 @@ var machoInfoCmd = &cobra.Command{
 
 		if info, err := os.Stat(machoPath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", machoPath)
+		} else if err != nil {
+			return err
 		} else if info.IsDir() {
 			machoPath, err = plist.GetBinaryInApp(machoPath)
 			if err != nil {
@@ -268,17 +271,12 @@ var machoInfoCmd = &cobra.Command{
 			}
 		}
 
-		if ok, err := magic.IsMachO(machoPath); !ok {
-			return err
-		}
-
 		folder := filepath.Dir(machoPath) // default to folder of macho file
 		if len(extractPath) > 0 {
 			folder = extractPath
 		}
 
-		// Use the helper to handle fat/universal files
-		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
+		mr, err := openMachOInput(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}

@@ -22,8 +22,23 @@ THE SOFTWARE.
 package macho
 
 import (
+	"path/filepath"
+	"strings"
+
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/spf13/cobra"
 )
+
+// openMachOInput is opt-in because some commands reopen the original path.
+func openMachOInput(path, arch string) (*mcmd.MachO, error) {
+	if strings.EqualFold(filepath.Ext(path), ".ipa") {
+		if ok, _ := magic.IsMachO(path); !ok {
+			return mcmd.OpenIPAMachO(path, arch)
+		}
+	}
+	return mcmd.OpenMachO(path, arch)
+}
 
 // MachoCmd represents the macho command
 var MachoCmd = &cobra.Command{

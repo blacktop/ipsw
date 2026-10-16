@@ -10,8 +10,12 @@ description: Explore a MachO file
 
 Explore a MachO file
 
+### Synopsis
+
+Explore a MachO file, app bundle, or the main executable in an IPA archive.
+
 ```
-ipsw macho info <macho> [flags]
+ipsw macho info <macho|app|ipa> [flags]
 ```
 
 ### Options

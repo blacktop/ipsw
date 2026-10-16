@@ -2,8 +2,10 @@ package disass
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -21,7 +23,6 @@ import (
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/symbols"
-	"github.com/pkg/errors"
 )
 
 type MachoDisass struct {
@@ -32,10 +33,12 @@ type MachoDisass struct {
 	sinfo     map[uint64]uint64
 	swiftstrs map[uint64]string
 	decoder   disassemble.Decoder
+	analysis  *machoAnalysis
 }
 
 func NewMachoDisass(f *macho.File, cfg *Config) *MachoDisass {
-	return &MachoDisass{f: f, cfg: cfg, a2s: make(map[uint64]string, 0), swiftstrs: make(map[uint64]string, 0)}
+	return &MachoDisass{f: f, cfg: cfg, a2s: make(map[uint64]string),
+		swiftstrs: make(map[uint64]string), analysis: &machoAnalysis{cache: newMachoCache(machoCacheKey{})}}
 }
 
 func (d MachoDisass) Demangle() bool {
@@ -190,10 +193,6 @@ func (d *MachoDisass) findSwiftStrings(batchSize int) (out map[uint64]string, er
 	var prevInstr disassemble.Inst
 	var hasPrev bool
 
-	d.tr = &Triage{
-		Addresses: make(map[uint64]uint64),
-		Locations: make(map[uint64][]uint64),
-	}
 	startAddr := d.StartAddr()
 	data := d.Data()
 
@@ -310,7 +309,7 @@ func (d *MachoDisass) findSwiftStrings(batchSize int) (out map[uint64]string, er
 func (d MachoDisass) IsFunctionStart(addr uint64) (bool, string) {
 	for _, fn := range d.f.GetFunctions() {
 		if addr == fn.StartAddr {
-			if symName, ok := d.a2s[addr]; ok {
+			if symName, ok := d.FindSymbol(addr); ok {
 				display := symbols.FormatSymbol(symName, d.Demangle())
 				return ok, display
 			}
@@ -367,7 +366,11 @@ func (d MachoDisass) FindSymbol(addr uint64) (string, bool) {
 	if symName, ok := d.a2s[addr]; ok {
 		return symName, true
 	}
-	return "", false
+	if symName, ok := d.analysis.seed[addr]; ok {
+		return symName, true
+	}
+	symName, ok := d.analysis.cache.symbols[addr]
+	return symName, ok
 }
 
 func (d MachoDisass) FindSwiftString(addr uint64) (string, bool) {
@@ -392,6 +395,53 @@ func (d MachoDisass) GetCString(addr uint64) (string, error) {
 }
 
 func (d MachoDisass) Analyze() error {
+	if !d.analysis.complete {
+		clear(d.a2s)
+		if err := d.analyzeImage(); err != nil {
+			return err
+		}
+		d.commitImageAnalysis()
+	}
+	return d.analyzeFunction()
+}
+
+// AnalyzeForced attempts image-wide analysis once, retaining partial symbols
+// for display while still analyzing each function. Partial maps are not saved.
+func (d MachoDisass) AnalyzeForced() error {
+	if !d.analysis.complete && !d.analysis.forcedAttempt {
+		d.analysis.forcedAttempt = true
+		clear(d.a2s)
+		d.analysis.forcedErr = d.analyzeImage()
+		if d.analysis.forcedErr == nil {
+			d.commitImageAnalysis()
+		}
+	}
+	return errors.Join(d.analysis.forcedErr, d.analyzeFunction())
+}
+
+func (d MachoDisass) commitImageAnalysis() {
+	cache := d.analysis.cache
+	maps.Copy(cache.symbols, d.analysis.seed)
+	maps.Copy(cache.symbols, d.a2s)
+	d.analysis.seed = nil
+	clear(d.a2s)
+	cache.metadata.Images[d.analysis.image] = true
+	cache.dirty = true
+	d.analysis.complete = true
+	d.analysis.forcedErr = nil
+}
+
+func (d MachoDisass) analyzeFunction() error {
+	clear(d.swiftstrs)
+	a2s, err := d.FindSwiftStrings()
+	if err != nil {
+		return fmt.Errorf("failed to find swift strings: %v", err)
+	}
+	maps.Copy(d.swiftstrs, a2s)
+	return nil
+}
+
+func (d *MachoDisass) analyzeImage() error {
 
 	if err := d.parseSymbols(); err != nil {
 		return fmt.Errorf("failed to parse symbols: %v", err)
@@ -427,12 +477,6 @@ func (d MachoDisass) Analyze() error {
 
 	if err := d.parseStubs(); err != nil {
 		return fmt.Errorf("failed to parse symbol stubs: %v", err)
-	}
-
-	if a2s, err := d.FindSwiftStrings(); err == nil {
-		maps.Copy(d.swiftstrs, a2s)
-	} else {
-		return fmt.Errorf("failed to find swift strings: %v", err)
 	}
 
 	return nil
@@ -578,9 +622,9 @@ func (d *MachoDisass) parseObjC() error {
 				return nil, err
 			}
 			for addr, sel := range addr2sel {
-				if d.a2s[sel] != "_objc_msgSend" {
+				if name, _ := d.FindSymbol(sel); name != "_objc_msgSend" {
 					stubs[addr] = &objc.Stub{
-						Name:        d.a2s[sel],
+						Name:        name,
 						SelectorRef: sel,
 					}
 				}
@@ -680,12 +724,12 @@ func (d *MachoDisass) parseGOT() error {
 		if slide, ok := d.sinfo[entry]; ok {
 			target = slide
 		}
-		if symName, ok := d.a2s[target]; ok {
+		if symName, ok := d.FindSymbol(target); ok {
 			d.a2s[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
 			continue
 		}
 		if laptr, ok := gots[target]; ok {
-			if symName, ok := d.a2s[laptr]; ok {
+			if symName, ok := d.FindSymbol(laptr); ok {
 				d.a2s[entry] = fmt.Sprintf("%s%s", symbols.PrefixGot, symName)
 				continue
 			}
@@ -715,7 +759,7 @@ func (d *MachoDisass) parseStubs() error {
 			target = slide
 		}
 		// Check if target is in GOT - if so, use the GOT entry's symbol
-		if gotSymName, ok := d.a2s[target]; ok {
+		if gotSymName, ok := d.FindSymbol(target); ok {
 			if !strings.HasPrefix(gotSymName, symbols.PrefixJump) {
 				d.a2s[stub] = symbols.PrefixJump + strings.TrimPrefix(strings.TrimPrefix(gotSymName, symbols.PrefixGot), symbols.PrefixStubHelper)
 			} else {
@@ -747,7 +791,7 @@ func (d *MachoDisass) parseHelpers() error {
 		if slide, ok := d.sinfo[start]; ok {
 			target = slide
 		}
-		if symName, ok := d.a2s[target]; ok {
+		if symName, ok := d.FindSymbol(target); ok {
 			d.a2s[start] = fmt.Sprintf("%s%s", symbols.PrefixStubHelper, symName)
 		} else {
 			d.a2s[start] = fmt.Sprintf("%s%x", symbols.PrefixStubHelper, target)
@@ -758,11 +802,26 @@ func (d *MachoDisass) parseHelpers() error {
 }
 
 func (d *MachoDisass) EmptySymMap() bool {
-	return len(d.a2s) == 0
+	return len(d.a2s) == 0 && len(d.analysis.seed) == 0 && len(d.analysis.cache.symbols) == 0
+}
+
+func (d *MachoDisass) seedSymbol(addr uint64, name string) {
+	if d.analysis.seed == nil {
+		d.analysis.seed = make(map[uint64]string)
+	}
+	d.analysis.seed[addr] = name
 }
 
 func (d *MachoDisass) SetStartSym(addr uint64) {
-	d.a2s[addr] = "start"
+	if name, _ := d.FindSymbol(addr); name != "start" {
+		if d.analysis.complete {
+			d.analysis.cache.symbols[addr] = "start"
+			d.analysis.cache.dirty = true
+		} else {
+			delete(d.a2s, addr)
+			d.seedSymbol(addr, "start")
+		}
+	}
 }
 
 func (d *MachoDisass) loadDwarf(machoPath string) error {
@@ -783,13 +842,13 @@ func (d *MachoDisass) loadDwarf(machoPath string) error {
 							name = demangle.Do(name, false, false)
 						}
 					}
-					d.a2s[sym.Value] = name
+					d.seedSymbol(sym.Value, name)
 					foundDSYMSymbols = true
 				}
 			}
 			dm.Close()
 			if foundDSYMSymbols {
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Loaded %d symbols from .dSYM file", len(d.a2s)))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Loaded %d symbols from .dSYM file", len(d.analysis.seed)))
 			} else {
 				utils.Indent(log.Warn, 2)("No symbols found in dSYM file")
 			}
@@ -799,12 +858,9 @@ func (d *MachoDisass) loadDwarf(machoPath string) error {
 }
 
 func (d *MachoDisass) getTempCachePath(cacheFile *string) string {
-	var tmpfile string
+	tmpfile := filepath.Base(*cacheFile)
 	if d.f != nil {
-		uuid := d.f.UUID()
-		if uuid.UUID.IsNull() {
-			tmpfile = filepath.Base(*cacheFile)
-		} else {
+		if uuid := d.f.UUID(); uuid != nil && !uuid.UUID.IsNull() {
 			tmpfile = uuid.String() + ".a2s"
 		}
 	}
@@ -813,20 +869,107 @@ func (d *MachoDisass) getTempCachePath(cacheFile *string) string {
 
 var ErrCorruptCache = errors.New("corrupt cache file")
 
-var (
-	cachedSymbols     map[uint64]string // In-memory cache of loaded symbols
-	cachedSymbolsFile string            // Track which file was loaded
-	cacheLoadedOnce   bool              // Track if we've printed the cache load message
+var errStaleMachoCache = errors.New("stale MachO symbol cache")
+
+// A fixed footer locates metadata before decoding the potentially large map.
+// The first gob value remains readable by legacy address-to-symbol consumers.
+const (
+	machoCacheVersion     = 3
+	machoCacheMagic       = "IPSWa2s2"
+	machoCacheFooterSize  = 4 + len(machoCacheMagic)
+	maxMachoCacheMetadata = 1 << 20
 )
 
+type machoCacheKey struct {
+	SourceSHA256      [32]byte
+	CPU, SubCPU       uint32
+	Demangle          bool
+	SwiftAutoDemangle bool
+}
+
+type machoCacheImage struct {
+	UUID        string
+	BaseAddress uint64
+	FileType    uint32
+}
+
+type machoCacheMetadata struct {
+	Version int
+	Key     machoCacheKey
+	Images  map[machoCacheImage]bool
+}
+
+type machoAnalysis struct {
+	source        *MachoSymbolSource
+	cache         *machoCacheMemo
+	seed          map[uint64]string
+	image         machoCacheImage
+	complete      bool
+	forcedAttempt bool
+	forcedErr     error
+}
+
+type machoCacheMemo struct {
+	metadata machoCacheMetadata
+	symbols  map[uint64]string
+	path     string
+	dirty    bool
+}
+
+func newMachoCache(key machoCacheKey) *machoCacheMemo {
+	return &machoCacheMemo{metadata: machoCacheMetadata{
+		Version: machoCacheVersion, Key: key, Images: make(map[machoCacheImage]bool),
+	}, symbols: make(map[uint64]string)}
+}
+
+// MachoSymbolSource binds symbol caches to one input's content. Reuse it when
+// analyzing multiple images in the same universal binary or fileset.
+type MachoSymbolSource struct {
+	path   string
+	digest [32]byte
+	cache  *machoCacheMemo
+}
+
+// NewMachoSymbolSource hashes the input used by an image's symbol cache.
+func NewMachoSymbolSource(machoPath string) (*MachoSymbolSource, error) {
+	f, err := os.Open(machoPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open symbol-cache source: %w", err)
+	}
+	defer f.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, f); err != nil {
+		return nil, fmt.Errorf("failed to hash symbol-cache source: %w", err)
+	}
+	source := &MachoSymbolSource{path: machoPath}
+	copy(source.digest[:], hash.Sum(nil))
+	return source, nil
+}
+
+// NewMachoSymbolSourceFromDigest uses a digest already computed from the input
+// bytes, for example while decompressing an IPA's main executable.
+func NewMachoSymbolSourceFromDigest(path string, digest [32]byte) *MachoSymbolSource {
+	return &MachoSymbolSource{path: path, digest: digest}
+}
+
+func (d *MachoDisass) initCacheIdentity(source *MachoSymbolSource) {
+	key := machoCacheKey{SourceSHA256: source.digest, CPU: uint32(d.f.CPU), SubCPU: uint32(d.f.SubCPU),
+		Demangle: d.cfg.Demangle, SwiftAutoDemangle: d.f.SwiftAutoDemangle()}
+	image := machoCacheImage{BaseAddress: d.f.GetBaseAddress(), FileType: uint32(d.f.Type)}
+	if uuid := d.f.UUID(); uuid != nil {
+		image.UUID = uuid.String()
+	}
+	*d.analysis = machoAnalysis{source: source, cache: newMachoCache(key), image: image}
+	clear(d.a2s)
+}
+
 func (d *MachoDisass) loadCache(cacheFile *string) error {
-	// If we've already loaded this exact file, copy from memory cache
-	if cachedSymbols != nil && cachedSymbolsFile == *cacheFile {
-		maps.Copy(d.a2s, cachedSymbols)
+	key := d.analysis.cache.metadata.Key
+	if memo := d.analysis.source.cache; memo != nil && memo.path == *cacheFile && memo.metadata.Key == key {
+		d.analysis.cache = memo
+		d.analysis.complete = memo.metadata.Images[d.analysis.image]
 		return nil
 	}
-
-	// Load from disk
 	f, err := os.Open(*cacheFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -836,94 +979,171 @@ func (d *MachoDisass) loadCache(cacheFile *string) error {
 	}
 	defer f.Close()
 
-	a2s := make(map[uint64]string)
-	if gobErr := gob.NewDecoder(f).Decode(&a2s); gobErr != nil {
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Size() < int64(machoCacheFooterSize) {
+		return errStaleMachoCache
+	}
+	var footer [machoCacheFooterSize]byte
+	if _, err := f.ReadAt(footer[:], info.Size()-int64(machoCacheFooterSize)); err != nil {
 		return ErrCorruptCache
 	}
-
-	// Copy to instance
-	maps.Copy(d.a2s, a2s)
-
-	// Cache in memory for future instances
-	cachedSymbols = a2s
-	cachedSymbolsFile = *cacheFile
-
-	// Only print the load message once per program execution
-	if !cacheLoadedOnce {
-		log.Infof("Loaded %d symbols from cache file: %s", len(a2s), *cacheFile)
-		cacheLoadedOnce = true
+	if string(footer[4:]) != machoCacheMagic {
+		return errStaleMachoCache
 	}
-
+	metadataSize := int64(binary.LittleEndian.Uint32(footer[:4]))
+	if metadataSize == 0 || metadataSize > maxMachoCacheMetadata || metadataSize > info.Size()-int64(machoCacheFooterSize) {
+		return ErrCorruptCache
+	}
+	mapSize := info.Size() - int64(machoCacheFooterSize) - metadataSize
+	var metadata machoCacheMetadata
+	if err := gob.NewDecoder(io.NewSectionReader(f, mapSize, metadataSize)).Decode(&metadata); err != nil {
+		return ErrCorruptCache
+	}
+	if metadata.Version != machoCacheVersion || metadata.Key != key {
+		return errStaleMachoCache
+	}
+	var symbols map[uint64]string
+	if err := gob.NewDecoder(io.NewSectionReader(f, 0, mapSize)).Decode(&symbols); err != nil {
+		return ErrCorruptCache
+	}
+	if symbols == nil {
+		symbols = make(map[uint64]string)
+	}
+	if metadata.Images == nil {
+		metadata.Images = make(map[machoCacheImage]bool)
+	}
+	memo := &machoCacheMemo{metadata: metadata, symbols: symbols, path: *cacheFile}
+	d.analysis.source.cache = memo
+	d.analysis.cache = memo
+	d.analysis.complete = metadata.Images[d.analysis.image]
+	log.Infof("Loaded %d symbols from cache file: %s", len(symbols), *cacheFile)
 	return nil
 }
 
 func (d *MachoDisass) OpenOrCreateSymMap(cacheFile *string, machoPath string) error {
+	source, err := NewMachoSymbolSource(machoPath)
+	if err != nil {
+		return err
+	}
+	return d.OpenOrCreateSymMapFromSource(cacheFile, source)
+}
+
+// OpenOrCreateSymMapFromSource reuses an already hashed source across images.
+func (d *MachoDisass) OpenOrCreateSymMapFromSource(cacheFile *string, source *MachoSymbolSource) error {
+	if source == nil {
+		return fmt.Errorf("missing MachO symbol-cache source")
+	}
+	d.initCacheIdentity(source)
 	if err := d.loadCache(cacheFile); err == nil {
-		return nil // cache file loaded successfully
+		if d.analysis.complete {
+			return nil
+		}
 	} else if errors.Is(err, os.ErrNotExist) {
 		tmpcache := d.getTempCachePath(cacheFile)
 		if err := d.loadCache(&tmpcache); err == nil {
 			*cacheFile = tmpcache
-			return nil // temp cache file loaded successfully
-		} else if errors.Is(err, os.ErrNotExist) {
+			if d.analysis.complete {
+				return nil
+			}
+		} else if errors.Is(err, os.ErrNotExist) || errors.Is(err, errStaleMachoCache) {
 			// cache AND temp cache files do not exist (create new one)
 		} else if errors.Is(err, ErrCorruptCache) {
-			log.Warn("temp cache file is corrupt, recreating it")
-			if err := os.Remove(tmpcache); err != nil {
-				return fmt.Errorf("failed to remove temp cache file: %v", err)
-			}
+			log.Warn("ignoring corrupt temp cache file")
 		} else {
 			return fmt.Errorf("failed to load temp cache file: %v", err)
 		}
 	} else if errors.Is(err, ErrCorruptCache) {
 		log.Warn("cache file is corrupt, recreating it")
-		if err := os.Remove(*cacheFile); err != nil {
-			return fmt.Errorf("failed to remove cache file: %v", err)
-		}
+	} else if errors.Is(err, errStaleMachoCache) {
+		log.Debug("symbol cache is stale, recreating it")
 	} else {
 		return fmt.Errorf("failed to load cache file: %v", err)
 	}
 	// load the .dSYM file if it exists
-	if err := d.loadDwarf(machoPath); err != nil {
+	if err := d.loadDwarf(source.path); err != nil {
 		return fmt.Errorf("failed to load dSYM file: %v", err)
 	}
-	if _, err := os.Create(*cacheFile); err != nil {
+	if err := probeMachoCachePath(*cacheFile); err != nil {
 		if errors.Is(err, os.ErrPermission) {
-			var e *os.PathError
-			if errors.As(err, &e) {
+			if e, ok := errors.AsType[*os.PathError](err); ok {
 				log.Errorf("failed to create symbol cache file %s (most likely a read-only location): %v", filepath.Base(e.Path), e.Err)
 			}
 			tmpcache := d.getTempCachePath(cacheFile)
-			if _, err := os.Create(tmpcache); err != nil {
+			if err := probeMachoCachePath(tmpcache); err != nil {
 				return fmt.Errorf("failed to create temp cache file: %v", err)
 			}
 			utils.Indent(log.Warn, 2)("creating in the temp folder")
 			utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future supply the flag: --cache %s ", tmpcache))
 			*cacheFile = tmpcache
-			return nil // Successfully created temp cache file
+			d.analysis.cache.path = *cacheFile
+			source.cache = d.analysis.cache
+			return nil
 		}
 		return fmt.Errorf("failed to create cache file: %v", err)
 	}
 
+	d.analysis.cache.path = *cacheFile
+	source.cache = d.analysis.cache
 	return nil
 }
 
+func probeMachoCachePath(path string) error {
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	return errors.Join(f.Close(), os.Remove(f.Name()))
+}
+
 func (d *MachoDisass) SaveAddrToSymMap(dest string) (err error) {
-	f, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if !d.analysis.complete {
+		return fmt.Errorf("cannot save an incomplete MachO symbol analysis")
+	}
+	cache := d.analysis.cache
+	if !cache.dirty && cache.path == dest {
+		return nil
+	}
+	f, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".tmp-*")
 	if err != nil {
 		return fmt.Errorf("failed to open symbol cache file %s: %v", dest, err)
 	}
-	defer f.Close()
-
-	buff := new(bytes.Buffer)
-
-	// Encoding the map
-	if err := gob.NewEncoder(buff).Encode(d.a2s); err != nil {
+	defer func() {
+		_ = f.Close()
+		if err != nil {
+			err = errors.Join(err, os.Remove(f.Name()))
+		}
+	}()
+	encoder := gob.NewEncoder(f)
+	if err := encoder.Encode(cache.symbols); err != nil {
 		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
-	if _, err := buff.WriteTo(f); err != nil {
-		return fmt.Errorf("failed to write addr2sym map to file: %v", err)
+	var metadata bytes.Buffer
+	if err := gob.NewEncoder(&metadata).Encode(cache.metadata); err != nil {
+		return fmt.Errorf("failed to encode symbol-cache metadata: %w", err)
 	}
-
+	metadataSize := metadata.Len()
+	if metadataSize > maxMachoCacheMetadata {
+		return fmt.Errorf("symbol-cache metadata exceeds %d bytes", maxMachoCacheMetadata)
+	}
+	if _, err := metadata.WriteTo(f); err != nil {
+		return err
+	}
+	var footer [machoCacheFooterSize]byte
+	binary.LittleEndian.PutUint32(footer[:4], uint32(metadataSize))
+	copy(footer[4:], machoCacheMagic)
+	if _, err := f.Write(footer[:]); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(f.Name(), dest); err != nil {
+		return fmt.Errorf("failed to replace symbol cache: %w", err)
+	}
+	cache.dirty = false
+	cache.path = dest
 	return nil
 }

@@ -34,8 +34,6 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/ai"
 	dcmd "github.com/blacktop/ipsw/internal/commands/disass"
-	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
-	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/caarlos0/ctrlc"
@@ -115,8 +113,11 @@ func init() {
 
 // machoDisassCmd represents the dis command
 var machoDisassCmd = &cobra.Command{
-	Use:           "disass <MACHO>",
-	Short:         "Disassemble ARM64 MachO at symbol/vaddr",
+	Use:   "disass <MACHO|IPA>",
+	Short: "Disassemble ARM64 MachO at symbol/vaddr",
+	Long: "Disassemble an ARM64 MachO file or the main executable in an IPA archive.\n\n" +
+		"Image-wide symbols are cached in <input>.a2s. Use --cache to choose another path,\n" +
+		"or --quiet to skip symbol analysis.",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -125,7 +126,6 @@ var machoDisassCmd = &cobra.Command{
 		var m *macho.File
 		var ms []*macho.File
 		var middleAddr uint64
-		var engine *disass.MachoDisass
 
 		// flags
 		selectedArch := viper.GetString("macho.disass.arch")
@@ -170,11 +170,7 @@ var machoDisassCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
-		if ok, err := magic.IsMachO(machoPath); !ok {
-			return fmt.Errorf("failed to detect file type: %v", err)
-		}
-
-		mr, err := mcmd.OpenMachO(machoPath, selectedArch)
+		mr, err := openMachOInput(machoPath, selectedArch)
 		if err != nil {
 			return err
 		}
@@ -234,6 +230,13 @@ var machoDisassCmd = &cobra.Command{
 			}
 		}
 
+		var cacheSource *disass.MachoSymbolSource
+		if !quiet {
+			cacheSource, err = mr.SymbolSource(machoPath)
+			if err != nil {
+				return err
+			}
+		}
 		if err := ctrlc.Default.Run(context.Background(), func() error {
 			for _, m := range ms {
 				if decompile {
@@ -252,10 +255,44 @@ var machoDisassCmd = &cobra.Command{
 					}
 				}
 
+				config := disass.Config{
+					AsJSON: asJSON, Demangle: demangleFlag, Quiet: quiet,
+					Color: utils.ColorEnabled() && !decompile,
+				}
+				engine := disass.NewMachoDisass(m, &config)
 				if !quiet {
 					if len(cacheFile) == 0 {
 						cacheFile = machoPath + ".a2s"
 					}
+					if err := engine.OpenOrCreateSymMapFromSource(&cacheFile, cacheSource); err != nil {
+						return fmt.Errorf("failed to open or create symbol map: %v", err)
+					}
+				}
+				analyze := func() error {
+					if quiet {
+						return nil
+					}
+					if err := engine.Triage(); err != nil {
+						return fmt.Errorf("first pass triage failed: %v", err)
+					}
+					var analysisErr error
+					if viper.GetBool("macho.disass.force") {
+						analysisErr = engine.AnalyzeForced()
+					} else {
+						analysisErr = engine.Analyze()
+					}
+					if analysisErr != nil && !viper.GetBool("macho.disass.force") {
+						return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", analysisErr)
+					}
+					if entryStart {
+						engine.SetStartSym(config.StartAddress)
+					}
+					if analysisErr == nil {
+						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+							log.Errorf("failed to save symbol map: %v", err)
+						}
+					}
+					return nil
 				}
 
 				if allFuncs && len(segmentSection) == 0 {
@@ -266,36 +303,9 @@ var machoDisassCmd = &cobra.Command{
 							continue
 						}
 
-						engine = disass.NewMachoDisass(m, &disass.Config{
-							Data:         data,
-							StartAddress: fn.StartAddr,
-							Middle:       0,
-							AsJSON:       asJSON,
-							Demangle:     demangleFlag,
-							Quiet:        quiet,
-							Color:        utils.ColorEnabled() && !decompile,
-						})
-
-						//***********************
-						//* First pass ANALYSIS *
-						//***********************
-						if !quiet {
-							if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath); err != nil {
-								return fmt.Errorf("failed to open or create symbol map: %v", err)
-							}
-							if err := engine.Triage(); err != nil {
-								return fmt.Errorf("first pass triage failed: %v", err)
-							}
-							if engine.EmptySymMap() {
-								if err := engine.Analyze(); err != nil {
-									if !viper.GetBool("macho.disass.force") {
-										return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
-									}
-								}
-							}
-							if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
-								log.Errorf("failed to save symbol map: %v", err)
-							}
+						config.Data, config.StartAddress, config.Middle = data, fn.StartAddr, 0
+						if err := analyze(); err != nil {
+							return err
 						}
 						//***************
 						//* DISASSEMBLE *
@@ -378,39 +388,9 @@ var machoDisassCmd = &cobra.Command{
 						log.Fatal("failed to disassemble")
 					}
 
-					engine = disass.NewMachoDisass(m, &disass.Config{
-						Data:         data,
-						StartAddress: startAddr,
-						Middle:       middleAddr,
-						AsJSON:       asJSON,
-						Demangle:     demangleFlag,
-						Quiet:        quiet,
-						Color:        utils.ColorEnabled() && !decompile,
-					})
-
-					//***********************
-					//* First pass ANALYSIS *
-					//***********************
-					if !quiet {
-						if err := engine.OpenOrCreateSymMap(&cacheFile, machoPath); err != nil {
-							return fmt.Errorf("failed to open or create symbol map: %v", err)
-						}
-						if err := engine.Triage(); err != nil {
-							return fmt.Errorf("first pass triage failed: %v", err)
-						}
-						// if engine.EmptySymMap() { FIXME: this is fast enough where we don't need to do this optimization
-						if err := engine.Analyze(); err != nil {
-							if !viper.GetBool("macho.disass.force") {
-								return fmt.Errorf("MachO analysis failed: %v (use --force to continue anyway)", err)
-							}
-						}
-						// }
-						if entryStart {
-							engine.SetStartSym(startAddr)
-						}
-						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
-							log.Errorf("failed to save symbol map: %v", err)
-						}
+					config.Data, config.StartAddress, config.Middle = data, startAddr, middleAddr
+					if err := analyze(); err != nil {
+						return err
 					}
 					//***************
 					//* DISASSEMBLE *
@@ -430,11 +410,6 @@ var machoDisassCmd = &cobra.Command{
 			return nil
 		}); err != nil {
 			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
-				if !quiet {
-					if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
-						log.Errorf("failed to save symbol map: %v", err)
-					}
-				}
 				log.Warn("exiting...")
 			} else {
 				return err

@@ -14,21 +14,36 @@ import (
 
 // MachO holds the result of opening a MachO file, handling both fat and regular files
 type MachO struct {
-	File    *macho.File    // The selected MachO file
-	FatFile *macho.FatFile // The fat file (nil if not a fat file)
-	FatArch *macho.FatArch // The selected architecture from fat file (nil if not a fat file)
+	File          *macho.File    // The selected MachO file
+	FatFile       *macho.FatFile // The fat file (nil if not a fat file)
+	FatArch       *macho.FatArch // The selected architecture from fat file (nil if not a fat file)
+	temporaryPath string
+	sourceDigest  [32]byte
+}
+
+// SymbolSource hashes the raw input once, or reuses the IPA executable digest
+// computed during extraction. The logical input path still controls sidecars.
+func (mr *MachO) SymbolSource(inputPath string) (*disass.MachoSymbolSource, error) {
+	if mr.temporaryPath != "" {
+		return disass.NewMachoSymbolSourceFromDigest(inputPath, mr.sourceDigest), nil
+	}
+	return disass.NewMachoSymbolSource(inputPath)
 }
 
 // Close closes the underlying file(s). For fat files, only the fat file needs to be closed.
 // For regular files, the individual file is closed.
 func (mr *MachO) Close() error {
+	var err error
 	if mr.FatFile != nil {
-		return mr.FatFile.Close()
+		err = mr.FatFile.Close()
+	} else if mr.File != nil {
+		err = mr.File.Close()
 	}
-	if mr.File != nil {
-		return mr.File.Close()
+	if mr.temporaryPath != "" {
+		err = errors.Join(err, os.Remove(mr.temporaryPath))
+		mr.temporaryPath = ""
 	}
-	return nil
+	return err
 }
 
 // OpenMachO opens a MachO file and returns a MachOResult that handles cleanup properly.

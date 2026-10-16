@@ -10,8 +10,15 @@ description: Disassemble ARM64 MachO at symbol/vaddr
 
 Disassemble ARM64 MachO at symbol/vaddr
 
+### Synopsis
+
+Disassemble an ARM64 MachO file or the main executable in an IPA archive.
+
+Image-wide symbols are cached in <input>.a2s. Use --cache to choose another path,
+or --quiet to skip symbol analysis.
+
 ```
-ipsw macho disass <MACHO> [flags]
+ipsw macho disass <MACHO|IPA> [flags]
 ```
 
 ### Options
