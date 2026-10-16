@@ -116,7 +116,7 @@ var machoDisassCmd = &cobra.Command{
 	Use:   "disass <MACHO|IPA>",
 	Short: "Disassemble ARM64 MachO at symbol/vaddr",
 	Long: "Disassemble an ARM64 MachO file or the main executable in an IPA archive.\n\n" +
-		"Image-wide symbols are cached in <input>.a2s. Use --cache to choose another path,\n" +
+		"Image-wide symbols are cached in `<input>.a2s`. Use --cache to choose another path,\n" +
 		"or --quiet to skip symbol analysis.",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
