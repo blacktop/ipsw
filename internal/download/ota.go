@@ -277,7 +277,8 @@ func (o *Ota) QueryPublicXML() []types.Asset {
 		if o.Config.Beta && asset.ReleaseType != "Beta" {
 			continue
 		}
-		if o.Config.Version.Original() != "0" {
+		// in delta mode --version is the source (prerequisite) version, not the target
+		if o.Config.Version.Original() != "0" && !o.Config.Delta {
 			if ver, err := semver.NewVersion(strings.TrimPrefix(asset.OSVersion, "9.9.")); err == nil {
 				if !o.Config.Version.Equal(ver) {
 					continue
@@ -844,7 +845,8 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 	}
 
 	// Apply version filtering for all platforms when version is specified
-	if o.Config.Version != nil && o.Config.Version.Original() != "0" {
+	// (skipped for delta, where --version is the source version sent to Pallas)
+	if o.Config.Version != nil && o.Config.Version.Original() != "0" && !o.Config.Delta {
 		var versionFiltered []types.Asset
 		for _, ota := range otas {
 			if o.matchesRequestedOTAVersion(ota) {
