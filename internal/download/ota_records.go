@@ -318,7 +318,7 @@ func cloneOTAAsset(asset types.Asset) types.Asset {
 }
 
 func (o *Ota) matchesOTARecordFilters(asset types.Asset) bool {
-	if o.Config.Version != nil && o.Config.Version.Original() != "0" {
+	if o.Config.Version != nil && o.Config.Version.Original() != "0" && !o.Config.Delta {
 		if !o.matchesRequestedOTAVersion(asset) {
 			return false
 		}

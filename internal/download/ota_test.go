@@ -48,7 +48,32 @@ func TestQueryPublicXMLRecordsMESUEvidenceBeforeDedup(t *testing.T) {
 	}
 }
 
+func TestQueryPublicXMLDeltaSourceVersion(t *testing.T) {
+	sourceVersion, err := version.NewVersion("98.1")
+	if err != nil {
+		t.Fatalf("parse source version: %v", err)
+	}
+	wanted := testOTAAsset("99A100", "delta.aea", []string{"ResearchPhone1,1"}, nil)
+	wanted.OSVersion = "9.9.99.0"
+	wanted.PrerequisiteBuild = "98A100"
+	wrongSource := wanted
+	wrongSource.RelativePath = "wrong-source.aea"
+	wrongSource.PrerequisiteBuild = "98A099"
+	o := &Ota{
+		Assets: []types.Asset{wrongSource, wanted},
+		Config: OtaConf{Platform: "ios", Version: sourceVersion, Build: wanted.PrerequisiteBuild, Delta: true},
+	}
+	got := o.QueryPublicXML()
+	if len(got) != 1 || OTAURL(got[0]) != OTAURL(wanted) {
+		t.Fatalf("selected assets = %+v, want target %s from source %s", got, wanted.Build, wanted.PrerequisiteBuild)
+	}
+}
+
 func TestSelectRequestedOTAsFiltersBeforeURLDedup(t *testing.T) {
+	version26, err := version.NewVersion("26.6.1")
+	if err != nil {
+		t.Fatalf("parse source version: %v", err)
+	}
 	version27, err := version.NewVersion("27.0")
 	if err != nil {
 		t.Fatalf("parse test version: %v", err)
@@ -69,7 +94,7 @@ func TestSelectRequestedOTAsFiltersBeforeURLDedup(t *testing.T) {
 		{name: "version", config: OtaConf{Platform: "ios", Version: version27, Build: "0"}, first: release, match: requested},
 		{
 			name:   "delta prerequisite",
-			config: OtaConf{Platform: "ios", Build: requested.PrerequisiteBuild, Delta: true},
+			config: OtaConf{Platform: "ios", Version: version26, Build: requested.PrerequisiteBuild, Delta: true},
 			first:  func() types.Asset { asset := release; asset.PrerequisiteBuild = "23G80"; return asset }(),
 			match:  requested,
 		},

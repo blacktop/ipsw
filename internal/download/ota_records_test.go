@@ -145,6 +145,45 @@ func TestOTARecordsCanonicalizeAssetFromRankedSightings(t *testing.T) {
 	}
 }
 
+func TestOTARecordsCanonicalizeDeltaWithSourceVersion(t *testing.T) {
+	sourceVersion, err := semver.NewVersion("98.1")
+	if err != nil {
+		t.Fatalf("parse source version: %v", err)
+	}
+	release := testOTAAsset("99A100", "delta.aea", []string{"ResearchPhone1,1"}, nil)
+	release.OSVersion = "9.9.99.0"
+	release.PrerequisiteBuild = "98A100"
+	alternate := release
+	alternate.Build = "99A101"
+	for _, ordering := range []struct {
+		name   string
+		assets []types.Asset
+	}{
+		{name: "release first", assets: []types.Asset{release, alternate}},
+		{name: "alternate first", assets: []types.Asset{alternate, release}},
+	} {
+		t.Run(ordering.name, func(t *testing.T) {
+			o := &Ota{Config: OtaConf{
+				Platform: "ios", Version: sourceVersion, Build: release.PrerequisiteBuild, Delta: true,
+			}}
+			for _, asset := range ordering.assets {
+				audience := testIOSReleaseAudience
+				if asset.Build == alternate.Build {
+					audience = testIOSAlternateAudience
+				}
+				o.noteSighting(asset, OTASighting{Source: OTASourcePallas, AudienceID: audience})
+			}
+			records, err := o.Records(o.selectRequestedOTAs(ordering.assets))
+			if err != nil {
+				t.Fatalf("Records() failed: %v", err)
+			}
+			if len(records) != 1 || records[0].Asset.Build != release.Build {
+				t.Fatalf("records = %+v, want preferred release build %s", records, release.Build)
+			}
+		})
+	}
+}
+
 func TestOTARecordsCanonicalAssetHonorsRequestedFilters(t *testing.T) {
 	release := testOTAAsset("23G83", "full.aea", nil, nil)
 	requested := testOTAAsset("24A1", "full.aea", nil, nil)
