@@ -475,7 +475,7 @@ func (f *File) getPrebuiltLoaderSetPool(uuid types.UUID) string {
 
 func (f *File) getObjcOpts(uuid types.UUID) string {
 	var output string
-	if f.IsDyld4 && f.Headers[uuid].ObjcOptsOffset > 0 {
+	if f.IsDyld4 && f.Headers[uuid].HasObjcOptsFields() && f.Headers[uuid].ObjcOptsOffset > 0 {
 		output = fmt.Sprintf("ObjC Opts:                    %3dB, offset:  0x%09X -> 0x%09X\n",
 			f.Headers[uuid].ObjcOptsSize,
 			f.Headers[uuid].ObjcOptsOffset,
@@ -497,7 +497,7 @@ func (f *File) getSwiftOpts(uuid types.UUID) string {
 
 func (f *File) getDynamicConfig(uuid types.UUID) string {
 	var output string
-	if f.IsDyld4 && f.Headers[uuid].SwiftOptsOffset > 0 {
+	if f.IsDyld4 && f.Headers[uuid].HasDynamicDataFields() && f.Headers[uuid].DynamicDataOffset > 0 {
 		output = fmt.Sprintf("Dynamic Config:              %3dkB, address: 0x%09X -> 0x%09X\n",
 			f.Headers[uuid].DynamicDataMaxSize/(1024),
 			f.Headers[uuid].SharedRegionStart+f.Headers[uuid].DynamicDataOffset,
@@ -530,13 +530,13 @@ func (f *File) getCodeSignature(uuid types.UUID) string {
 
 func (f *File) getRosetta(uuid types.UUID) string {
 	var output string
-	if f.Headers[uuid].RosettaReadOnlySize > 0 {
+	if f.Headers[uuid].HasRosettaFields() && f.Headers[uuid].RosettaReadOnlySize > 0 {
 		output += fmt.Sprintf("Rosetta RO:    %s, address: 0x%09X -> 0x%09X\n",
 			humanize.Bytes(f.Headers[uuid].RosettaReadOnlySize),
 			f.Headers[uuid].RosettaReadOnlyAddr,
 			f.Headers[uuid].RosettaReadOnlyAddr+f.Headers[uuid].RosettaReadOnlySize)
 	}
-	if f.Headers[uuid].RosettaReadWriteSize > 0 {
+	if f.Headers[uuid].HasRosettaFields() && f.Headers[uuid].RosettaReadWriteSize > 0 {
 		output += fmt.Sprintf("Rosetta RW:    %s, address: 0x%09X -> 0x%09X\n",
 			humanize.Bytes(f.Headers[uuid].RosettaReadWriteSize),
 			f.Headers[uuid].RosettaReadWriteAddr,
