@@ -355,20 +355,11 @@ func (f *File) getLocalSymbols() string {
 
 func (f *File) getImagesTextInfo(uuid types.UUID) string {
 	var output string
-	imagesCount := f.Headers[uuid].ImagesCountOld
-	imageHumanSize := int(f.Headers[uuid].ImagesCountOld) * binary.Size(CacheImageInfo{}) / 1024
-	imagesOffset := int(f.Headers[uuid].ImagesOffsetOld)
-	imagesSize := int(imagesCount) * binary.Size(CacheImageInfo{})
+	imagesTextOffset := f.Headers[uuid].ImagesTextOffset
+	imagesTextSize := f.Headers[uuid].ImagesTextCount * uint64(binary.Size(CacheImageTextInfo{}))
 
-	if f.Headers[uuid].ImagesOffsetOld == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-		imagesCount = f.Headers[uuid].ImagesCount
-		imageHumanSize = int(f.Headers[uuid].ImagesCount) * binary.Size(CacheImageInfo{}) / 1024
-		imagesOffset = int(f.Headers[uuid].ImagesOffset)
-		imagesSize = int(f.Headers[uuid].ImagesCount) * binary.Size(CacheImageInfo{})
-	}
-
-	if imagesCount > 0 || imagesOffset > 0 || imagesSize > 0 {
-		output = fmt.Sprintf("ImagesText Info:             %3dKB, offset:  0x%09X -> 0x%09X\n", imageHumanSize, imagesOffset, imagesOffset+imagesSize)
+	if imagesTextOffset > 0 || imagesTextSize > 0 {
+		output = fmt.Sprintf("ImagesText Info:             %3dKB, offset:  0x%09X -> 0x%09X\n", imagesTextSize/1024, imagesTextOffset, imagesTextOffset+imagesTextSize)
 	}
 
 	return output
