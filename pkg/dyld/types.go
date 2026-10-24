@@ -216,6 +216,24 @@ type CacheHeader struct {
 	CacheCPUReserved uint64           // reserved; observed zero (Apple's field name unknown)
 }
 
+// HasRosettaFields returns true if the cache header is new enough to contain the
+// Rosetta read-only/read-write region fields (i.e. MappingOffset is past them).
+func (dch CacheHeader) HasRosettaFields() bool {
+	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.RosettaReadWriteSize)+unsafe.Sizeof(dch.RosettaReadWriteSize))
+}
+
+// HasObjcOptsFields returns true if the cache header is new enough to contain the
+// objcOpts offset/size fields (i.e. MappingOffset is past them).
+func (dch CacheHeader) HasObjcOptsFields() bool {
+	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.ObjcOptsSize)+unsafe.Sizeof(dch.ObjcOptsSize))
+}
+
+// HasDynamicDataFields returns true if the cache header is new enough to contain the
+// dynamic data offset/max size fields (i.e. MappingOffset is past them).
+func (dch CacheHeader) HasDynamicDataFields() bool {
+	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.DynamicDataMaxSize)+unsafe.Sizeof(dch.DynamicDataMaxSize))
+}
+
 // HasCacheCPUFields returns true if the cache header is new enough to contain the
 // cache CPU type/subtype fields (i.e. MappingOffset covers the header extension).
 func (dch CacheHeader) HasCacheCPUFields() bool {

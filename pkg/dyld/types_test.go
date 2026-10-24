@@ -104,3 +104,41 @@ func TestCacheHeaderHasCacheCPUFields(t *testing.T) {
 		})
 	}
 }
+
+func TestCacheHeaderHasAppendedFields(t *testing.T) {
+	rosettaEnd := uint32(unsafe.Offsetof(CacheHeader{}.RosettaReadWriteSize) + unsafe.Sizeof(CacheHeader{}.RosettaReadWriteSize))
+	objcOptsEnd := uint32(unsafe.Offsetof(CacheHeader{}.ObjcOptsSize) + unsafe.Sizeof(CacheHeader{}.ObjcOptsSize))
+	dynamicDataEnd := uint32(unsafe.Offsetof(CacheHeader{}.DynamicDataMaxSize) + unsafe.Sizeof(CacheHeader{}.DynamicDataMaxSize))
+
+	tests := []struct {
+		name          string
+		mappingOffset uint32
+		wantRosetta   bool
+		wantObjcOpts  bool
+		wantDynamic   bool
+	}{
+		{"macOS 11 header (0x140)", 0x140, false, false, false},
+		{"one byte short of the rosetta fields end", rosettaEnd - 1, false, false, false},
+		{"header includes rosetta fields", rosettaEnd, true, false, false},
+		{"macOS 12 header (0x1c8)", 0x1c8, true, false, false},
+		{"header includes objcOpts fields", objcOptsEnd, true, true, false},
+		{"one byte short of the dynamic data fields end", dynamicDataEnd - 1, true, true, false},
+		{"macOS 13 header (0x200)", 0x200, true, true, true},
+		{"full header", uint32(binary.Size(CacheHeader{})), true, true, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hdr := CacheHeader{MappingOffset: tt.mappingOffset}
+			if got := hdr.HasRosettaFields(); got != tt.wantRosetta {
+				t.Errorf("HasRosettaFields() = %t, want %t (MappingOffset = %#x)", got, tt.wantRosetta, tt.mappingOffset)
+			}
+			if got := hdr.HasObjcOptsFields(); got != tt.wantObjcOpts {
+				t.Errorf("HasObjcOptsFields() = %t, want %t (MappingOffset = %#x)", got, tt.wantObjcOpts, tt.mappingOffset)
+			}
+			if got := hdr.HasDynamicDataFields(); got != tt.wantDynamic {
+				t.Errorf("HasDynamicDataFields() = %t, want %t (MappingOffset = %#x)", got, tt.wantDynamic, tt.mappingOffset)
+			}
+		})
+	}
+}
