@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -71,18 +70,31 @@ var pbzxCmd = &cobra.Command{
 			return err
 		}
 
-		var pbuf bytes.Buffer
-		if err := pbzx.Extract(context.Background(), f, &pbuf, runtime.NumCPU()); err != nil {
+		fname := infile + ".extracted"
+
+		out, err := os.Create(fname)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		// stream decompressed chunks straight to disk instead of buffering the whole payload in memory
+		if err := pbzx.Extract(context.Background(), f, out, runtime.NumCPU()); err != nil {
+			out.Close()
+			os.Remove(fname)
 			return err
 		}
 
-		fname := infile + ".extracted"
+		oinfo, err := out.Stat()
+		if err != nil {
+			return err
+		}
 
 		log.WithFields(log.Fields{
 			"compressed":   fmt.Sprintf("%d bytes (%s)", finfo.Size(), humanize.IBytes(uint64(finfo.Size()))),
-			"decompressed": fmt.Sprintf("%d bytes (%s)", pbuf.Len(), humanize.IBytes(uint64(pbuf.Len()))),
+			"decompressed": fmt.Sprintf("%d bytes (%s)", oinfo.Size(), humanize.IBytes(uint64(oinfo.Size()))),
 			"output":       fname,
 		}).Info("Extracted PBZX file")
-		return os.WriteFile(fname, pbuf.Bytes(), 0o644)
+		return out.Close()
 	},
 }
