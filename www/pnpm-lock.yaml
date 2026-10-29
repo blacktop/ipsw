@@ -2530,6 +2530,11 @@ packages:
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
+    peerDependencies:
+      ajv: ^8.0.0
+    peerDependenciesMeta:
+      ajv:
+        optional: true
 
   ajv-keywords@3.5.2:
     resolution: {integrity: sha512-5p6WTN0DdTGVQk6VjcEju19IgaHudalcfabD7yhDGeA6bcQnmL+CpveLJq/3hvfwd1aof6L386Ougkx6RfyMIQ==}
@@ -4282,8 +4287,8 @@ packages:
     resolution: {integrity: sha512-KvNT4XqAMzdcL6ka6Tl3i2lYeFDgXNCuIX+xNx6ZMVR1dFq+idXd9FLKNMOIx0t9mJ9/HudyX4oZWXZQ0UJHeg==}
     engines: {node: '>=14.16'}
 
-  launch-editor@2.10.0:
-    resolution: {integrity: sha512-D7dBRJo/qcGX9xlvt/6wUYzQxjh5G1RvZPgPv8vi4KRU99DVQL/oW7tnVOCCTm2HGeo3C5HvGE5Yrh6UBoZ0vA==}
+  launch-editor@2.14.2:
+    resolution: {integrity: sha512-NHJEb30MGBCkmZXLZwz25t37QR4aY03ZzPYUJXOJaOa92uWwExI9SBQUuIznBYc1xkD7cJNGX7oc3Nl3sq2kQQ==}
 
   layout-base@1.0.2:
     resolution: {integrity: sha512-8h2oVEZNktL4BH2JCOI90iD1yXwL6iNW7KcCKT2QZgQJR2vbqDsldCTPRU9NifTCqHZci57XvQQ15YTu+sTYPg==}
@@ -5944,8 +5949,8 @@ packages:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
 
-  shell-quote@1.8.2:
-    resolution: {integrity: sha512-AzqKpGKjrj7EM6rKVQEPpB288oCfnrEIuyoT9cyF4nmGa7V8Zk6f7RRqYisX8X9m+Q7bd632aZW4ky7EhbQztA==}
+  shell-quote@1.12.0:
+    resolution: {integrity: sha512-PcByqNyT/38F2kDNi006HAMRJaULuBzq/FOsw3qdZvX/GA9W/jamDaRskgHjubHiftXK5sIFxLNkvrXUwcof6Q==}
     engines: {node: '>= 0.4'}
 
   should-equal@2.0.0:
@@ -10280,8 +10285,8 @@ snapshots:
     dependencies:
       ajv: 8.18.0
 
-  ajv-formats@3.0.1:
-    dependencies:
+  ajv-formats@3.0.1(ajv@8.20.0):
+    optionalDependencies:
       ajv: 8.20.0
 
   ajv-keywords@3.5.2(ajv@6.14.0):
@@ -12199,10 +12204,10 @@ snapshots:
     dependencies:
       package-json: 8.1.1
 
-  launch-editor@2.10.0:
+  launch-editor@2.14.2:
     dependencies:
       picocolors: 1.1.1
-      shell-quote: 1.8.2
+      shell-quote: 1.12.0
 
   layout-base@1.0.2: {}
 
@@ -14150,14 +14155,14 @@ snapshots:
     dependencies:
       '@types/json-schema': 7.0.15
       ajv: 8.20.0
-      ajv-formats: 3.0.1
+      ajv-formats: 3.0.1(ajv@8.20.0)
       ajv-keywords: 5.1.0(ajv@8.20.0)
 
   schema-utils@4.8.1(webpack@5.112.2(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.23))(csso@5.0.5)(html-minifier-terser@7.2.0)(postcss@8.5.23)(svgo@3.3.5)):
     dependencies:
       '@types/json-schema': 7.0.15
       ajv: 8.20.0
-      ajv-formats: 3.0.1
+      ajv-formats: 3.0.1(ajv@8.20.0)
       ajv-keywords: 5.1.0(ajv@8.20.0)
     optionalDependencies:
       webpack: 5.112.2(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.23))(csso@5.0.5)(html-minifier-terser@7.2.0)(postcss@8.5.23)(svgo@3.3.5)
@@ -14262,7 +14267,7 @@ snapshots:
 
   shebang-regex@3.0.0: {}
 
-  shell-quote@1.8.2: {}
+  shell-quote@1.12.0: {}
 
   should-equal@2.0.0:
     dependencies:
@@ -14867,7 +14872,7 @@ snapshots:
       graceful-fs: 4.2.11
       http-proxy-middleware: 2.0.9(@types/express@4.17.21)(debug@4.4.0(supports-color@8.1.1))
       ipaddr.js: 2.2.0
-      launch-editor: 2.10.0
+      launch-editor: 2.14.2
       open: 10.2.0
       p-retry: 6.2.1
       schema-utils: 4.3.3
