@@ -97,7 +97,7 @@ func (s *Swift) DumpType(pattern string) error {
 
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
-			log.Errorf("failed to precache swift fields/types: %v", err)
+			return fmt.Errorf("failed to precache swift fields/types: %w", err)
 		}
 
 		typs, err := m.GetSwiftTypes()
@@ -158,7 +158,7 @@ func (s *Swift) DumpProtocol(pattern string) error {
 
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
-			log.Errorf("failed to precache swift fields/types: %v", err)
+			return fmt.Errorf("failed to precache swift fields/types: %w", err)
 		}
 
 		protos, err := m.GetSwiftProtocols()
@@ -219,7 +219,7 @@ func (s *Swift) DumpExtension(pattern string) error {
 
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
-			log.Errorf("failed to precache swift fields/types: %v", err)
+			return fmt.Errorf("failed to precache swift fields/types: %w", err)
 		}
 
 		exts, err := m.GetSwiftProtocolConformances()
@@ -280,7 +280,7 @@ func (s *Swift) DumpAssociatedType(pattern string) error {
 
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
-			log.Errorf("failed to precache swift fields/types: %v", err)
+			return fmt.Errorf("failed to precache swift fields/types: %w", err)
 		}
 
 		asstyps, err := m.GetSwiftAssociatedTypes()
@@ -334,13 +334,13 @@ func (s *Swift) Dump() error {
 		if !m.HasSwift() {
 			return ErrNoSwift
 		}
+		if err := m.PreCache(); err != nil { // cache fields and types
+			return fmt.Errorf("failed to precache swift fields/types: %w", err)
+		}
+
 		toc := m.GetSwiftTOC()
 		if s.conf.Verbose {
 			fmt.Println(toc)
-		}
-
-		if err := m.PreCache(); err != nil { // cache fields and types
-			log.Errorf("failed to precache swift fields/types: %v", err)
 		}
 
 		var sout string
@@ -379,7 +379,7 @@ func (s *Swift) Dump() error {
 				}
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift types: %v", err)
+			return fmt.Errorf("failed to parse swift types: %w", err)
 		}
 		/* Swift Protocols */
 		if protos, err := m.GetSwiftProtocols(); err == nil {
@@ -415,7 +415,7 @@ func (s *Swift) Dump() error {
 				}
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift protocols: %v", err)
+			return fmt.Errorf("failed to parse swift protocols: %w", err)
 		}
 		/* Swift Extensions */
 		if protos, err := m.GetSwiftProtocolConformances(); err == nil {
@@ -451,7 +451,7 @@ func (s *Swift) Dump() error {
 				}
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift protocol conformances: %v", err)
+			return fmt.Errorf("failed to parse swift protocol conformances: %w", err)
 		}
 		/* Swift Associated Types */
 		if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
@@ -483,7 +483,7 @@ func (s *Swift) Dump() error {
 				}
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift associated types: %v", err)
+			return fmt.Errorf("failed to parse swift associated types: %w", err)
 		}
 		if s.conf.All {
 			fmt.Println("Swift (Other Sections)")
@@ -497,7 +497,7 @@ func (s *Swift) Dump() error {
 				fmt.Println()
 				fmt.Printf("%#x: entry\n\n", entry)
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift entrypoint: %v", err)
+				return fmt.Errorf("failed to parse swift entrypoint: %w", err)
 			}
 			if bins, err := m.GetSwiftBuiltinTypes(); err == nil {
 				log.WithFields(log.Fields{
@@ -525,7 +525,7 @@ func (s *Swift) Dump() error {
 					}
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift built-in types: %v", err)
+				return fmt.Errorf("failed to parse swift built-in types: %w", err)
 			}
 			if metadatas, err := m.GetSwiftColocateMetadata(); err == nil {
 				log.WithFields(log.Fields{
@@ -537,7 +537,7 @@ func (s *Swift) Dump() error {
 					fmt.Println(md.Verbose())
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift colocate metadata: %v", err)
+				return fmt.Errorf("failed to parse swift colocate metadata: %w", err)
 			}
 			if mpenums, err := m.GetSwiftMultiPayloadEnums(); err == nil {
 				log.WithFields(log.Fields{
@@ -558,7 +558,7 @@ func (s *Swift) Dump() error {
 					}
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift multi-payload enums: %v", err)
+				return fmt.Errorf("failed to parse swift multi-payload enums: %w", err)
 			}
 			if closures, err := m.GetSwiftClosures(); err == nil {
 				log.WithFields(log.Fields{
@@ -579,7 +579,7 @@ func (s *Swift) Dump() error {
 					}
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift closures: %v", err)
+				return fmt.Errorf("failed to parse swift closures: %w", err)
 			}
 			if rep, err := m.GetSwiftDynamicReplacementInfo(); err == nil {
 				log.WithFields(log.Fields{
@@ -591,7 +591,7 @@ func (s *Swift) Dump() error {
 					fmt.Println(rep)
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift dynamic replacement info: %v", err)
+				return fmt.Errorf("failed to parse swift dynamic replacement info: %w", err)
 			}
 			if rep, err := m.GetSwiftDynamicReplacementInfoForOpaqueTypes(); err == nil {
 				log.WithFields(log.Fields{
@@ -603,7 +603,7 @@ func (s *Swift) Dump() error {
 					fmt.Println(rep)
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift dynamic replacement info opaque types: %v", err)
+				return fmt.Errorf("failed to parse swift dynamic replacement info opaque types: %w", err)
 			}
 			if afuncs, err := m.GetSwiftAccessibleFunctions(); err == nil {
 				log.WithFields(log.Fields{
@@ -620,7 +620,7 @@ func (s *Swift) Dump() error {
 					}
 				}
 			} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				log.Errorf("failed to parse swift accessible functions: %v", err)
+				return fmt.Errorf("failed to parse swift accessible functions: %w", err)
 			}
 		}
 	}
@@ -651,7 +651,7 @@ func (s *Swift) WriteHeaders() error {
 		}
 
 		if err := m.PreCache(); err != nil { // cache fields and types
-			log.Errorf("failed to precache swift fields/types: %v", err)
+			return fmt.Errorf("failed to precache swift fields/types: %w", err)
 		}
 
 		var buildVersions []string
@@ -696,7 +696,7 @@ func (s *Swift) WriteHeaders() error {
 				headers = append(headers, filepath.Base(fname))
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift types: %v", err)
+			return fmt.Errorf("failed to parse swift types: %w", err)
 		}
 
 		/* generate Swift protocol headers */
@@ -730,7 +730,7 @@ func (s *Swift) WriteHeaders() error {
 				headers = append(headers, filepath.Base(fname))
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift protocols: %v", err)
+			return fmt.Errorf("failed to parse swift protocols: %w", err)
 		}
 
 		/* generate Swift extension headers */
@@ -764,7 +764,7 @@ func (s *Swift) WriteHeaders() error {
 				headers = append(headers, filepath.Base(fname))
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift protocol conformances: %v", err)
+			return fmt.Errorf("failed to parse swift protocol conformances: %w", err)
 		}
 
 		/* generate Swift associated type headers */
@@ -798,7 +798,7 @@ func (s *Swift) WriteHeaders() error {
 				headers = append(headers, filepath.Base(fname))
 			}
 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-			log.Errorf("failed to parse swift associated types: %v", err)
+			return fmt.Errorf("failed to parse swift associated types: %w", err)
 		}
 
 		/* generate umbrella header */
