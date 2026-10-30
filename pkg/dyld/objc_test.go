@@ -25,6 +25,55 @@ func TestObjCOptimizationHeaderGetVersionReportsHashTableV16(t *testing.T) {
 	}
 }
 
+func TestGetOptimizationsHeaderBoundary(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		mappingOffset uint32
+		wantPresent   bool
+	}{
+		{"one byte short", 0x1df, false},
+		{"complete size field", 0x1e0, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := syntheticPrimaryBytes(t, layoutSelfContained, func(h *CacheHeader) {
+				h.MappingOffset = tt.mappingOffset
+				h.MappingCount = 1
+				h.SharedRegionStart = 0x100000000
+				h.ObjcOptsOffset = 0x1000
+				h.ObjcOptsSize = objcOptHeaderV1Size
+			})
+			data = append(data, make([]byte, 0x2000-len(data))...)
+			// The mapping overwrites any header fields absent from this layout.
+			if _, err := binary.Encode(data[tt.mappingOffset:], binary.LittleEndian, CacheMappingInfo{
+				Address: 0x100000000,
+				Size:    uint64(len(data)),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			binary.LittleEndian.PutUint32(data[0x1000:], 1)
+
+			f, err := NewFile(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			got, err := f.GetOptimizations()
+			if !tt.wantPresent {
+				if err == nil {
+					t.Fatalf("accepted incomplete ObjC header: %T", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if hdr, ok := got.(*ObjCOptimizationHeader); !ok || hdr.Version != 1 {
+				t.Fatalf("GetOptimizations() = %#v, want ObjC header v1", got)
+			}
+		})
+	}
+}
+
 func TestGetAllObjcMethods(t *testing.T) {
 	data := make([]byte, 0x60)
 	binary.LittleEndian.PutUint32(data, 24) // absolute method entry size

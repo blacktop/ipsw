@@ -263,7 +263,7 @@ func (f *File) getOptimizations() (Optimization, error) {
 	// NEW objc optimizations live in the dyld_cache_header itself: the cache must
 	// be new enough to carry the objcOpts fields (MappingOffset guard) and
 	// actually have a header present (objcOptsOffset/objcOptsSize).
-	if hdr.MappingOffset > uint32(unsafe.Offsetof(hdr.ObjcOptsSize)) &&
+	if hdr.HasObjcOptsFields() &&
 		hdr.ObjcOptsOffset > 0 && hdr.ObjcOptsSize >= objcOptHeaderV1Size {
 		return f.parseObjCOptimizationHeader()
 	}
