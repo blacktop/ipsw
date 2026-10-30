@@ -2,10 +2,75 @@ package img3
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"testing"
 )
+
+func TestDecryptDataExtent(t *testing.T) {
+	iv := bytes.Repeat([]byte{0x11}, aes.BlockSize)
+	key := bytes.Repeat([]byte{0x22}, 32)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ data, stored int }{{1, 4}, {16, 16}, {17, 20}, {28, 32}, {32, 48}} {
+		t.Run(fmt.Sprintf("%d/%d", tc.data, tc.stored), func(t *testing.T) {
+			plain := bytes.Repeat([]byte{0x42}, tc.stored)
+			plain[tc.data-1] = 1 // A real payload byte, not PKCS#7 padding.
+			encrypted := bytes.Clone(plain)
+			end := len(encrypted) / aes.BlockSize * aes.BlockSize
+			cipher.NewCBCEncrypter(block, iv).CryptBlocks(encrypted[:end], encrypted[:end])
+			var image bytes.Buffer
+			for _, value := range []any{
+				Header{Magic: [4]byte{'3', 'g', 'm', 'I'}, FullSize: uint32(32 + tc.stored), SizeNoPack: uint32(12 + tc.stored)},
+				TagHeader{Magic: [4]byte{'A', 'T', 'A', 'D'}, TotalLength: uint32(12 + tc.stored), DataLength: uint32(tc.data)},
+				encrypted,
+			} {
+				if err := binary.Write(&image, binary.LittleEndian, value); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before := bytes.Clone(image.Bytes())
+			got, err := Decrypt(image.Bytes(), iv, key)
+			if err != nil || !bytes.Equal(got, plain[:tc.data]) {
+				t.Fatalf("Decrypt = %x, %v; want %x", got, err, plain[:tc.data])
+			}
+			if !bytes.Equal(image.Bytes(), before) {
+				t.Fatal("Decrypt mutated its input")
+			}
+			got, err = DecryptData(encrypted, iv, key)
+			if err != nil || !bytes.Equal(got, plain) {
+				t.Fatalf("DecryptData = %x, %v; want %x", got, err, plain)
+			}
+		})
+	}
+	if _, err := DecryptData(make([]byte, 16), iv[:15], key); err == nil {
+		t.Fatal("accepted short IV")
+	}
+}
+
+func TestParseImg3RejectsInvalidTagLengths(t *testing.T) {
+	for _, tag := range []TagHeader{
+		{TotalLength: 11},
+		{TotalLength: 12, DataLength: 1},
+		{TotalLength: 16, DataLength: 4},
+		{TotalLength: ^uint32(0), DataLength: 1},
+	} {
+		var image bytes.Buffer
+		for _, value := range []any{Header{Magic: [4]byte{'3', 'g', 'm', 'I'}}, tag} {
+			if err := binary.Write(&image, binary.LittleEndian, value); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := ParseImg3(image.Bytes()); err == nil {
+			t.Fatalf("accepted invalid tag: %+v", tag)
+		}
+	}
+}
 
 func TestStringBinaryTags(t *testing.T) {
 	for _, magic := range []string{"CERT", "SHSH", "TEST", "KBAG"} {

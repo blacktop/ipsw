@@ -25,11 +25,13 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
+	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
@@ -163,6 +165,24 @@ func DecryptPayloadWithKeys(inputPath, outputPath string, wikiKeys download.Wiki
 	}
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0750); err != nil {
 		return false, fmt.Errorf("failed to create output directory: %v", err)
+	}
+	isImg3, err := magic.IsImg3(inputPath)
+	if err != nil {
+		return false, err
+	}
+	if isImg3 {
+		data, err := os.ReadFile(inputPath)
+		if err != nil {
+			return false, err
+		}
+		data, err = img3.Decrypt(data, iv, key)
+		if err != nil {
+			return false, err
+		}
+		if err := os.WriteFile(outputPath, data, 0644); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 	if err := img4.DecryptPayload(inputPath, outputPath, iv, key); err != nil {
 		return false, err
@@ -412,6 +432,10 @@ func matchingZipFileName(files []*zip.File, name string) []*zip.File {
 }
 
 func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) (out []string, retErr error) {
+	return extractFromDMG(ipswPath, dmgPath, destPath, pemDB, pattern, nil)
+}
+
+func extractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp, keys download.WikiFWKeys) (out []string, retErr error) {
 	skipCleanup := false
 	tmpExtractDir := ""
 
@@ -478,6 +502,12 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 					os.Remove(path)
 				}
 			}(dmgPath)
+		}
+	}
+
+	if keys != nil {
+		if err := mount.DecryptDMG(dmgPath, keys); err != nil {
+			return nil, fmt.Errorf("failed to decrypt DMG %s: %w", dmgPath, err)
 		}
 	}
 
@@ -1332,7 +1362,7 @@ func extractRemoteDMG(c *Config, zr *zip.Reader, dmgPath, destPath, pemDB string
 
 	var artifacts []string
 	for _, dmg := range extracted {
-		out, err := ExtractFromDMG(dmg, dmg, destPath, pemDB, pattern)
+		out, err := extractFromDMG(dmg, dmg, destPath, pemDB, pattern, c.wikiKeys)
 		artifacts = append(artifacts, out...)
 		if err != nil {
 			return artifacts, err
@@ -1600,28 +1630,28 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		artifacts = append(artifacts, out...)
 		if c.DMGs { // SEARCH THE DMGs
 			if appOS, err := i.GetAppOsDmg(); err == nil {
-				out, err := ExtractFromDMG(c.IPSW, appOS, destPath, c.PemDB, re)
+				out, err := extractFromDMG(c.IPSW, appOS, destPath, c.PemDB, re, c.wikiKeys)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from AppOS %s: %w", appOS, err)
 				}
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				out, err := ExtractFromDMG(c.IPSW, systemOS, destPath, c.PemDB, re)
+				out, err := extractFromDMG(c.IPSW, systemOS, destPath, c.PemDB, re, c.wikiKeys)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from SystemOS %s: %w", systemOS, err)
 				}
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				out, err := ExtractFromDMG(c.IPSW, fsOS, destPath, c.PemDB, re)
+				out, err := extractFromDMG(c.IPSW, fsOS, destPath, c.PemDB, re, c.wikiKeys)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from filesystem %s: %w", fsOS, err)
 				}
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
-				out, err := ExtractFromDMG(c.IPSW, excOS, destPath, c.PemDB, re)
+				out, err := extractFromDMG(c.IPSW, excOS, destPath, c.PemDB, re, c.wikiKeys)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from ExclaveOS %s: %w", excOS, err)

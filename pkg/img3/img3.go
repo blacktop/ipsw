@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/blacktop/ipsw/pkg/lzfse"
@@ -128,6 +129,9 @@ func ParseImg3(data []byte) (*Img3, error) {
 			return nil, fmt.Errorf("failed to read IMG3 tag header: %v", err)
 		}
 
+		if tag.TotalLength < 12 || tag.DataLength > tag.TotalLength-12 || uint64(tag.TotalLength-12) > uint64(r.Len()) {
+			return nil, fmt.Errorf("invalid IMG3 tag lengths: total=%d data=%d remaining=%d", tag.TotalLength, tag.DataLength, r.Len())
+		}
 		tag.Data = make([]byte, tag.DataLength)
 		tag.Pad = make([]byte, tag.TotalLength-tag.DataLength-12)
 
@@ -264,34 +268,33 @@ func DecryptKBag(kbag *KBagData, gidKey []byte) error {
 	return nil
 }
 
-// DecryptData decrypts IMG3 data using the provided IV and key
+// DecryptData decrypts the complete AES blocks in an IMG3 DATA extent.
+// Any trailing partial block is stored in plaintext.
 func DecryptData(data, iv, key []byte) ([]byte, error) {
+	data = bytes.Clone(data)
+	if err := decryptData(data, iv, key); err != nil {
+		return nil, err
+	}
+	return decompressData(data)
+}
+
+func decryptData(data, iv, key []byte) error {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
+		return fmt.Errorf("failed to create AES cipher: %v", err)
 	}
 
-	if len(data) < aes.BlockSize {
-		return nil, fmt.Errorf("IMG3 data too short")
+	if len(iv) != aes.BlockSize {
+		return fmt.Errorf("IV must be %d bytes, got %d", aes.BlockSize, len(iv))
 	}
-
-	// CBC mode always works in whole blocks
-	if len(data)%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("IMG3 data is not a multiple of the block size")
-	}
-
-	// Create a copy of the data to decrypt
-	decrypted := make([]byte, len(data))
-	copy(decrypted, data)
 
 	mode := cipher.NewCBCDecrypter(block, iv)
-	mode.CryptBlocks(decrypted, decrypted)
+	fullBlocks := len(data) / aes.BlockSize * aes.BlockSize
+	mode.CryptBlocks(data[:fullBlocks], data[:fullBlocks])
+	return nil
+}
 
-	// Try to remove PKCS#7 padding, but continue without it if it fails
-	if paddingRemoved, err := removePKCS7Padding(decrypted); err == nil {
-		decrypted = paddingRemoved
-	}
-
+func decompressData(decrypted []byte) ([]byte, error) {
 	// Check if data is LZFSE compressed
 	if len(decrypted) >= 4 && bytes.Contains(decrypted[:4], []byte("bvx2")) {
 		decompressed, err := lzfse.NewDecoder(decrypted).DecodeBuffer()
@@ -304,29 +307,20 @@ func DecryptData(data, iv, key []byte) ([]byte, error) {
 	return decrypted, nil
 }
 
-// removePKCS7Padding removes PKCS#7 padding from the decrypted data
-func removePKCS7Padding(data []byte) ([]byte, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("data is empty")
-	}
-
-	// The last byte tells us how many padding bytes there are
-	paddingLength := int(data[len(data)-1])
-
-	// Validate padding length
-	if paddingLength == 0 || paddingLength > aes.BlockSize || paddingLength > len(data) {
-		return nil, fmt.Errorf("invalid padding length: %d", paddingLength)
-	}
-
-	// Check if all padding bytes are correct
-	for i := len(data) - paddingLength; i < len(data); i++ {
-		if data[i] != byte(paddingLength) {
-			return nil, fmt.Errorf("invalid padding at position %d: expected %d, got %d", i, paddingLength, data[i])
+func (i *Img3) decryptDataTag(iv, key []byte) ([]byte, error) {
+	for _, tag := range i.Tags {
+		if string(reverseBytes(tag.Magic[:])) != "DATA" {
+			continue
 		}
+		// The last cipher block may extend into tag padding. The declared
+		// DATA length, not PKCS#7, determines the plaintext length.
+		stored := slices.Concat(tag.Data, tag.Pad)
+		if err := decryptData(stored, iv, key); err != nil {
+			return nil, err
+		}
+		return decompressData(stored[:len(tag.Data)])
 	}
-
-	// Remove padding
-	return data[:len(data)-paddingLength], nil
+	return nil, fmt.Errorf("no DATA tag found in IMG3")
 }
 
 // Decrypt decrypts an IMG3 file using the provided IV and key
@@ -337,12 +331,7 @@ func Decrypt(data, iv, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse IMG3: %v", err)
 	}
 
-	dataTag, err := img3.GetDataTag()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DATA tag: %v", err)
-	}
-
-	return DecryptData(dataTag, iv, key)
+	return img3.decryptDataTag(iv, key)
 }
 
 // ExtractData extracts and decompresses data from an unencrypted IMG3 file
@@ -358,16 +347,7 @@ func ExtractData(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get DATA tag: %v", err)
 	}
 
-	// Check if data is LZFSE compressed
-	if len(dataTag) >= 4 && bytes.Contains(dataTag[:4], []byte("bvx2")) {
-		decompressed, err := lzfse.NewDecoder(dataTag).DecodeBuffer()
-		if err != nil {
-			return nil, fmt.Errorf("failed to LZFSE decompress: %v", err)
-		}
-		return decompressed, nil
-	}
-
-	return dataTag, nil
+	return decompressData(dataTag)
 }
 
 // DecryptWithGIDKey decrypts an IMG3 file using the provided GID key
@@ -382,11 +362,6 @@ func DecryptWithGIDKey(data, gidKey []byte) ([]byte, error) {
 	kbagDataList, err := img3.GetAllKBagTags()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get KBAG tags: %v", err)
-	}
-
-	dataTag, err := img3.GetDataTag()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DATA tag: %v", err)
 	}
 
 	var lastErr error
@@ -413,7 +388,7 @@ func DecryptWithGIDKey(data, gidKey []byte) ([]byte, error) {
 		}
 
 		// Try to decrypt the data with this KBAG
-		decryptedData, err := DecryptData(dataTag, kbagCopy.IV, kbagCopy.Key)
+		decryptedData, err := img3.decryptDataTag(kbagCopy.IV, kbagCopy.Key)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to decrypt data with KBAG %d (CryptState=%d): %v", i+1, kbag.CryptState, err)
 			continue
@@ -455,11 +430,6 @@ func DecryptWithKBAGKey(data, kbagKey []byte) ([]byte, error) {
 	kbagDataList, err := img3.GetAllKBagTags()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get KBAG tags: %v", err)
-	}
-
-	dataTag, err := img3.GetDataTag()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DATA tag: %v", err)
 	}
 
 	// Split the KBAG key into IV and Key - but for ECB mode we only need the Key part
@@ -525,7 +495,7 @@ func DecryptWithKBAGKey(data, kbagKey []byte) ([]byte, error) {
 		}
 
 		// Now use the decrypted IV and Key to decrypt the actual data
-		decryptedData, err := DecryptData(dataTag, finalIV, finalKey)
+		decryptedData, err := img3.decryptDataTag(finalIV, finalKey)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to decrypt data with KBAG %d (CryptState=%d): %v", i+1, kbag.CryptState, err)
 			continue

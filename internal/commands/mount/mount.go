@@ -337,7 +337,7 @@ func (a *imageAttempt) mount(extractedDMG, typ string) (*Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := decryptDMG(extractedDMG, a.cfg.Keys); err != nil {
+	if err := DecryptDMG(extractedDMG, a.cfg.Keys); err != nil {
 		return nil, err
 	}
 	if typ == "rdisk" {
@@ -382,7 +382,9 @@ func (a *imageAttempt) decryptAEA(encryptedDMG string) (string, error) {
 	return decrypted, nil
 }
 
-func decryptDMG(path string, keys any) error {
+// DecryptDMG replaces an encrypted legacy DMG with its decrypted UDIF image.
+// Unencrypted images are left untouched. The caller must own the backing file.
+func DecryptDMG(path string, keys any) error {
 	isEncrypted, err := magic.IsEncryptedDMG(path)
 	if err != nil {
 		return fmt.Errorf("failed to check if DMG is encrypted: %v", err)

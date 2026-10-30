@@ -530,6 +530,6 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Vet
-        run: go vet ./pkg/dyld ./pkg/disass ./internal/commands/macho ./internal/commands/dsc ./internal/diff ./internal/syms
+        run: go vet ./pkg/dyld ./pkg/disass ./pkg/img3 ./pkg/devicetree ./internal/magic ./internal/utils ./internal/commands/macho ./internal/commands/dsc ./internal/commands/mount ./internal/commands/extract ./internal/diff ./internal/syms
       - name: Test
-        run: go test -count=1 ./pkg/dyld ./pkg/disass ./internal/commands/macho ./internal/commands/dsc ./internal/diff ./internal/syms
+        run: go test -count=1 ./pkg/dyld ./pkg/disass ./pkg/img3 ./pkg/devicetree ./internal/magic ./internal/utils ./internal/commands/macho ./internal/commands/dsc ./internal/commands/mount ./internal/commands/extract ./internal/diff ./internal/syms

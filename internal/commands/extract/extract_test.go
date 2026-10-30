@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -22,10 +23,67 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/img3"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+func TestDecryptPayloadWithKeysImg3(t *testing.T) {
+	iv := bytes.Repeat([]byte{0x11}, aes.BlockSize)
+	key := bytes.Repeat([]byte{0x22}, 32)
+	plain := []byte("synthetic DeviceTree payload")
+	stored := make([]byte, 32)
+	copy(stored, plain)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(stored, stored)
+	var image bytes.Buffer
+	for _, value := range []any{
+		img3.Header{Magic: [4]byte{'3', 'g', 'm', 'I'}, FullSize: 64, SizeNoPack: 44},
+		img3.TagHeader{Magic: [4]byte{'A', 'T', 'A', 'D'}, TotalLength: 44, DataLength: uint32(len(plain))},
+		stored,
+	} {
+		if err := binary.Write(&image, binary.LittleEndian, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	input := filepath.Join(t.TempDir(), "DeviceTree.synthetic.img3")
+	if err := os.WriteFile(input, image.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	keys := download.WikiFWKeys{"DeviceTree": {
+		Filename: []string{filepath.Base(input)}, Iv: []string{hex.EncodeToString(iv)}, Key: []string{hex.EncodeToString(key)},
+	}}
+	output, err := decryptExtractedIM4P(input, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(output); err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("decrypted payload = %q, %v; want %q", got, err, plain)
+	}
+	if _, err := os.Stat(input); !os.IsNotExist(err) {
+		t.Fatalf("encrypted input remains: %v", err)
+	}
+}
+
+func TestExtractFromDMGUsesLegacyKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "synthetic.dmg")
+	data := []byte("encrcdsa synthetic encrypted DMG")
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	keys := download.WikiFWKeys{"RootFS": {Filename: []string{filepath.Base(path)}, Key: []string{"00"}}}
+	_, err := extractFromDMG(path, path, t.TempDir(), "", regexp.MustCompile("test"), keys)
+	if err == nil || !strings.Contains(err.Error(), "invalid key length") {
+		t.Fatalf("legacy decryption key was not consumed: %v", err)
+	}
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, data) {
+		t.Fatalf("failed decryption changed the source: %v", err)
+	}
+}
 
 func TestRemoteKeybagsStoredPayloadUsesSmallRanges(t *testing.T) {
 	key := bytes.Repeat([]byte{0x22}, 32)

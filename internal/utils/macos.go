@@ -613,31 +613,6 @@ func mountWithAPFSFuse(image, mountPoint string) error {
 	return nil
 }
 
-// mountWithHFSPlus mounts using native Linux HFS+ kernel support
-func mountWithHFSPlus(image, mountPoint string) error {
-	// Set up a loop device for the DMG file
-	out, err := exec.Command("losetup", "-f", "--show", image).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to set up loop device for '%s': %v: cmd output - '%s'", image, err, out)
-	}
-
-	loopDevice := strings.TrimSpace(string(out))
-	log.Debugf("created loop device: %s", loopDevice)
-
-	// Mount the loop device using native HFS+ support
-	err = exec.Command("mount", "-t", "hfsplus", "-o", "ro", loopDevice, mountPoint).Run()
-	if err != nil {
-		// Clean up loop device on mount failure
-		if cleanupErr := exec.Command("losetup", "-d", loopDevice).Run(); cleanupErr != nil {
-			log.Warnf("failed to clean up loop device %s: %v", loopDevice, cleanupErr)
-		}
-		return fmt.Errorf("failed to mount HFS+ filesystem '%s': %v (ensure hfsplus kernel module is loaded)", loopDevice, err)
-	}
-
-	log.Debugf("mounted HFS+ filesystem at %s", mountPoint)
-	return nil
-}
-
 func MountEncrypted(image, mountPoint, password string) error {
 	if runtime.GOOS == "darwin" {
 		return attachDarwinImage(image, mountPoint, strings.NewReader(password), runCommandWithFileOutput)

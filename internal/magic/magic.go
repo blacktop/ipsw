@@ -145,7 +145,7 @@ func IsImg3(filePath string) (bool, error) {
 	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
 		return false, fmt.Errorf("failed to read bundle header: %w", err)
 	}
-	if string(hdr.Magic[:]) == img3.Magic {
+	if hdr.Magic == [4]byte{'3', 'g', 'm', 'I'} {
 		return true, nil
 	}
 	return false, nil
@@ -276,7 +276,7 @@ func IsHFSPlus(filePath string) (bool, error) {
 	if err := binary.Read(f, binary.BigEndian, &magic); err != nil {
 		return false, fmt.Errorf("failed to read magic: %w", err)
 	}
-	if magic == uint16(hfsplus.HFSPlusSigWord) {
+	if magic == uint16(hfsplus.HFSPlusSigWord) || magic == uint16(hfsplus.HFSXSigWord) {
 		return true, nil
 	}
 	return false, nil
