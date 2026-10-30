@@ -142,5 +142,5 @@ Via the power of `partialzip`
 ### Extract all files matching a user-specified regex pattern from remote IPSW or OTA zip
 
 ```bash
-❯ ipsw extract --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw --pattern '.*BuidManifest.plist$'
+❯ ipsw extract --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw --pattern '.*BuildManifest.plist$'
 ```
