@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,107 @@ import (
 
 	mtypes "github.com/blacktop/go-macho/types"
 )
+
+func TestReadCacheCodeSignatureBounds(t *testing.T) {
+	data := make([]byte, 32)
+	if _, err := binary.Encode(data[16:], binary.BigEndian, fakeCodeSignature); err != nil {
+		t.Fatal(err)
+	}
+	for _, length := range []uint64{0, 12, 16} {
+		if _, err := readCacheCodeSignature(bytes.NewReader(data), 16, length, int64(len(data))); err != nil {
+			t.Errorf("valid extent %d: %v", length, err)
+		}
+	}
+	for _, tc := range []struct {
+		name           string
+		offset, length uint64
+		size           int64
+		blobLength     uint32
+		count          uint32
+	}{
+		{"unknown EOF", 16, 0, -1, 12, 0},
+		{"offset past EOF", 33, 0, 32, 12, 0},
+		{"extent past EOF", 16, 17, 32, 12, 0},
+		{"overflow", math.MaxInt64, 12, -1, 12, 0},
+		{"truncated header", 16, 11, 32, 12, 0},
+		{"short superblob", 16, 16, 32, 8, 0},
+		{"long superblob", 16, 16, 32, 17, 0},
+		{"oversized index", 16, 16, 32, 12, math.MaxUint32},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			blob := bytes.Clone(data)
+			binary.BigEndian.PutUint32(blob[20:], tc.blobLength)
+			binary.BigEndian.PutUint32(blob[24:], tc.count)
+			if _, err := readCacheCodeSignature(bytes.NewReader(blob), tc.offset, tc.length, tc.size); err == nil {
+				t.Fatal("accepted invalid code-signature extent")
+			}
+		})
+	}
+	cache := syntheticPrimaryBytes(t, layoutSelfContained, func(h *CacheHeader) { h.CodeSignatureSize = 0 })
+	f, err := NewFile(bytes.NewReader(cache))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if f.Headers[f.UUID].CodeSignatureSize != 0 || f.CodeSignatures[f.UUID] == nil {
+		t.Fatal("zero-size signature was not parsed without changing the header")
+	}
+	if _, err := NewFile(struct{ io.ReaderAt }{bytes.NewReader(cache)}); err == nil || !strings.Contains(err.Error(), "known size") {
+		t.Fatalf("unsized reader error = %v", err)
+	}
+}
+
+func writeLegacyMachO(t *testing.T, dst []byte, offset, address, textSize uint64, is64 bool) {
+	t.Helper()
+	header := mtypes.FileHeader{Magic: mtypes.Magic32, CPU: mtypes.CPUArm, Type: mtypes.MH_DYLIB, NCommands: 2}
+	var name [16]byte
+	copy(name[:], "__TEXT")
+	var segment any = mtypes.Segment32{LoadCmd: mtypes.LC_SEGMENT, Len: uint32(binary.Size(mtypes.Segment32{})), Name: name,
+		Addr: uint32(address), Memsz: uint32(textSize), Offset: uint32(offset), Filesz: uint32(textSize), Maxprot: 5, Prot: 5}
+	if is64 {
+		header.Magic, header.CPU = mtypes.Magic64, mtypes.CPUArm64
+		segment = mtypes.Segment64{LoadCmd: mtypes.LC_SEGMENT_64, Len: uint32(binary.Size(mtypes.Segment64{})), Name: name,
+			Addr: address, Memsz: textSize, Offset: offset, Filesz: textSize, Maxprot: 5, Prot: 5}
+	}
+	uuid := mtypes.UUIDCmd{LoadCmd: mtypes.LC_UUID, Len: uint32(binary.Size(mtypes.UUIDCmd{})), UUID: mtypes.UUID{0x91}}
+	header.SizeCommands = uint32(binary.Size(segment) + binary.Size(uuid))
+	pos := header.Put(dst, binary.LittleEndian)
+	for _, cmd := range []any{segment, uuid} {
+		n, err := binary.Encode(dst[pos:], binary.LittleEndian, cmd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pos += n
+	}
+}
+
+func TestReadLegacyImageTextInfoBounds(t *testing.T) {
+	data := make([]byte, 0x200)
+	writeLegacyMachO(t, data, 0, 0x1000, 0x200, true)
+	for _, tc := range []struct {
+		name   string
+		mutate func([]byte)
+	}{
+		{"load commands past mapping", func(b []byte) { binary.LittleEndian.PutUint32(b[20:], 0x201) }},
+		{"too many commands", func(b []byte) { binary.LittleEndian.PutUint32(b[16:], math.MaxUint32) }},
+		{"short command", func(b []byte) { binary.LittleEndian.PutUint32(b[36:], 7) }},
+		{"long command", func(b []byte) { binary.LittleEndian.PutUint32(b[36:], 0x200) }},
+		{"wrong text address", func(b []byte) { binary.LittleEndian.PutUint64(b[56:], 0x1001) }},
+		{"text past mapping", func(b []byte) { binary.LittleEndian.PutUint64(b[64:], 0x201) }},
+		{"text too short", func(b []byte) { binary.LittleEndian.PutUint64(b[64:], 32) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bad := bytes.Clone(data)
+			tc.mutate(bad)
+			f := &File{ByteOrder: binary.LittleEndian,
+				Mappings: map[mtypes.UUID]cacheMappings{{}: {{CacheMappingInfo: CacheMappingInfo{Address: 0x1000, Size: 0x200}}}},
+				r:        map[mtypes.UUID]io.ReaderAt{{}: bytes.NewReader(bad)}}
+			if _, err := f.readLegacyImageTextInfo(mtypes.UUID{}, CacheImageInfo{Address: 0x1000}, int64(len(bad))); err == nil {
+				t.Fatal("accepted malformed legacy text metadata")
+			}
+		})
+	}
+}
 
 func TestReadCacheHeaderBounds(t *testing.T) {
 	want := CacheHeader{MappingOffset: 0x58, MappingCount: 3, ImagesOffsetOld: 0xb8,
@@ -80,6 +182,7 @@ func TestParseCacheWithPreUUIDHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy(data[0x100:], "/usr/lib/libsynthetic.dylib\x00")
+	writeLegacyMachO(t, data[0x200:], 0x200, imageAddr, 0x180, false)
 	if _, err := binary.Encode(data[signatureOffset:], binary.BigEndian, fakeCodeSignature); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +194,7 @@ func TestParseCacheWithPreUUIDHeader(t *testing.T) {
 	if !f.UUID.IsNull() || f.Headers[f.UUID] != header || len(f.BranchPools) != 0 || len(f.SubCacheInfo) != 0 {
 		t.Fatalf("mapping bytes escaped into header fields: %+v", f.Headers[f.UUID])
 	}
-	if len(f.Images) != 1 || f.Images[0].LoadAddress != imageAddr {
+	if len(f.Images) != 1 || f.Images[0].LoadAddress != imageAddr || f.Images[0].TextSegmentSize != 0x180 || f.Images[0].UUID != (mtypes.UUID{0x91}) {
 		t.Fatalf("images = %+v, want load address %#x", f.Images, imageAddr)
 	}
 	path := filepath.Join(t.TempDir(), "dyld_shared_cache_armv7")
@@ -100,6 +203,25 @@ func TestParseCacheWithPreUUIDHeader(t *testing.T) {
 	}
 	if got, err := ReadHeader(path); err != nil || *got != header {
 		t.Fatalf("ReadHeader = %+v, %v", got, err)
+	}
+	opened, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer opened.Close()
+	img := opened.Images[0]
+	if m, err := img.GetMacho(); err != nil || m.Segment("__TEXT").Memsz != 0x180 {
+		t.Fatalf("GetMacho = %v, %v", m, err)
+	}
+	for _, lookup := range []func(uint64) (*CacheImage, error){opened.GetImageContainingTextAddr, opened.GetImageContainingVMAddr} {
+		for _, address := range []uint64{imageAddr, imageAddr + 0x17f} {
+			if got, err := lookup(address); err != nil || got != img {
+				t.Errorf("lookup(%#x) = %v, %v", address, got, err)
+			}
+		}
+		if _, err := lookup(imageAddr + 0x180); err == nil {
+			t.Error("lookup includes the end of __TEXT")
+		}
 	}
 }
 
@@ -809,7 +931,7 @@ func TestHasImagePathRejectsIndexOverflow(t *testing.T) {
 }
 
 func TestParseCacheBackfillsLoadAddressWithoutTextInfo(t *testing.T) {
-	const imageAddr = 0x100001000
+	const imageAddr = 0x100001200
 	data := syntheticPrimaryBytes(t, layoutSelfContained, func(h *CacheHeader) {
 		h.MappingOffset = 0x70
 		h.MappingCount = 1
@@ -834,13 +956,14 @@ func TestParseCacheBackfillsLoadAddressWithoutTextInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy(data[0x1100:], "/usr/lib/libsynthetic.dylib\x00")
+	writeLegacyMachO(t, data[0x1200:], 0x1200, imageAddr, 0x400, true)
 
 	f, err := NewFile(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	if len(f.Images) != 1 || f.Images[0].LoadAddress != imageAddr {
+	if len(f.Images) != 1 || f.Images[0].LoadAddress != imageAddr || f.Images[0].TextSegmentSize != 0x400 {
 		t.Fatalf("images = %+v, want one image with LoadAddress %#x", f.Images, uint64(imageAddr))
 	}
 }

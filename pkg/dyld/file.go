@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"math/bits"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
+	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -205,6 +207,143 @@ func getUUID(r io.ReaderAt) (mtypes.UUID, error) {
 	return header.UUID, nil
 }
 
+func readCacheCodeSignature(r io.ReaderAt, offset, length uint64, fileSize int64) (*codesign.CodeSignature, error) {
+	if fileSize >= 0 {
+		if offset > uint64(fileSize) {
+			return nil, fmt.Errorf("offset %#x exceeds file size %#x", offset, fileSize)
+		}
+		remaining := uint64(fileSize) - offset
+		if length == 0 {
+			length = remaining
+		} else if length > remaining {
+			return nil, fmt.Errorf("size %#x exceeds remaining file size %#x", length, remaining)
+		}
+	} else if length == 0 {
+		return nil, errors.New("zero code-signature size requires a reader with a known size")
+	}
+	if offset > math.MaxInt64 || length > math.MaxInt64-offset {
+		return nil, errors.New("code-signature range overflows the reader")
+	}
+	sr := io.NewSectionReader(r, int64(offset), int64(length))
+	var header cstypes.SbHeader
+	if err := binary.Read(sr, binary.BigEndian, &header); err != nil {
+		return nil, err
+	}
+	headerSize := uint64(binary.Size(header))
+	if header.Magic != cstypes.MAGIC_EMBEDDED_SIGNATURE && header.Magic != cstypes.MAGIC_EMBEDDED_SIGNATURE_OLD {
+		return nil, fmt.Errorf("invalid superblob magic %#x", header.Magic)
+	}
+	if uint64(header.Length) < headerSize || uint64(header.Length) > length || uint64(header.Length) > uint64(math.MaxInt) {
+		return nil, fmt.Errorf("superblob length %#x exceeds signature extent %#x", header.Length, length)
+	}
+	if uint64(header.Count) > (uint64(header.Length)-headerSize)/uint64(binary.Size(cstypes.BlobIndex{})) {
+		return nil, errors.New("superblob index exceeds its declared length")
+	}
+	if data, ok := mappedBytes(r); ok {
+		end := offset + uint64(header.Length)
+		if end > uint64(len(data)) {
+			return nil, io.ErrUnexpectedEOF
+		}
+		return codesign.ParseCodeSignature(data[offset:end])
+	}
+	data := make([]byte, int(header.Length))
+	if _, err := r.ReadAt(data, int64(offset)); err != nil {
+		return nil, err
+	}
+	return codesign.ParseCodeSignature(data)
+}
+
+// readLegacyImageTextInfo recovers the text_info fields from load commands in
+// caches that predate that table. Only fixed-size commands are decoded here.
+func (f *File) readLegacyImageTextInfo(uuid mtypes.UUID, info CacheImageInfo, fileSize int64) (CacheImageTextInfo, error) {
+	var text CacheImageTextInfo
+	var offset, available uint64
+	for _, mapping := range f.Mappings[uuid] {
+		if info.Address >= mapping.Address && info.Address-mapping.Address < mapping.Size {
+			delta := info.Address - mapping.Address
+			if mapping.FileOffset > math.MaxInt64 || delta > math.MaxInt64-mapping.FileOffset {
+				return text, errors.New("image offset overflows the reader")
+			}
+			offset = mapping.FileOffset + delta
+			available = min(mapping.Size-delta, uint64(math.MaxInt64)-offset)
+			break
+		}
+	}
+	if fileSize >= 0 {
+		if offset > uint64(fileSize) {
+			return text, errors.New("image offset exceeds the file")
+		}
+		available = min(available, uint64(fileSize)-offset)
+	}
+	sr := io.NewSectionReader(f.r[uuid], int64(offset), int64(available))
+	var header mtypes.FileHeader
+	if err := binary.Read(sr, f.ByteOrder, &header); err != nil {
+		return text, err
+	}
+	headerSize := uint64(mtypes.FileHeaderSize32)
+	switch header.Magic {
+	case mtypes.Magic32:
+	case mtypes.Magic64:
+		headerSize = mtypes.FileHeaderSize64
+	default:
+		return text, fmt.Errorf("invalid Mach-O magic %#x", header.Magic)
+	}
+	commandSize := uint64(header.SizeCommands)
+	if available < headerSize || commandSize > available-headerSize || uint64(header.NCommands) > commandSize/8 {
+		return text, errors.New("Mach-O load commands exceed the image mapping")
+	}
+	commands := io.NewSectionReader(sr, int64(headerSize), int64(commandSize))
+	var pos, textSize uint64
+	for range header.NCommands {
+		var cmd struct {
+			Kind mtypes.LoadCmd
+			Size uint32
+		}
+		if err := binary.Read(io.NewSectionReader(commands, int64(pos), 8), f.ByteOrder, &cmd); err != nil {
+			return text, err
+		}
+		if cmd.Size < 8 || uint64(cmd.Size) > commandSize-pos {
+			return text, errors.New("invalid Mach-O load command size")
+		}
+		cr := io.NewSectionReader(commands, int64(pos), int64(cmd.Size))
+		var name [16]byte
+		var addr, size uint64
+		switch cmd.Kind {
+		case mtypes.LC_SEGMENT:
+			var segment mtypes.Segment32
+			if err := binary.Read(cr, f.ByteOrder, &segment); err != nil {
+				return text, err
+			}
+			name, addr, size = segment.Name, uint64(segment.Addr), uint64(segment.Memsz)
+		case mtypes.LC_SEGMENT_64:
+			var segment mtypes.Segment64
+			if err := binary.Read(cr, f.ByteOrder, &segment); err != nil {
+				return text, err
+			}
+			name, addr, size = segment.Name, segment.Addr, segment.Memsz
+		case mtypes.LC_UUID:
+			var command mtypes.UUIDCmd
+			if err := binary.Read(cr, f.ByteOrder, &command); err != nil {
+				return text, err
+			}
+			text.UUID = command.UUID
+		}
+		if strings.TrimRight(string(name[:]), "\x00") == "__TEXT" {
+			if textSize != 0 || addr != info.Address || size == 0 || size > math.MaxUint32 || size > available || size > math.MaxUint64-addr {
+				return text, errors.New("invalid Mach-O __TEXT range")
+			}
+			text.LoadAddress, textSize = addr, size
+		}
+		pos += uint64(cmd.Size)
+	}
+	if textSize < headerSize+commandSize {
+		return text, errors.New("Mach-O __TEXT does not contain its load commands")
+	}
+	text.TextSegmentSize = uint32(textSize)
+	text.PathOffset = info.PathFileOffset
+	return text, nil
+}
+
 // Open opens the named file and prepares it for use as a dyld binary.
 func Open(name string) (*File, error) {
 
@@ -217,7 +356,7 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 
-	ff, err := NewFile(r)
+	ff, err := newFile(r, size)
 	if err != nil {
 		closer.Close()
 		return nil, err
@@ -317,7 +456,7 @@ func (f *File) openCacheMember(name string, want mtypes.UUID) (int64, error) {
 		return fail(fmt.Errorf("%s: UUID %s is already loaded by another cache member", name, uuid))
 	}
 	f.closers[uuid] = closer
-	if err := f.parseCache(r, uuid); err != nil {
+	if err := f.parseCache(r, uuid, size); err != nil {
 		return 0, fmt.Errorf("failed to parse cache %s: %w", name, err)
 	}
 	return size, nil
@@ -382,6 +521,21 @@ func ReadHeader(name string) (*CacheHeader, error) {
 // NewFile creates a new File for accessing a dyld binary in an underlying reader.
 // The dyld binary is expected to start at position 0 in the ReaderAt.
 func NewFile(r io.ReaderAt) (*File, error) {
+	size := int64(-1)
+	switch r := r.(type) {
+	case interface{ Size() int64 }:
+		size = r.Size()
+	case interface{ Stat() (os.FileInfo, error) }:
+		info, err := r.Stat()
+		if err != nil {
+			return nil, err
+		}
+		size = info.Size()
+	}
+	return newFile(r, size)
+}
+
+func newFile(r io.ReaderAt, size int64) (*File, error) {
 
 	f := new(File)
 
@@ -414,17 +568,21 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 	f.UUID = uuid
 
-	if err := f.parseCache(r, f.UUID); err != nil {
-		return nil, fmt.Errorf("failed to parse cache %s: %v", f.UUID, err)
+	if err := f.parseCache(r, f.UUID, size); err != nil {
+		return nil, fmt.Errorf("failed to parse cache %s: %w", f.UUID, err)
 	}
 
 	return f, nil
 }
 
 // parseCache parses dyld shared cache file
-func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
+func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID, size int64) error {
 
-	sr := io.NewSectionReader(r, 0, 1<<63-1)
+	readerSize := size
+	if readerSize < 0 {
+		readerSize = math.MaxInt64
+	}
+	sr := io.NewSectionReader(r, 0, readerSize)
 
 	// Read and decode dyld magic
 	var ident [16]byte
@@ -569,16 +727,9 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 
 	// Read dyld code signature.
-	sr.Seek(int64(f.Headers[uuid].CodeSignatureOffset), io.SeekStart)
-
-	cs := make([]byte, f.Headers[uuid].CodeSignatureSize)
-	if err := binary.Read(sr, f.ByteOrder, &cs); err != nil {
-		return err
-	}
-
-	csig, err := codesign.ParseCodeSignature(cs)
+	csig, err := readCacheCodeSignature(r, hdr.CodeSignatureOffset, hdr.CodeSignatureSize, size)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read code signature: %w", err)
 	}
 	f.CodeSignatures[uuid] = csig
 
@@ -748,11 +899,12 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			}
 		}
 	} else {
-		// Pre-iOS 9 caches carry no text_info table. The image table still
-		// records each image's unslid __TEXT address, which image sorting,
-		// address lookups and export tries read from LoadAddress.
+		// Pre-iOS 9 caches carry no text_info table.
 		for _, image := range f.Images {
-			image.LoadAddress = image.Info.Address
+			image.CacheImageTextInfo, err = f.readLegacyImageTextInfo(uuid, image.Info, size)
+			if err != nil {
+				return fmt.Errorf("failed to read legacy image %s: %w", image.Name, err)
+			}
 		}
 	}
 

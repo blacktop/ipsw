@@ -245,12 +245,12 @@ func strictDscMainHeader(header CacheHeader) bool {
 }
 
 func strictDscReferences(name string) (refs []SubcacheEntry, retErr error) {
-	r, closer, _, err := openCacheFile(name)
+	r, closer, size, err := openCacheFile(name)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { retErr = errors.Join(retErr, closer.Close()) }()
-	f, err := NewFile(r)
+	f, err := newFile(r, size)
 	if err != nil {
 		return nil, err
 	}
