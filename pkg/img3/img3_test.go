@@ -42,14 +42,29 @@ func TestDecryptDataExtent(t *testing.T) {
 			if !bytes.Equal(image.Bytes(), before) {
 				t.Fatal("Decrypt mutated its input")
 			}
+			encryptedBefore := bytes.Clone(encrypted)
 			got, err = DecryptData(encrypted, iv, key)
 			if err != nil || !bytes.Equal(got, plain) {
-				t.Fatalf("DecryptData = %x, %v; want %x", got, err, plain)
+				t.Fatalf("package DecryptData = %x, %v; want %x", got, err, plain)
+			}
+			if !bytes.Equal(encrypted, encryptedBefore) {
+				t.Fatal("package DecryptData mutated its input")
+			}
+			parsed, err := ParseImg3(image.Bytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err = parsed.DecryptData(iv, key)
+			if err != nil || !bytes.Equal(got, plain[:tc.data]) {
+				t.Fatalf("DecryptData = %x, %v; want %x", got, err, plain[:tc.data])
+			}
+			if _, err := parsed.DecryptData(iv[:15], key); err == nil {
+				t.Fatal("accepted short IV")
 			}
 		})
 	}
-	if _, err := DecryptData(make([]byte, 16), iv[:15], key); err == nil {
-		t.Fatal("accepted short IV")
+	if _, err := DecryptData(make([]byte, aes.BlockSize), iv[:15], key); err == nil {
+		t.Fatal("package DecryptData accepted a short IV")
 	}
 }
 

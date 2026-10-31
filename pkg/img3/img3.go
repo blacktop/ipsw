@@ -16,6 +16,12 @@ import (
 
 const Magic = "Img3"
 
+// HasMagic reports whether magic holds the IMG3 magic as stored on disk,
+// where the ASCII "Img3" appears byte-reversed.
+func HasMagic(magic [4]byte) bool {
+	return string(reverseBytes(magic[:])) == Magic
+}
+
 // Img3 object
 type Img3 struct {
 	Header
@@ -114,7 +120,7 @@ func ParseImg3(data []byte) (*Img3, error) {
 	}
 
 	// Verify magic
-	if string(reverseBytes(i.Magic[:])) != Magic {
+	if !HasMagic(i.Magic) {
 		return nil, fmt.Errorf("invalid IMG3 magic: %s", string(reverseBytes(i.Magic[:])))
 	}
 
@@ -270,6 +276,8 @@ func DecryptKBag(kbag *KBagData, gidKey []byte) error {
 
 // DecryptData decrypts the complete AES blocks in an IMG3 DATA extent.
 // Any trailing partial block is stored in plaintext.
+//
+// Deprecated: use (*Img3).DecryptData to include the DATA tag's stored padding.
 func DecryptData(data, iv, key []byte) ([]byte, error) {
 	data = bytes.Clone(data)
 	if err := decryptData(data, iv, key); err != nil {
@@ -307,13 +315,15 @@ func decompressData(decrypted []byte) ([]byte, error) {
 	return decrypted, nil
 }
 
-func (i *Img3) decryptDataTag(iv, key []byte) ([]byte, error) {
+// DecryptData decrypts and decompresses the DATA tag using the provided IV and
+// key. The last cipher block may extend into the tag padding, so the stored
+// tag extent, not GetDataTag's payload, is what gets decrypted.
+func (i *Img3) DecryptData(iv, key []byte) ([]byte, error) {
 	for _, tag := range i.Tags {
 		if string(reverseBytes(tag.Magic[:])) != "DATA" {
 			continue
 		}
-		// The last cipher block may extend into tag padding. The declared
-		// DATA length, not PKCS#7, determines the plaintext length.
+		// The declared DATA length, not PKCS#7, determines the plaintext length.
 		stored := slices.Concat(tag.Data, tag.Pad)
 		if err := decryptData(stored, iv, key); err != nil {
 			return nil, err
@@ -331,7 +341,7 @@ func Decrypt(data, iv, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse IMG3: %v", err)
 	}
 
-	return img3.decryptDataTag(iv, key)
+	return img3.DecryptData(iv, key)
 }
 
 // ExtractData extracts and decompresses data from an unencrypted IMG3 file
@@ -388,7 +398,7 @@ func DecryptWithGIDKey(data, gidKey []byte) ([]byte, error) {
 		}
 
 		// Try to decrypt the data with this KBAG
-		decryptedData, err := img3.decryptDataTag(kbagCopy.IV, kbagCopy.Key)
+		decryptedData, err := img3.DecryptData(kbagCopy.IV, kbagCopy.Key)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to decrypt data with KBAG %d (CryptState=%d): %v", i+1, kbag.CryptState, err)
 			continue
@@ -495,7 +505,7 @@ func DecryptWithKBAGKey(data, kbagKey []byte) ([]byte, error) {
 		}
 
 		// Now use the decrypted IV and Key to decrypt the actual data
-		decryptedData, err := img3.decryptDataTag(finalIV, finalKey)
+		decryptedData, err := img3.DecryptData(finalIV, finalKey)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to decrypt data with KBAG %d (CryptState=%d): %v", i+1, kbag.CryptState, err)
 			continue

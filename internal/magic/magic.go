@@ -145,10 +145,7 @@ func IsImg3(filePath string) (bool, error) {
 	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
 		return false, fmt.Errorf("failed to read bundle header: %w", err)
 	}
-	if hdr.Magic == [4]byte{'3', 'g', 'm', 'I'} {
-		return true, nil
-	}
-	return false, nil
+	return img3.HasMagic(hdr.Magic), nil
 }
 
 func IsBUND(filePath string) (bool, error) {
