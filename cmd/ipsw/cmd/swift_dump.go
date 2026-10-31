@@ -26,13 +26,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -165,6 +165,27 @@ func runSwiftDumpDiff(args []string, oldPath string, conf *mcmd.SwiftConfig) err
 	return nil
 }
 
+func runSwiftDumpImages(images []*dyld.CacheImage, all bool, dump func(*dyld.CacheImage) error) error {
+	var errs []error
+	for _, image := range images {
+		if err := dump(image); err != nil {
+			if errors.Is(err, mcmd.ErrNoSwift) {
+				if !all {
+					log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
+				}
+				continue
+			}
+			err = fmt.Errorf("failed to dump Swift info for dylib '%s': %w", image.Name, err)
+			if !all {
+				return err
+			}
+			log.WithError(err).Warn("Skipping dylib")
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // swiftDumpCmd represents the swiftDump command
 var swiftDumpCmd = &cobra.Command{
 	Use:     "swift-dump [<DSC> <DYLIB>|<MACHO>]",
@@ -187,9 +208,6 @@ var swiftDumpCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var m *macho.File
-		var s *mcmd.Swift
-
 		// Validate Flags
 		if viper.GetBool("swift-dump.interface") &&
 			(viper.GetString("swift-dump.type") != "" ||
@@ -207,6 +225,13 @@ var swiftDumpCmd = &cobra.Command{
 			viper.GetString("swift-dump.proto") == "" &&
 			viper.GetString("swift-dump.ext") == "" &&
 			viper.GetString("swift-dump.ass") == ""
+		for _, flag := range []string{"type", "proto", "ext", "ass"} {
+			if pattern := viper.GetString("swift-dump." + flag); pattern != "" {
+				if _, err := regexp.Compile(pattern); err != nil {
+					return fmt.Errorf("invalid --%s pattern: %w", flag, err)
+				}
+			}
+		}
 
 		if len(viper.GetString("swift-dump.output")) > 0 {
 			if err := os.MkdirAll(viper.GetString("swift-dump.output"), 0o750); err != nil {
@@ -239,6 +264,35 @@ var swiftDumpCmd = &cobra.Command{
 		if oldPath := viper.GetString("swift-dump.diff"); oldPath != "" {
 			return runSwiftDumpDiff(args, oldPath, &conf)
 		}
+		dumpSwift := func(s *mcmd.Swift) error {
+			if conf.Interface {
+				return s.Interface()
+			}
+			if pattern := viper.GetString("swift-dump.type"); pattern != "" {
+				if err := s.DumpType(pattern); err != nil {
+					return fmt.Errorf("failed to dump type: %w", err)
+				}
+			}
+			if pattern := viper.GetString("swift-dump.proto"); pattern != "" {
+				if err := s.DumpProtocol(pattern); err != nil {
+					return fmt.Errorf("failed to dump protocol: %w", err)
+				}
+			}
+			if pattern := viper.GetString("swift-dump.ext"); pattern != "" {
+				if err := s.DumpExtension(pattern); err != nil {
+					return fmt.Errorf("failed to dump extension: %w", err)
+				}
+			}
+			if pattern := viper.GetString("swift-dump.ass"); pattern != "" {
+				if err := s.DumpAssociatedType(pattern); err != nil {
+					return fmt.Errorf("failed to dump associated type: %w", err)
+				}
+			}
+			if doDump {
+				return s.Dump()
+			}
+			return nil
+		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
 			machoPath := filepath.Clean(args[0])
@@ -247,53 +301,17 @@ var swiftDumpCmd = &cobra.Command{
 				return err
 			}
 			defer mr.Close()
-			m = mr.File
 			if viper.GetBool("swift-dump.deps") {
 				log.Error("cannot dump imported private frameworks from a MachO file (only from a DSC)")
 			}
 
 			conf.Name = filepath.Base(machoPath)
 
-			s, err = mcmd.NewSwift(m, nil, &conf)
+			s, err := mcmd.NewSwift(mr.File, nil, &conf)
 			if err != nil {
 				return err
 			}
-
-			if viper.GetBool("swift-dump.interface") {
-				return s.Interface()
-			}
-
-			if viper.GetString("swift-dump.type") != "" {
-				if err := s.DumpType(viper.GetString("swift-dump.type")); err != nil {
-					return fmt.Errorf("failed to dump type: %v", err)
-				}
-			}
-
-			if viper.GetString("swift-dump.proto") != "" {
-				if err := s.DumpProtocol(viper.GetString("swift-dump.proto")); err != nil {
-					return fmt.Errorf("failed to dump protocol: %v", err)
-				}
-			}
-
-			if viper.GetString("swift-dump.ext") != "" {
-				if err := s.DumpExtension(viper.GetString("swift-dump.ext")); err != nil {
-					return fmt.Errorf("failed to dump extension: %v", err)
-				}
-			}
-
-			if viper.GetString("swift-dump.ass") != "" {
-				if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
-					return fmt.Errorf("failed to dump associated type: %v", err)
-				}
-			}
-
-			if viper.GetBool("swift-dump.headers") {
-				return s.WriteHeaders()
-			}
-
-			if doDump {
-				return s.Dump()
-			}
+			return dumpSwift(s)
 		} else { /* DSC file */
 			if len(args) < 2 && !viper.GetBool("swift-dump.all") {
 				return fmt.Errorf("must provide an in-cache DYLIB to dump")
@@ -317,8 +335,8 @@ var swiftDumpCmd = &cobra.Command{
 				images = append(images, img)
 			}
 
-			for _, image := range images {
-				m, err = image.GetMacho()
+			return runSwiftDumpImages(images, viper.GetBool("swift-dump.all"), func(image *dyld.CacheImage) error {
+				m, err := image.GetMacho()
 				if err != nil {
 					return fmt.Errorf("failed to parse MachO from dylib '%s': %v", filepath.Base(image.Name), err)
 				}
@@ -327,93 +345,12 @@ var swiftDumpCmd = &cobra.Command{
 
 				conf.Name = filepath.Base(image.Name)
 
-				s, err = mcmd.NewSwift(m, f, &conf)
+				s, err := mcmd.NewSwift(m, f, &conf)
 				if err != nil {
-					if errors.Is(err, mcmd.ErrNoSwift) {
-						if !viper.GetBool("swift-dump.all") {
-							log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
-						}
-						continue
-					}
-
 					return err
 				}
-
-				if viper.GetBool("swift-dump.interface") {
-					if err := s.Interface(); err != nil {
-						return err
-					}
-				}
-
-				if viper.GetString("swift-dump.type") != "" {
-					if err := s.DumpType(viper.GetString("swift-dump.type")); err != nil {
-						if errors.Is(err, mcmd.ErrNoSwift) {
-							if !viper.GetBool("swift-dump.all") {
-								log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
-							}
-							continue
-						}
-						return err
-					}
-				}
-
-				if viper.GetString("swift-dump.proto") != "" {
-					if err := s.DumpProtocol(viper.GetString("swift-dump.proto")); err != nil {
-						if errors.Is(err, mcmd.ErrNoSwift) {
-							if !viper.GetBool("swift-dump.all") {
-								log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
-							}
-							continue
-						}
-						return err
-					}
-				}
-
-				if viper.GetString("swift-dump.ext") != "" {
-					if err := s.DumpExtension(viper.GetString("swift-dump.ext")); err != nil {
-						if errors.Is(err, mcmd.ErrNoSwift) {
-							if !viper.GetBool("swift-dump.all") {
-								log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
-							}
-							continue
-						}
-						return err
-					}
-				}
-
-				if viper.GetString("swift-dump.ass") != "" {
-					if err := s.DumpAssociatedType(viper.GetString("swift-dump.ass")); err != nil {
-						if errors.Is(err, mcmd.ErrNoSwift) {
-							if !viper.GetBool("swift-dump.all") {
-								log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
-							}
-							continue
-						}
-						return err
-					}
-				}
-
-				if viper.GetBool("swift-dump.headers") {
-					if err := s.WriteHeaders(); err != nil {
-						return err
-					}
-				}
-
-				if doDump {
-					if err := s.Dump(); err != nil {
-						if errors.Is(err, mcmd.ErrNoSwift) {
-							if !viper.GetBool("swift-dump.all") {
-								log.Warnf("Skipping dylib '%s': no swift metadata", filepath.Base(image.Name))
-							}
-							continue
-						}
-
-						return fmt.Errorf("failed to dump Swift info for dylib '%s': %v", filepath.Base(image.Name), err)
-					}
-				}
-			}
+				return dumpSwift(s)
+			})
 		}
-
-		return nil
 	},
 }

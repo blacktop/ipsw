@@ -3,6 +3,8 @@ package macho
 import (
 	"bytes"
 	"encoding/binary"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,11 +14,16 @@ import (
 
 func swiftSectionFixture(t *testing.T, name string, payload []byte) *gomacho.File {
 	t.Helper()
+	return swiftSectionDataFixture(t, name, payload, uint64(len(payload)))
+}
+
+func swiftSectionDataFixture(t *testing.T, name string, payload []byte, sectionSize uint64) *gomacho.File {
+	t.Helper()
 	sections := []types.Section{{
 		Seg: "__TEXT", Name: "__swift5_reflstr", Addr: 0x1300, Offset: 0x300, Size: 1}}
 	if name != "" {
 		sections = append(sections, types.Section{
-			Seg: "__TEXT", Name: name, Addr: 0x1320, Offset: 0x320, Size: uint64(len(payload))})
+			Seg: "__TEXT", Name: name, Addr: 0x1320, Offset: 0x320, Size: sectionSize})
 	}
 	data := make([]byte, 0x400)
 	segment := gomacho.Segment{
@@ -42,6 +49,20 @@ func swiftSectionFixture(t *testing.T, name string, payload []byte) *gomacho.Fil
 	return m
 }
 
+func swiftTypeFixture(t *testing.T, installName, typeName string) *gomacho.File {
+	t.Helper()
+	payload := make([]byte, 0x80)
+	binary.LittleEndian.PutUint32(payload, 0x20)        // __swift5_types -> descriptor
+	binary.LittleEndian.PutUint32(payload[0x20:], 17)   // non-generic struct descriptor
+	binary.LittleEndian.PutUint32(payload[0x28:], 0x38) // descriptor -> type name
+	copy(payload[0x60:], typeName)
+	m := swiftSectionDataFixture(t, "__swift5_types", payload, 4)
+	m.AddLoad(&gomacho.IDDylib{Dylib: gomacho.Dylib{
+		DylibCmd: types.DylibCmd{LoadCmd: types.LC_ID_DYLIB}, Name: installName,
+	}})
+	return m
+}
+
 func TestSwiftPrecacheErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -64,6 +85,78 @@ func TestSwiftPrecacheErrors(t *testing.T) {
 				t.Fatalf("expected precache error, got %v", err)
 			}
 		})
+	}
+}
+
+func TestSwiftDependencyErrorsDoNotAbort(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		dump func(*Swift) error
+	}{
+		{"dump", (*Swift).Dump},
+		{"type", func(s *Swift) error { return s.DumpType(".*") }},
+		{"protocol", func(s *Swift) error { return s.DumpProtocol(".*") }},
+		{"extension", func(s *Swift) error { return s.DumpExtension(".*") }},
+		{"associated type", func(s *Swift) error { return s.DumpAssociatedType(".*") }},
+		{"headers", (*Swift).WriteHeaders},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Swift{
+				conf: &SwiftConfig{Name: "Primary", Deps: true, Output: t.TempDir()},
+				file: swiftSectionFixture(t, "", nil),
+				deps: []*gomacho.File{
+					swiftSectionFixture(t, "__constg_swiftt", []byte{1}),
+					swiftSectionFixture(t, "__constg_swiftt", []byte{1}),
+				},
+			}
+			err := tc.dump(s)
+			if err == nil {
+				t.Fatal("dependency precache failures were dropped")
+			}
+			if got := strings.Count(err.Error(), "failed to precache swift fields/types"); got != 2 {
+				t.Fatalf("expected both dependency failures, got %d in %v", got, err)
+			}
+		})
+	}
+}
+
+func TestSwiftHeadersKeepImageDestinations(t *testing.T) {
+	output := t.TempDir()
+	primary := swiftTypeFixture(t, "/System/Library/Frameworks/Primary.framework/Primary", "Record")
+	s, err := NewSwift(primary, nil, &SwiftConfig{Name: "Primary", Output: output})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.conf.Deps = true
+	s.deps = []*gomacho.File{
+		swiftTypeFixture(t, "/System/Library/Frameworks/Dependency.framework/Dependency", "Record"),
+		swiftTypeFixture(t, "/System/Library/PrivateFrameworks/Primary.framework/Primary", "Other"),
+		swiftTypeFixture(t, "/usr/lib/dependency", "Third"),
+	}
+	if err := s.WriteHeaders(); err != nil {
+		t.Fatal(err)
+	}
+	for _, image := range []struct{ folder, typeName string }{
+		{"Primary", "Record"},
+		{"Dependency", "Record"},
+		{"Primary-2", "Other"},
+		{"dependency-2", "Third"},
+	} {
+		t.Run(image.folder, func(t *testing.T) {
+			dir := filepath.Join(output, image.folder)
+			body, err := os.ReadFile(filepath.Join(dir, image.typeName+".swift"))
+			if err != nil || !strings.Contains(string(body), "struct "+image.typeName) {
+				t.Fatalf("type header = %q, %v", body, err)
+			}
+			umbrella, err := os.ReadFile(filepath.Join(dir, image.folder+".swift"))
+			if err != nil || !strings.Contains(string(umbrella), "import \""+image.typeName+".swift\"") ||
+				strings.Count(string(umbrella), "import \"") != 1 {
+				t.Fatalf("umbrella header = %q, %v", umbrella, err)
+			}
+		})
+	}
+	if s.conf.Name != "Primary" {
+		t.Fatalf("header export changed the configured name to %q", s.conf.Name)
 	}
 }
 

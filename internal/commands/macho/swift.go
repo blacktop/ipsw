@@ -86,15 +86,7 @@ func (s *Swift) DumpType(pattern string) error {
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
 	}
-	ms := []*macho.File{s.file}
-	if s.conf.Deps {
-		ms = append(ms, s.deps...)
-	}
-	for _, m := range ms {
-		if !m.HasSwift() {
-			return ErrNoSwift
-		}
-
+	return s.forEachMachO(func(m *macho.File) error {
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
 			return fmt.Errorf("failed to precache swift fields/types: %w", err)
@@ -103,7 +95,7 @@ func (s *Swift) DumpType(pattern string) error {
 		typs, err := m.GetSwiftTypes()
 		if err != nil {
 			if errors.Is(err, macho.ErrSwiftSectionError) {
-				continue // skip to next MachO
+				return nil // skip to next MachO
 			}
 			return err
 		}
@@ -134,9 +126,8 @@ func (s *Swift) DumpType(pattern string) error {
 				}
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // DumpProtocol returns Swift protocols matching a given pattern from a MachO
@@ -147,15 +138,7 @@ func (s *Swift) DumpProtocol(pattern string) error {
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
 	}
-	ms := []*macho.File{s.file}
-	if s.conf.Deps {
-		ms = append(ms, s.deps...)
-	}
-	for _, m := range ms {
-		if !m.HasSwift() {
-			return ErrNoSwift
-		}
-
+	return s.forEachMachO(func(m *macho.File) error {
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
 			return fmt.Errorf("failed to precache swift fields/types: %w", err)
@@ -164,7 +147,7 @@ func (s *Swift) DumpProtocol(pattern string) error {
 		protos, err := m.GetSwiftProtocols()
 		if err != nil {
 			if errors.Is(err, macho.ErrSwiftSectionError) {
-				continue // skip to next MachO
+				return nil // skip to next MachO
 			}
 			return err
 		}
@@ -195,9 +178,8 @@ func (s *Swift) DumpProtocol(pattern string) error {
 				}
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // DumpExtension returns Swift extensions matching a given pattern from a MachO
@@ -208,15 +190,7 @@ func (s *Swift) DumpExtension(pattern string) error {
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
 	}
-	ms := []*macho.File{s.file}
-	if s.conf.Deps {
-		ms = append(ms, s.deps...)
-	}
-	for _, m := range ms {
-		if !m.HasSwift() {
-			return ErrNoSwift
-		}
-
+	return s.forEachMachO(func(m *macho.File) error {
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
 			return fmt.Errorf("failed to precache swift fields/types: %w", err)
@@ -225,7 +199,7 @@ func (s *Swift) DumpExtension(pattern string) error {
 		exts, err := m.GetSwiftProtocolConformances()
 		if err != nil {
 			if errors.Is(err, macho.ErrSwiftSectionError) {
-				continue // skip to next MachO
+				return nil // skip to next MachO
 			}
 			return err
 		}
@@ -256,9 +230,8 @@ func (s *Swift) DumpExtension(pattern string) error {
 				}
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // DumpAssociatedType returns Swift associated types matching a given pattern from a MachO
@@ -269,15 +242,7 @@ func (s *Swift) DumpAssociatedType(pattern string) error {
 	if err != nil {
 		return fmt.Errorf("failed to compile regex: %v", err)
 	}
-	ms := []*macho.File{s.file}
-	if s.conf.Deps {
-		ms = append(ms, s.deps...)
-	}
-	for _, m := range ms {
-		if !m.HasSwift() {
-			return ErrNoSwift
-		}
-
+	return s.forEachMachO(func(m *macho.File) error {
 		toc := m.GetSwiftTOC()
 		if err := m.PreCache(); err != nil { // cache fields and types
 			return fmt.Errorf("failed to precache swift fields/types: %w", err)
@@ -286,7 +251,7 @@ func (s *Swift) DumpAssociatedType(pattern string) error {
 		asstyps, err := m.GetSwiftAssociatedTypes()
 		if err != nil {
 			if errors.Is(err, macho.ErrSwiftSectionError) {
-				continue // skip to next MachO
+				return nil // skip to next MachO
 			}
 			return err
 		}
@@ -317,23 +282,15 @@ func (s *Swift) DumpAssociatedType(pattern string) error {
 				}
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // Dump outputs Swift info from a MachO
 func (s *Swift) Dump() error {
 	restore := s.setAutoDemangle(s.conf.Demangle)
 	defer restore()
-	ms := []*macho.File{s.file}
-	if s.conf.Deps {
-		ms = append(ms, s.deps...)
-	}
-	for _, m := range ms {
-		if !m.HasSwift() {
-			return ErrNoSwift
-		}
+	return s.forEachMachO(func(m *macho.File) error {
 		if err := m.PreCache(); err != nil { // cache fields and types
 			return fmt.Errorf("failed to precache swift fields/types: %w", err)
 		}
@@ -623,9 +580,8 @@ func (s *Swift) Dump() error {
 				return fmt.Errorf("failed to parse swift accessible functions: %w", err)
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // Interface outputs Swift swift-dump interface from a MachO
@@ -643,15 +599,21 @@ func (s *Swift) Interface() error {
 func (s *Swift) WriteHeaders() error {
 	restore := s.setAutoDemangle(s.conf.Demangle)
 	defer restore()
+	usedNames := map[string]bool{strings.ToLower(s.conf.Name): true}
 	writeSwiftHeaders := func(m *macho.File) error {
 		var headers []string
 
-		if !m.HasSwift() {
-			return nil
-		}
-
 		if err := m.PreCache(); err != nil { // cache fields and types
 			return fmt.Errorf("failed to precache swift fields/types: %w", err)
+		}
+		name := s.conf.Name
+		if m != s.file {
+			base := safeSwiftFileName(filepath.Base(machoName(m)), "")
+			name = base
+			for n := 2; usedNames[strings.ToLower(name)]; n++ {
+				name = safeSwiftFileName(base, fmt.Sprintf("-%d", n))
+			}
+			usedNames[strings.ToLower(name)] = true
 		}
 
 		var buildVersions []string
@@ -682,7 +644,7 @@ func (s *Swift) WriteHeaders() error {
 				}
 
 				safeName := safeSwiftFileName(typ.Name, ".swift")
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
+				fname := filepath.Join(s.conf.Output, name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
@@ -716,7 +678,7 @@ func (s *Swift) WriteHeaders() error {
 				}
 
 				safeName := safeSwiftFileName(proto.Name, "-Protocol.swift")
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
+				fname := filepath.Join(s.conf.Output, name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
@@ -750,7 +712,7 @@ func (s *Swift) WriteHeaders() error {
 				}
 
 				safeName := safeSwiftFileName(ext.Protocol, "-Extension.swift")
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
+				fname := filepath.Join(s.conf.Output, name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
@@ -784,7 +746,7 @@ func (s *Swift) WriteHeaders() error {
 				}
 
 				safeName := safeSwiftFileName(at.ConformingTypeName, "-AssociatedType.swift")
-				fname := filepath.Join(s.conf.Output, s.conf.Name, safeName)
+				fname := filepath.Join(s.conf.Output, name, safeName)
 				if err := writeSwiftHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   s.conf.IpswVersion,
@@ -804,17 +766,17 @@ func (s *Swift) WriteHeaders() error {
 		/* generate umbrella header */
 		if len(headers) > 0 {
 			var umbrella string
-			if slices.Contains(headers, s.conf.Name+".swift") {
-				umbrella = s.conf.Name + "-Umbrella"
+			if slices.Contains(headers, name+".swift") {
+				umbrella = name + "-Umbrella"
 			} else {
-				umbrella = s.conf.Name
+				umbrella = name
 			}
 
 			for i, header := range headers {
 				headers[i] = "import \"" + header + "\""
 			}
 
-			fname := filepath.Join(s.conf.Output, s.conf.Name, umbrella+".swift")
+			fname := filepath.Join(s.conf.Output, name, umbrella+".swift")
 			if err := writeSwiftHeader(&headerInfo{
 				FileName:      fname,
 				IpswVersion:   s.conf.IpswVersion,
@@ -831,15 +793,36 @@ func (s *Swift) WriteHeaders() error {
 		return nil
 	}
 
-	if len(s.deps) > 0 {
-		for _, m := range s.deps {
-			if err := writeSwiftHeaders(m); err != nil {
-				return err
-			}
+	return s.forEachMachO(writeSwiftHeaders)
+}
+
+// forEachMachO runs fn on the primary MachO and, with --deps, on each imported
+// dependency that contains Swift. A primary failure aborts; dependency failures
+// are collected so one broken framework does not hide the others' output.
+func (s *Swift) forEachMachO(fn func(*macho.File) error) error {
+	if err := fn(s.file); err != nil {
+		return err
+	}
+	if !s.conf.Deps {
+		return nil
+	}
+	var errs []error
+	for _, dep := range s.deps {
+		if !dep.HasSwift() {
+			continue
+		}
+		if err := fn(dep); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", machoName(dep), err))
 		}
 	}
+	return errors.Join(errs...)
+}
 
-	return writeSwiftHeaders(s.file)
+func machoName(m *macho.File) string {
+	if id := m.DylibID(); id != nil {
+		return id.Name
+	}
+	return "dependency"
 }
 
 func (s *Swift) setAutoDemangle(enabled bool) func() {
