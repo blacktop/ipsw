@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,22 +72,36 @@ var pbzxCmd = &cobra.Command{
 		}
 
 		fname := infile + ".extracted"
+		mode := os.FileMode(0o644)
+		if info, err := os.Stat(fname); err == nil {
+			mode &= info.Mode().Perm()
+		} else if !os.IsNotExist(err) {
+			return err
+		}
 
-		out, err := os.Create(fname)
+		tmpname := filepath.Join(filepath.Dir(fname), ".ipsw-pbzx-"+rand.Text()+".tmp")
+		out, err := os.OpenFile(tmpname, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 		if err != nil {
 			return err
 		}
-		defer out.Close()
-
-		// stream decompressed chunks straight to disk instead of buffering the whole payload in memory
-		if err := pbzx.Extract(context.Background(), f, out, runtime.NumCPU()); err != nil {
+		defer func() {
 			out.Close()
-			os.Remove(fname)
+			os.Remove(tmpname)
+		}()
+
+		// Keep the previous output until the streamed extraction is complete.
+		if err := pbzx.Extract(context.Background(), f, out, runtime.NumCPU()); err != nil {
 			return err
 		}
 
 		oinfo, err := out.Stat()
 		if err != nil {
+			return err
+		}
+		if err := out.Close(); err != nil {
+			return err
+		}
+		if err := os.Rename(tmpname, fname); err != nil {
 			return err
 		}
 
@@ -95,6 +110,6 @@ var pbzxCmd = &cobra.Command{
 			"decompressed": fmt.Sprintf("%d bytes (%s)", oinfo.Size(), humanize.IBytes(uint64(oinfo.Size()))),
 			"output":       fname,
 		}).Info("Extracted PBZX file")
-		return out.Close()
+		return nil
 	},
 }
