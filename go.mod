@@ -20,11 +20,11 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.84.0
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.1
-	github.com/blacktop/arm64-cgo v1.0.75
-	github.com/blacktop/go-apfs v1.0.29
+	github.com/blacktop/arm64-cgo v1.0.76
+	github.com/blacktop/go-apfs v1.0.30
 	github.com/blacktop/go-download v0.2.8
-	github.com/blacktop/go-dwarf v1.0.14
-	github.com/blacktop/go-macho v1.1.295
+	github.com/blacktop/go-dwarf v1.1.0
+	github.com/blacktop/go-macho v1.1.296
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.26
 	github.com/blacktop/lzfse-cgo v1.2.0
@@ -72,7 +72,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/twmb/murmur3 v1.2.1
+	github.com/twmb/murmur3 v1.2.2
 	github.com/ulikunitz/xz v0.5.17
 	github.com/unicorn-engine/unicorn v0.0.0-20260217064959-7c5db94191de
 	github.com/vbauerster/cupwriter v0.0.5
