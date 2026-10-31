@@ -2,7 +2,6 @@ package dyld
 
 import (
 	"archive/zip"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -225,11 +224,12 @@ func readStrictDscHeader(name string) (header *CacheHeader, retErr error) {
 	if !slices.Contains(knownMagic, strings.Trim(string(magic[:]), "\x00")) {
 		return nil, fmt.Errorf("unsupported dyld cache magic %q", magic[:n])
 	}
-	header = new(CacheHeader)
-	if err := binary.Read(io.NewSectionReader(f, 0, int64(binary.Size(*header))), binary.LittleEndian, header); err != nil {
+	decoded, err := readCacheHeader(f)
+	if err != nil {
 		return nil, fmt.Errorf("read dyld cache header: %w", err)
 	}
-	if header.UUID.IsNull() || header.CacheType > CacheTypeUniversal {
+	header = &decoded
+	if !header.HasUUIDField() || header.UUID.IsNull() || header.CacheType > CacheTypeUniversal {
 		return nil, errors.New("invalid dyld cache UUID or cache type")
 	}
 	return header, nil

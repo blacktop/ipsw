@@ -11,6 +11,18 @@ func cacheCPUFieldsEnd() uint32 {
 	return uint32(unsafe.Offsetof(CacheHeader{}.CacheCPUReserved) + unsafe.Sizeof(CacheHeader{}.CacheCPUReserved))
 }
 
+func TestCacheHeaderHasSwiftOptsFields(t *testing.T) {
+	end := uint32(unsafe.Offsetof(CacheHeader{}.SwiftOptsSize) + unsafe.Sizeof(CacheHeader{}.SwiftOptsSize))
+	for _, tc := range []struct {
+		offset uint32
+		want   bool
+	}{{0x140, false}, {end - 1, false}, {end, true}} {
+		if got := (CacheHeader{MappingOffset: tc.offset}).HasSwiftOptsFields(); got != tc.want {
+			t.Errorf("HasSwiftOptsFields(%#x) = %t, want %t", tc.offset, got, tc.want)
+		}
+	}
+}
+
 func TestCacheHeaderCacheCPULayout(t *testing.T) {
 	prewarmingEnd := unsafe.Offsetof(CacheHeader{}.PrewarmingDataSize) + unsafe.Sizeof(CacheHeader{}.PrewarmingDataSize)
 	if got := unsafe.Offsetof(CacheHeader{}.CacheCPUType); got != prewarmingEnd {
@@ -106,30 +118,38 @@ func TestCacheHeaderHasCacheCPUFields(t *testing.T) {
 }
 
 func TestCacheHeaderHasAppendedFields(t *testing.T) {
+	imagesTextEnd := uint32(unsafe.Offsetof(CacheHeader{}.ImagesTextCount) + unsafe.Sizeof(CacheHeader{}.ImagesTextCount))
 	rosettaEnd := uint32(unsafe.Offsetof(CacheHeader{}.RosettaReadWriteSize) + unsafe.Sizeof(CacheHeader{}.RosettaReadWriteSize))
 	objcOptsEnd := uint32(unsafe.Offsetof(CacheHeader{}.ObjcOptsSize) + unsafe.Sizeof(CacheHeader{}.ObjcOptsSize))
 	dynamicDataEnd := uint32(unsafe.Offsetof(CacheHeader{}.DynamicDataMaxSize) + unsafe.Sizeof(CacheHeader{}.DynamicDataMaxSize))
 
 	tests := []struct {
-		name          string
-		mappingOffset uint32
-		wantRosetta   bool
-		wantObjcOpts  bool
-		wantDynamic   bool
+		name           string
+		mappingOffset  uint32
+		wantImagesText bool
+		wantRosetta    bool
+		wantObjcOpts   bool
+		wantDynamic    bool
 	}{
-		{"macOS 11 header (0x140)", 0x140, false, false, false},
-		{"one byte short of the rosetta fields end", rosettaEnd - 1, false, false, false},
-		{"header includes rosetta fields", rosettaEnd, true, false, false},
-		{"macOS 12 header (0x1c8)", 0x1c8, true, false, false},
-		{"header includes objcOpts fields", objcOptsEnd, true, true, false},
-		{"one byte short of the dynamic data fields end", dynamicDataEnd - 1, true, true, false},
-		{"macOS 13 header (0x200)", 0x200, true, true, true},
-		{"full header", uint32(binary.Size(CacheHeader{})), true, true, true},
+		{"iOS 8 header (0x70)", 0x70, false, false, false, false},
+		{"one byte short of the images text fields end", imagesTextEnd - 1, false, false, false, false},
+		{"header includes images text fields", imagesTextEnd, true, false, false, false},
+		{"macOS 11 header (0x140)", 0x140, true, false, false, false},
+		{"one byte short of the rosetta fields end", rosettaEnd - 1, true, false, false, false},
+		{"header includes rosetta fields", rosettaEnd, true, true, false, false},
+		{"macOS 12 header (0x1c8)", 0x1c8, true, true, false, false},
+		{"header includes objcOpts fields", objcOptsEnd, true, true, true, false},
+		{"one byte short of the dynamic data fields end", dynamicDataEnd - 1, true, true, true, false},
+		{"macOS 13 header (0x200)", 0x200, true, true, true, true},
+		{"full header", uint32(binary.Size(CacheHeader{})), true, true, true, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hdr := CacheHeader{MappingOffset: tt.mappingOffset}
+			if got := hdr.HasImagesTextFields(); got != tt.wantImagesText {
+				t.Errorf("HasImagesTextFields() = %t, want %t (MappingOffset = %#x)", got, tt.wantImagesText, tt.mappingOffset)
+			}
 			if got := hdr.HasRosettaFields(); got != tt.wantRosetta {
 				t.Errorf("HasRosettaFields() = %t, want %t (MappingOffset = %#x)", got, tt.wantRosetta, tt.mappingOffset)
 			}

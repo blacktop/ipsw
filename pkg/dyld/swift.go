@@ -213,7 +213,7 @@ func (s *SwiftHashTable) Read(r *io.SectionReader) error {
 }
 
 func (f *File) getSwiftTypeHashTable() (*SwiftHashTable, error) {
-	if f.IsDyld4 && f.Headers[f.UUID].SwiftOptsOffset > 0 {
+	if f.IsDyld4 && f.Headers[f.UUID].HasSwiftOptsFields() && f.Headers[f.UUID].SwiftOptsOffset > 0 {
 		uuid, off, err := f.GetCacheOffset(f.Headers[f.UUID].SwiftOptsOffset)
 		if err != nil {
 			return nil, err
@@ -249,7 +249,7 @@ func (f *File) getSwiftTypeHashTable() (*SwiftHashTable, error) {
 }
 
 func (f *File) getSwiftMetadataTable() (*SwiftHashTable, error) {
-	if f.IsDyld4 && f.Headers[f.UUID].SwiftOptsOffset > 0 {
+	if f.IsDyld4 && f.Headers[f.UUID].HasSwiftOptsFields() && f.Headers[f.UUID].SwiftOptsOffset > 0 {
 		uuid, off, err := f.GetCacheOffset(f.Headers[f.UUID].SwiftOptsOffset)
 		if err != nil {
 			return nil, err
@@ -285,7 +285,7 @@ func (f *File) getSwiftMetadataTable() (*SwiftHashTable, error) {
 }
 
 func (f *File) getSwiftForeignTypeHashTable() (*SwiftHashTable, error) {
-	if f.IsDyld4 && f.Headers[f.UUID].SwiftOptsOffset > 0 {
+	if f.IsDyld4 && f.Headers[f.UUID].HasSwiftOptsFields() && f.Headers[f.UUID].SwiftOptsOffset > 0 {
 		uuid, off, err := f.GetCacheOffset(f.Headers[f.UUID].SwiftOptsOffset)
 		if err != nil {
 			return nil, err

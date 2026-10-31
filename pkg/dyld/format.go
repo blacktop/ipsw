@@ -355,6 +355,9 @@ func (f *File) getLocalSymbols() string {
 
 func (f *File) getImagesTextInfo(uuid types.UUID) string {
 	var output string
+	if !f.Headers[uuid].HasImagesTextFields() {
+		return output
+	}
 	imagesCount := f.Headers[uuid].ImagesTextCount
 	imagesOffset := f.Headers[uuid].ImagesTextOffset
 	imagesSize := imagesCount * uint64(binary.Size(CacheImageTextInfo{}))
@@ -478,7 +481,7 @@ func (f *File) getObjcOpts(uuid types.UUID) string {
 
 func (f *File) getSwiftOpts(uuid types.UUID) string {
 	var output string
-	if f.IsDyld4 && f.Headers[uuid].SwiftOptsOffset > 0 {
+	if f.IsDyld4 && f.Headers[uuid].HasSwiftOptsFields() && f.Headers[uuid].SwiftOptsOffset > 0 {
 		output = fmt.Sprintf("Swift Opts:                  %3dkB, offset:  0x%09X -> 0x%09X\n",
 			f.Headers[uuid].SwiftOptsSize/(1024),
 			f.Headers[uuid].SwiftOptsOffset,

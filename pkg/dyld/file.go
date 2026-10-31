@@ -167,21 +167,42 @@ func (e *FormatError) Error() string {
 	return msg
 }
 
+// readCacheHeader decodes the original fixed prefix and only the appended
+// fields covered by MappingOffset. Future header bytes are not needed here.
+func readCacheHeader(r io.ReaderAt) (CacheHeader, error) {
+	var header CacheHeader
+	var prefix [0x28]byte // through dyldBaseAddress
+	if _, err := io.ReadFull(io.NewSectionReader(r, 0, int64(len(prefix))), prefix[:]); err != nil {
+		return header, err
+	}
+	length := binary.LittleEndian.Uint32(prefix[0x10:0x14])
+	if length < uint32(len(prefix)) {
+		return header, &FormatError{0x10, "cache header is shorter than its fixed prefix", length}
+	}
+	data := make([]byte, binary.Size(header))
+	copy(data, prefix[:])
+	end := int(min(uint64(length), uint64(len(data))))
+	if _, err := io.ReadFull(io.NewSectionReader(r, int64(len(prefix)), int64(end-len(prefix))), data[len(prefix):end]); err != nil {
+		return header, err
+	}
+	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &header); err != nil {
+		return header, err
+	}
+	if !header.HasUUIDField() {
+		header.UUID = mtypes.UUID{}
+	}
+	return header, nil
+}
+
 func getUUID(r io.ReaderAt) (mtypes.UUID, error) {
-	var uuidBytes [16]byte
-	var badUUID mtypes.UUID
-
-	if _, err := r.ReadAt(uuidBytes[0:], 0x58); err != nil {
-		return badUUID, err
+	header, err := readCacheHeader(r)
+	if err != nil {
+		return mtypes.UUID{}, err
 	}
-
-	uuid := mtypes.UUID(uuidBytes)
-
-	if uuid.IsNull() {
-		return badUUID, fmt.Errorf("file's UUID is empty") // FIXME: should this actually stop or continue
+	if header.HasUUIDField() && header.UUID.IsNull() {
+		return mtypes.UUID{}, fmt.Errorf("file's UUID is empty")
 	}
-
-	return uuid, nil
+	return header.UUID, nil
 }
 
 // Open opens the named file and prepares it for use as a dyld binary.
@@ -341,8 +362,6 @@ func (f *File) Close() error {
 
 // ReadHeader opens a given cache and returns the dyld_cache_header
 func ReadHeader(name string) (*CacheHeader, error) {
-	var header CacheHeader
-
 	log.WithFields(log.Fields{
 		"cache": name,
 	}).Debug("Parsing Cache Header")
@@ -351,8 +370,9 @@ func ReadHeader(name string) (*CacheHeader, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if err := binary.Read(f, binary.LittleEndian, &header); err != nil {
+	defer f.Close()
+	header, err := readCacheHeader(f)
+	if err != nil {
 		return nil, err
 	}
 
@@ -418,9 +438,8 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	f.r[uuid] = r
 
-	// Read entire file header.
-	var hdr CacheHeader
-	if err := binary.Read(sr, f.ByteOrder, &hdr); err != nil {
+	hdr, err := readCacheHeader(r)
+	if err != nil {
 		return err
 	}
 	f.Headers[uuid] = hdr
@@ -716,15 +735,24 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 
 	// Read dyld text_info entries.
-	if f.Headers[uuid].ImagesTextCount > uint64(len(f.Images)) {
-		return &FormatError{int64(f.Headers[uuid].ImagesTextOffset),
-			fmt.Sprintf("header declares %d text_info entries for %d images",
-				f.Headers[uuid].ImagesTextCount, len(f.Images)), nil}
-	}
-	sr.Seek(int64(f.Headers[uuid].ImagesTextOffset), io.SeekStart)
-	for i := uint64(0); i != f.Headers[uuid].ImagesTextCount; i++ {
-		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
-			return err
+	if f.Headers[uuid].HasImagesTextFields() {
+		if f.Headers[uuid].ImagesTextCount > uint64(len(f.Images)) {
+			return &FormatError{int64(f.Headers[uuid].ImagesTextOffset),
+				fmt.Sprintf("header declares %d text_info entries for %d images",
+					f.Headers[uuid].ImagesTextCount, len(f.Images)), nil}
+		}
+		sr.Seek(int64(f.Headers[uuid].ImagesTextOffset), io.SeekStart)
+		for i := uint64(0); i != f.Headers[uuid].ImagesTextCount; i++ {
+			if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
+				return err
+			}
+		}
+	} else {
+		// Pre-iOS 9 caches carry no text_info table. The image table still
+		// records each image's unslid __TEXT address, which image sorting,
+		// address lookups and export tries read from LoadAddress.
+		for _, image := range f.Images {
+			image.LoadAddress = image.Info.Address
 		}
 	}
 

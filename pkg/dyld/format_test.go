@@ -70,6 +70,7 @@ func TestImagesTextInfo(t *testing.T) {
 		{
 			name: "legacy image table",
 			header: CacheHeader{
+				MappingOffset:   0xb0,
 				ImagesOffsetOld: 0x400, ImagesCountOld: 2,
 				ImagesTextOffset: 0x580, ImagesTextCount: 1,
 			},
@@ -78,7 +79,8 @@ func TestImagesTextInfo(t *testing.T) {
 		{
 			name: "modern image table",
 			header: CacheHeader{
-				ImagesOffset: 0x400, ImagesCount: 40,
+				MappingOffset: 0x200,
+				ImagesOffset:  0x400, ImagesCount: 40,
 				ImagesTextOffset: 0x100001000, ImagesTextCount: 33,
 			},
 			want: "ImagesText Info:               1KB, offset:  0x100001000 -> 0x100001420\n",
@@ -86,8 +88,19 @@ func TestImagesTextInfo(t *testing.T) {
 		{
 			name: "no text info",
 			header: CacheHeader{
+				MappingOffset:   0x200,
 				ImagesOffsetOld: 0x400, ImagesCountOld: 2,
 				ImagesOffset: 0x500, ImagesCount: 3,
+			},
+		},
+		{
+			// A pre-iOS 9 header ends before the text info fields, so the
+			// struct holds mapping table bytes there.
+			name: "header predates text info",
+			header: CacheHeader{
+				MappingOffset:   0x70,
+				ImagesOffsetOld: 0x400, ImagesCountOld: 2,
+				ImagesTextOffset: 0x300000003, ImagesTextCount: 0x1c000,
 			},
 		},
 	} {
@@ -98,5 +111,20 @@ func TestImagesTextInfo(t *testing.T) {
 				t.Fatalf("getImagesTextInfo() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSwiftOptsInfoHeaderGuard(t *testing.T) {
+	uuid := types.UUID{1}
+	for _, tc := range []struct {
+		offset uint32
+		want   bool
+	}{{0x140, false}, {0x200, true}} {
+		f := File{IsDyld4: true, Headers: map[types.UUID]CacheHeader{
+			uuid: {MappingOffset: tc.offset, SwiftOptsOffset: 0x5000, SwiftOptsSize: 0x1000},
+		}}
+		if got := f.getSwiftOpts(uuid) != ""; got != tc.want {
+			t.Errorf("Swift opts present for header %#x = %t, want %t", tc.offset, got, tc.want)
+		}
 	}
 }

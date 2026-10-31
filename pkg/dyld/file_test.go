@@ -15,6 +15,94 @@ import (
 	mtypes "github.com/blacktop/go-macho/types"
 )
 
+func TestReadCacheHeaderBounds(t *testing.T) {
+	want := CacheHeader{MappingOffset: 0x58, MappingCount: 3, ImagesOffsetOld: 0xb8,
+		ImagesCountOld: 1, DyldBaseAddress: 0x20000000, CodeSignatureOffset: 0x400,
+		CodeSignatureSize: 12, LocalSymbolsOffset: 0x300, LocalSymbolsSize: 0x80}
+	copy(want.Magic[:], "dyld_v1   armv7")
+	encoded := make([]byte, binary.Size(want))
+	if _, err := binary.Encode(encoded, binary.LittleEndian, want); err != nil {
+		t.Fatal(err)
+	}
+	data := bytes.Repeat([]byte{0xff}, len(encoded))
+	copy(data[:want.MappingOffset], encoded[:want.MappingOffset])
+	got, err := readCacheHeader(bytes.NewReader(data))
+	if err != nil || got != want {
+		t.Fatalf("bounded header = %+v, %v; want %+v", got, err, want)
+	}
+	if uuid, err := getUUID(bytes.NewReader(data)); err != nil || !uuid.IsNull() {
+		t.Fatalf("absent UUID = %s, %v", uuid, err)
+	}
+
+	want.MappingOffset = uint32(len(encoded) + 64)
+	want.UUID[0] = 1
+	if _, err := binary.Encode(encoded, binary.LittleEndian, want); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := readCacheHeader(bytes.NewReader(encoded)); err != nil || got != want {
+		t.Fatalf("future header prefix = %+v, %v", got, err)
+	}
+	if _, err := readCacheHeader(bytes.NewReader(encoded[:0x60])); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("truncated header error = %v", err)
+	}
+	binary.LittleEndian.PutUint32(encoded[0x10:], 0x24)
+	if _, err := readCacheHeader(bytes.NewReader(encoded)); err == nil {
+		t.Fatal("accepted a header shorter than the fixed prefix")
+	}
+	emptyUUID := syntheticPrimaryBytes(t, layoutSelfContained, func(h *CacheHeader) { h.UUID = mtypes.UUID{} })
+	if _, err := getUUID(bytes.NewReader(emptyUUID)); err == nil {
+		t.Fatal("accepted a present empty UUID")
+	}
+}
+
+func TestParseCacheWithPreUUIDHeader(t *testing.T) {
+	const imageAddr = 0x10000200
+	const signatureOffset = 0xc00
+	header := CacheHeader{MappingOffset: 0x58, MappingCount: 3, ImagesOffsetOld: 0xb8,
+		ImagesCountOld: 1, CodeSignatureOffset: signatureOffset, CodeSignatureSize: 12}
+	copy(header.Magic[:], "dyld_v1   armv7")
+	encoded := make([]byte, binary.Size(header))
+	if _, err := binary.Encode(encoded, binary.LittleEndian, header); err != nil {
+		t.Fatal(err)
+	}
+	data := make([]byte, signatureOffset+12)
+	copy(data, encoded[:header.MappingOffset])
+	for idx, mapping := range []CacheMappingInfo{
+		{Address: 0x10000000, Size: 0x400, MaxProt: 5, InitProt: 5},
+		{Address: 0x10000400, Size: 0x400, FileOffset: 0x400, MaxProt: 3, InitProt: 3},
+		{Address: 0x10000800, Size: 0x400, FileOffset: 0x800, MaxProt: 1, InitProt: 1},
+	} {
+		if _, err := binary.Encode(data[0x58+idx*32:], binary.LittleEndian, mapping); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := binary.Encode(data[0xb8:], binary.LittleEndian, CacheImageInfo{Address: imageAddr, PathFileOffset: 0x100}); err != nil {
+		t.Fatal(err)
+	}
+	copy(data[0x100:], "/usr/lib/libsynthetic.dylib\x00")
+	if _, err := binary.Encode(data[signatureOffset:], binary.BigEndian, fakeCodeSignature); err != nil {
+		t.Fatal(err)
+	}
+	f, err := NewFile(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if !f.UUID.IsNull() || f.Headers[f.UUID] != header || len(f.BranchPools) != 0 || len(f.SubCacheInfo) != 0 {
+		t.Fatalf("mapping bytes escaped into header fields: %+v", f.Headers[f.UUID])
+	}
+	if len(f.Images) != 1 || f.Images[0].LoadAddress != imageAddr {
+		t.Fatalf("images = %+v, want load address %#x", f.Images, imageAddr)
+	}
+	path := filepath.Join(t.TempDir(), "dyld_shared_cache_armv7")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ReadHeader(path); err != nil || *got != header {
+		t.Fatalf("ReadHeader = %+v, %v", got, err)
+	}
+}
+
 func TestImageAmbiguityWithoutTerminal(t *testing.T) {
 	input, err := os.Open(os.DevNull)
 	if err != nil {
@@ -717,5 +805,42 @@ func TestHasImagePathRejectsIndexOverflow(t *testing.T) {
 		if got, err := f.HasImagePath("/lib/test"); err == nil || got != -1 {
 			t.Fatalf("index %d: got %d err=%v", index, got, err)
 		}
+	}
+}
+
+func TestParseCacheBackfillsLoadAddressWithoutTextInfo(t *testing.T) {
+	const imageAddr = 0x100001000
+	data := syntheticPrimaryBytes(t, layoutSelfContained, func(h *CacheHeader) {
+		h.MappingOffset = 0x70
+		h.MappingCount = 1
+		h.ImagesOffsetOld = 0x1000
+		h.ImagesCountOld = 1
+		h.SharedRegionStart = 0x100000000
+		// A 0x70 header ends before text_info; these bytes are not a table.
+		h.ImagesTextOffset = 0x300000003
+		h.ImagesTextCount = 0x1c000
+	})
+	data = append(data, make([]byte, 0x2000-len(data))...)
+	if _, err := binary.Encode(data[0x70:], binary.LittleEndian, CacheMappingInfo{
+		Address: 0x100000000,
+		Size:    uint64(len(data)),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := binary.Encode(data[0x1000:], binary.LittleEndian, CacheImageInfo{
+		Address:        imageAddr,
+		PathFileOffset: 0x1100,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	copy(data[0x1100:], "/usr/lib/libsynthetic.dylib\x00")
+
+	f, err := NewFile(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if len(f.Images) != 1 || f.Images[0].LoadAddress != imageAddr {
+		t.Fatalf("images = %+v, want one image with LoadAddress %#x", f.Images, uint64(imageAddr))
 	}
 }

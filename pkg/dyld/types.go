@@ -216,6 +216,11 @@ type CacheHeader struct {
 	CacheCPUReserved uint64           // reserved; observed zero (Apple's field name unknown)
 }
 
+// HasUUIDField reports whether the header contains the complete cache UUID.
+func (dch CacheHeader) HasUUIDField() bool {
+	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.UUID)+unsafe.Sizeof(dch.UUID))
+}
+
 // HasRosettaFields returns true if the cache header is new enough to contain the
 // Rosetta read-only/read-write region fields (i.e. MappingOffset is past them).
 func (dch CacheHeader) HasRosettaFields() bool {
@@ -228,10 +233,21 @@ func (dch CacheHeader) HasObjcOptsFields() bool {
 	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.ObjcOptsSize)+unsafe.Sizeof(dch.ObjcOptsSize))
 }
 
+// HasSwiftOptsFields reports whether the header contains both Swift optimization fields.
+func (dch CacheHeader) HasSwiftOptsFields() bool {
+	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.SwiftOptsSize)+unsafe.Sizeof(dch.SwiftOptsSize))
+}
+
 // HasDynamicDataFields returns true if the cache header is new enough to contain the
 // dynamic data offset/max size fields (i.e. MappingOffset is past them).
 func (dch CacheHeader) HasDynamicDataFields() bool {
 	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.DynamicDataMaxSize)+unsafe.Sizeof(dch.DynamicDataMaxSize))
+}
+
+// HasImagesTextFields returns true if the cache header is new enough to contain the
+// image text info offset/count fields (i.e. MappingOffset is past them).
+func (dch CacheHeader) HasImagesTextFields() bool {
+	return dch.MappingOffset >= uint32(unsafe.Offsetof(dch.ImagesTextCount)+unsafe.Sizeof(dch.ImagesTextCount))
 }
 
 // HasCacheCPUFields returns true if the cache header is new enough to contain the
