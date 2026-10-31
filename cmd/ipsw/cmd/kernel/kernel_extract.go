@@ -28,6 +28,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
@@ -35,6 +36,7 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/kernelcache/kdk"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -120,19 +122,33 @@ func init() {
 	kerExtractCmd.Flags().StringP("output", "o", "", "Directory to extract KEXTs to")
 	kerExtractCmd.MarkFlagDirname("output")
 	kerExtractCmd.Flags().StringP("arch", "e", "", "Which architecture to use for fat/universal MachO")
+	kerExtractCmd.Flags().Bool("kdk", false, "Recreate a KDK: the kernel and all KEXTs as standalone Mach-Os that kmutil can link, with their Info.plists")
+	kerExtractCmd.Flags().String("symbols", "", "With --kdk: symbol map of the kernelcache ('ipsw kernel symbolicate --json') used to name the links of a stripped kernelcache")
+	kerExtractCmd.MarkFlagFilename("symbols")
 
 	viper.BindPFlag("kernel.extract.all", kerExtractCmd.Flags().Lookup("all"))
 	viper.BindPFlag("kernel.extract.force", kerExtractCmd.Flags().Lookup("force"))
 	viper.BindPFlag("kernel.extract.imports", kerExtractCmd.Flags().Lookup("imports"))
 	viper.BindPFlag("kernel.extract.output", kerExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("kernel.extract.arch", kerExtractCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("kernel.extract.kdk", kerExtractCmd.Flags().Lookup("kdk"))
+	viper.BindPFlag("kernel.extract.symbols", kerExtractCmd.Flags().Lookup("symbols"))
 }
 
 // kerExtractCmd represents the kerExtract command
 var kerExtractCmd = &cobra.Command{
-	Use:           "extract <KERNELCACHE> <KEXT>",
-	Aliases:       []string{"e"},
-	Short:         "Extract KEXT(s) from kernelcache",
+	Use:     "extract <KERNELCACHE> <KEXT>",
+	Aliases: []string{"e"},
+	Short:   "Extract KEXT(s) from kernelcache",
+	Example: heredoc.Doc(`
+		# Extract a single KEXT
+		❯ ipsw kernel extract kernelcache.release.iPhone18,1 com.apple.iokit.IOSurface
+		# Extract all KEXTs and resolve their imported symbols
+		❯ ipsw kernel extract --all --imports kernelcache.release.iPhone18,1
+		# Recreate a KDK whose KEXTs kmutil can link into a new kernelcache
+		❯ ipsw kernel extract --kdk kernelcache.release.iPhone18,1 -o /tmp/kdk
+		# Same for a stripped kernelcache, naming its links from a symbol map
+		❯ ipsw kernel extract --kdk --symbols kernelcache.release.iPhone18,1.symbols.json kernelcache.release.iPhone18,1`),
 	Args:          cobra.MinimumNArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -142,9 +158,14 @@ var kerExtractCmd = &cobra.Command{
 		addImports := viper.GetBool("kernel.extract.imports")
 		extractPath := viper.GetString("kernel.extract.output")
 		selectedArch := viper.GetString("kernel.extract.arch")
+		makeKDK := viper.GetBool("kernel.extract.kdk")
+		symbolsPath := viper.GetString("kernel.extract.symbols")
 
-		if len(args) == 1 && !dumpAll {
-			return fmt.Errorf("you must specify a KEXT to extract OR use the --all flag")
+		if len(args) == 1 && !dumpAll && !makeKDK {
+			return fmt.Errorf("you must specify a KEXT to extract OR use the --all or --kdk flag")
+		}
+		if symbolsPath != "" && !makeKDK {
+			return fmt.Errorf("--symbols requires --kdk")
 		}
 
 		kernPath := filepath.Clean(args[0])
@@ -167,6 +188,14 @@ var kerExtractCmd = &cobra.Command{
 		if m.File.FileTOC.FileHeader.Type != types.MH_FILESET {
 			return fmt.Errorf("kernelcache type is not MH_FILESET (KEXT extraction not supported yet)")
 		}
+		if makeKDK {
+			symbols, err := kdk.LoadSymbolMap(symbolsPath)
+			if err != nil {
+				return err
+			}
+			return kdk.Extract(m.File, kdk.Config{Output: folder, Force: forceExtract, Symbols: symbols})
+		}
+
 		var selected *macho.FilesetEntry
 		if !dumpAll {
 			selected, err = resolveKext(m.File.FileSets(), args[1])
