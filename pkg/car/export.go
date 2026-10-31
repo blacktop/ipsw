@@ -1,7 +1,6 @@
 package car
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
@@ -16,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/atomicfile"
 	"github.com/blacktop/ipsw/pkg/car/internal/compression"
 )
 
@@ -450,39 +450,19 @@ func (a *Asset) exportRenditions(index renditionIndex) {
 func writeRendition(path string, asset any, space colorSpaceID) error {
 	// Replace the directory entry only after a successful write. Existing
 	// symlinks are replaced, never followed, and failures preserve old output.
-	temp := filepath.Join(filepath.Dir(path), ".car-"+rand.Text())
-	f, err := os.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
-	// New files use 0644 subject to umask. Preserve an existing regular file's
-	// mode without consulting a symlink's target.
-	if info, statErr := os.Lstat(path); statErr == nil && info.Mode().IsRegular() {
-		err = f.Chmod(info.Mode().Perm())
-	} else if statErr != nil && !os.IsNotExist(statErr) {
-		err = statErr
-	}
-	if err == nil {
+	return atomicfile.Write(path, 0o644, func(f *os.File) error {
 		switch value := asset.(type) {
 		case image.Image:
-			err = encodePNG(f, value, space)
+			return encodePNG(f, value, space)
 		case []byte:
-			_, err = f.Write(value)
+			_, err := f.Write(value)
+			return err
 		case csiColor, csiMultisizeImageSet:
 			encoder := json.NewEncoder(f)
 			encoder.SetIndent("", "  ")
-			err = encoder.Encode(value)
+			return encoder.Encode(value)
 		default:
-			err = fmt.Errorf("unsupported export asset: %T", asset)
+			return fmt.Errorf("unsupported export asset: %T", asset)
 		}
-	}
-	closeErr := f.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	return os.Rename(f.Name(), path)
+	})
 }

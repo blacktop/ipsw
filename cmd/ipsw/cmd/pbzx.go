@@ -22,14 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"context"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/atomicfile"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/dustin/go-humanize"
@@ -72,36 +71,22 @@ var pbzxCmd = &cobra.Command{
 		}
 
 		fname := infile + ".extracted"
-		mode := os.FileMode(0o644)
-		if info, err := os.Stat(fname); err == nil {
-			mode &= info.Mode().Perm()
-		} else if !os.IsNotExist(err) {
-			return err
-		}
-
-		tmpname := filepath.Join(filepath.Dir(fname), ".ipsw-pbzx-"+rand.Text()+".tmp")
-		out, err := os.OpenFile(tmpname, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+		output, err := atomicfile.Resolve(fname)
 		if err != nil {
 			return err
 		}
-		defer func() {
-			out.Close()
-			os.Remove(tmpname)
-		}()
-
-		// Keep the previous output until the streamed extraction is complete.
-		if err := pbzx.Extract(context.Background(), f, out, runtime.NumCPU()); err != nil {
-			return err
-		}
-
-		oinfo, err := out.Stat()
-		if err != nil {
-			return err
-		}
-		if err := out.Close(); err != nil {
-			return err
-		}
-		if err := os.Rename(tmpname, fname); err != nil {
+		var oinfo os.FileInfo
+		if err := atomicfile.Write(output, 0o644, func(out *os.File) error {
+			if err := pbzx.Extract(cmd.Context(), f, out, runtime.NumCPU()); err != nil {
+				return err
+			}
+			var err error
+			oinfo, err = out.Stat()
+			if err != nil {
+				return err
+			}
+			return cmd.Context().Err()
+		}); err != nil {
 			return err
 		}
 

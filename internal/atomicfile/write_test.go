@@ -20,8 +20,9 @@ func TestWriteSyncFailure(t *testing.T) {
 		// Force the subsequent Sync to fail on a real file descriptor.
 		return f.Close()
 	})
-	if !errors.Is(err, os.ErrClosed) {
-		t.Fatalf("Write error = %v, want os.ErrClosed", err)
+	var pathErr *os.PathError
+	if !errors.Is(err, os.ErrClosed) || !errors.As(err, &pathErr) || pathErr.Op != "sync" {
+		t.Fatalf("Write error = %v, want a sync error on a closed file", err)
 	}
 	if got, err := os.ReadFile(path); err != nil || string(got) != "previous" {
 		t.Fatalf("previous output = %q, %v", got, err)
