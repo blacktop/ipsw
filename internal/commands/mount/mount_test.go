@@ -9,8 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/testutil"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 )
@@ -440,5 +443,75 @@ func TestExactComponentMountRemovesPartialExtraction(t *testing.T) {
 	}
 	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
 		t.Fatalf("partial extraction left files: %v, %v", entries, err)
+	}
+}
+
+func TestDecryptDMGCopyLeavesSourceIntact(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	filesystem := make([]byte, 1024)
+	copy(filesystem, "synthetic filesystem")
+	plain := testutil.UDIFImage(t, filesystem)
+	path := filepath.Join(t.TempDir(), "058-12345-678.dmg")
+	key := testutil.WriteEncryptedDMG(t, path, plain)
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decrypted, err := DecryptDMGCopy(path, key)
+	if err != nil {
+		t.Fatalf("DecryptDMGCopy: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(decrypted) })
+	if got, err := os.ReadFile(decrypted); err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("decrypted copy = %q, %v; want plaintext", got, err)
+	}
+	if after, err := os.ReadFile(path); err != nil || !bytes.Equal(after, before) {
+		t.Fatalf("DecryptDMGCopy changed the source: %v", err)
+	}
+
+	keys := download.WikiFWKeys{"RootFS": {Filename: []string{filepath.Base(path)}, Key: []string{key}}}
+	if err := DecryptDMG(path, keys); err != nil {
+		t.Fatalf("DecryptDMG: %v", err)
+	}
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("DecryptDMG did not replace the source in place: %v", err)
+	}
+	if again, err := DecryptDMGCopy(path, key); err != nil || again != "" {
+		t.Fatalf("plaintext DMG was treated as encrypted: %q, %v", again, err)
+	}
+}
+
+func TestDecryptDMGCrossDevice(t *testing.T) {
+	destination, err := os.MkdirTemp("/dev/shm", "ipsw-dmg-test-")
+	if err != nil {
+		t.Skipf("requires a writable second filesystem: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(destination) })
+	staging := t.TempDir()
+	probe := filepath.Join(staging, "probe")
+	if err := os.WriteFile(probe, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(probe, filepath.Join(destination, "probe")); err == nil {
+		t.Skip("temporary directories are on the same filesystem")
+	} else if !errors.Is(err, syscall.EXDEV) {
+		t.Fatalf("cross-filesystem probe: %v", err)
+	}
+	if err := os.Remove(probe); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", staging)
+	plain := testutil.UDIFImage(t, make([]byte, 1024))
+	path := filepath.Join(destination, "encrypted.dmg")
+	key := testutil.WriteEncryptedDMG(t, path, plain)
+	if err := DecryptDMG(path, key); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("cross-filesystem replacement differs: %v", err)
+	}
+	if entries, err := os.ReadDir(staging); err != nil || len(entries) != 0 {
+		t.Fatalf("decrypted temporary files remain: %v, %v", entries, err)
 	}
 }

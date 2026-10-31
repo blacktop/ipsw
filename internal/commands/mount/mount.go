@@ -14,6 +14,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-apfs/pkg/disk/dmg"
+	"github.com/blacktop/ipsw/internal/atomicfile"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -385,12 +386,41 @@ func (a *imageAttempt) decryptAEA(encryptedDMG string) (string, error) {
 // DecryptDMG replaces an encrypted legacy DMG with its decrypted UDIF image.
 // Unencrypted images are left untouched. The caller must own the backing file.
 func DecryptDMG(path string, keys any) error {
+	decrypted, err := DecryptDMGCopy(path, keys)
+	if err != nil || decrypted == "" {
+		return err
+	}
+	defer os.Remove(decrypted)
+	renameErr := os.Rename(decrypted, path)
+	if renameErr == nil {
+		return nil
+	}
+	// Keep the cheap rename when possible, and stage beside the destination
+	// when the source cannot be renamed there (including across filesystems).
+	in, err := os.Open(decrypted)
+	if err != nil {
+		return fmt.Errorf("failed to overwrite encrypted DMG with the decrypted one: %w", errors.Join(renameErr, err))
+	}
+	defer in.Close()
+	if err := atomicfile.Write(path, 0o644, func(out *os.File) error {
+		_, err := io.Copy(out, in)
+		return err
+	}); err != nil {
+		return fmt.Errorf("failed to overwrite encrypted DMG with the decrypted one: %w", errors.Join(renameErr, err))
+	}
+	return nil
+}
+
+// DecryptDMGCopy decrypts an encrypted DMG into a new temporary file and returns
+// its path, leaving the input untouched. It returns "" when the DMG is not
+// encrypted. The caller owns the returned file.
+func DecryptDMGCopy(path string, keys any) (string, error) {
 	isEncrypted, err := magic.IsEncryptedDMG(path)
 	if err != nil {
-		return fmt.Errorf("failed to check if DMG is encrypted: %v", err)
+		return "", fmt.Errorf("failed to check if DMG is encrypted: %v", err)
 	}
 	if !isEncrypted {
-		return nil
+		return "", nil
 	}
 	var key string
 	switch v := keys.(type) {
@@ -399,19 +429,29 @@ func DecryptDMG(path string, keys any) error {
 	case download.WikiFWKeys:
 		key, err = v.GetKeyByFilename(path)
 		if err != nil {
-			return fmt.Errorf("failed to get key for DMG '%s': %v", path, err)
+			return "", fmt.Errorf("failed to get key for DMG '%s': %v", path, err)
 		}
 	}
 	log.Info("Decrypting DMG...")
 	d, err := dmg.Open(path, &dmg.Config{Key: key})
 	if err != nil {
-		return fmt.Errorf("failed to open DMG '%s': %v", path, err)
+		return "", fmt.Errorf("failed to open DMG '%s': %v", path, err)
 	}
+	// Close removes the decrypted temp, so move it to a path we own first.
 	defer func() { _ = d.Close() }()
-	if err := os.Rename(d.DecryptedTemp(), path); err != nil {
-		return fmt.Errorf("failed to overwrite encrypted DMG with the decrypted one: %v", err)
+	out, err := os.CreateTemp(filepath.Dir(d.DecryptedTemp()), "ipsw-decrypted-*.dmg")
+	if err != nil {
+		return "", err
 	}
-	return nil
+	if err := out.Close(); err != nil {
+		_ = os.Remove(out.Name())
+		return "", err
+	}
+	if err := os.Rename(d.DecryptedTemp(), out.Name()); err != nil {
+		_ = os.Remove(out.Name())
+		return "", fmt.Errorf("failed to keep decrypted DMG: %v", err)
+	}
+	return out.Name(), nil
 }
 
 // unwrapRamdisk replaces a ramdisk IM4P with its raw DMG payload.
