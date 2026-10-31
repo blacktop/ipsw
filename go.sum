@@ -175,6 +175,8 @@ github.com/blacktop/arm64-cgo v1.0.75 h1:VU4k+1ibLECTaToketX9yHblZfcHcfRmc+nUKaO
 github.com/blacktop/arm64-cgo v1.0.75/go.mod h1:TEHamtch3FVfsjPoB6hMc+wyxvvoGvii0l1H4ESf62A=
 github.com/blacktop/go-apfs v1.0.28 h1:kXihmwrGdKZjUn37ULxWHG0R6IgtQKOqmtRHo6QuAa8=
 github.com/blacktop/go-apfs v1.0.28/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
+github.com/blacktop/go-apfs v1.0.29 h1:6ssS4i68yCg4a+VBKJmVFiFyYfFE3q7FT3TkOn7pZVo=
+github.com/blacktop/go-apfs v1.0.29/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
 github.com/blacktop/go-download v0.2.8 h1:vRYv89vcJaFMN3mUM77cwz6r1boN3hi7XlSqW4jHYBg=
 github.com/blacktop/go-download v0.2.8/go.mod h1:R0AmlwVorsuDQct7iP7bK2yZWhDB2unQEcLbgp4A/PQ=
 github.com/blacktop/go-dwarf v1.0.14 h1:OjmzfSgg/qAKckn2tWFebcgKgJ7HOqCj7bS+CiE1lrY=
