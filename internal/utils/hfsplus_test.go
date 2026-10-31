@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"compress/zlib"
 	"encoding/binary"
 	"errors"
 	"os"
@@ -13,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/blacktop/go-apfs/pkg/disk/dmg"
-	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/testutil"
 )
 
 func TestMountHFSPlusImages(t *testing.T) {
@@ -28,13 +27,13 @@ func TestMountHFSPlusImages(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				root := t.TempDir()
-				t.Setenv("TMPDIR", root)
+				t.Setenv("TMPDIR", t.TempDir())
 				plain := make([]byte, 4*512)
 				copy(plain[1024:], "HX")
 				copy(plain[1536:], "synthetic filesystem")
 				data := plain
 				if container {
-					data = syntheticHFSPlusDMG(t, plain)
+					data = testutil.UDIFImage(t, plain)
 				}
 				image := filepath.Join(root, "image.dmg")
 				if err := os.WriteFile(image, data, 0600); err != nil {
@@ -53,6 +52,9 @@ func TestMountHFSPlusImages(t *testing.T) {
 					}
 					if (mountedImage != image) != container {
 						t.Fatalf("wrong backing image: %s", mountedImage)
+					}
+					if filepath.Dir(mountedImage) != root {
+						t.Fatalf("raw image %s was not staged beside %s", mountedImage, image)
 					}
 					if got, err := os.ReadFile(mountedImage); err != nil || !bytes.Equal(got, plain) {
 						t.Fatalf("mount did not receive the raw filesystem: %v", err)
@@ -100,42 +102,21 @@ func TestHFSPlusImageRejectsResourceFork(t *testing.T) {
 	}
 }
 
-func syntheticHFSPlusDMG(t *testing.T, plain []byte) []byte {
-	t.Helper()
-	var compressed bytes.Buffer
-	zw := zlib.NewWriter(&compressed)
-	if _, err := zw.Write(plain); err != nil {
+func TestHFSPlusImageReportsProbeFailure(t *testing.T) {
+	plain := make([]byte, 4*512)
+	copy(plain[1024:], "H+")
+	data := testutil.UDIFImage(t, plain)
+	// Corrupt the zlib stream so decoding the only partition fails.
+	for i := 2; i < 12; i++ {
+		data[i] ^= 0xff
+	}
+	path := filepath.Join(t.TempDir(), "corrupt.dmg")
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := zw.Close(); err != nil {
-		t.Fatal(err)
+	_, err := hfsPlusImage(path)
+	if err == nil || !strings.Contains(err.Error(), "no HFS+ partition found") ||
+		!strings.Contains(err.Error(), `partition "synthetic partition"`) {
+		t.Fatalf("decode failure was hidden: %v", err)
 	}
-	// One mish block with one zlib chunk. The fields use sector units.
-	blkx := make([]byte, 204+40)
-	copy(blkx, "mish")
-	binary.BigEndian.PutUint32(blkx[4:], 1)
-	binary.BigEndian.PutUint64(blkx[16:], uint64(len(plain)/512))
-	binary.BigEndian.PutUint32(blkx[32:], 1)
-	binary.BigEndian.PutUint32(blkx[200:], 1)
-	binary.BigEndian.PutUint32(blkx[204:], 0x80000005)
-	binary.BigEndian.PutUint64(blkx[220:], uint64(len(plain)/512))
-	binary.BigEndian.PutUint64(blkx[236:], uint64(compressed.Len()))
-	p, err := plist.Marshal(map[string]any{"resource-fork": map[string]any{
-		"blkx": []map[string]any{{"Name": "synthetic partition", "Data": blkx}},
-	}}, plist.XMLFormat)
-	if err != nil {
-		t.Fatal(err)
-	}
-	footer := dmg.UDIFResourceFile{
-		Signature: [4]byte{'k', 'o', 'l', 'y'}, Version: 4, HeaderSize: 512,
-		DataForkLength: uint64(compressed.Len()), PlistOffset: uint64(compressed.Len()),
-		PlistLength: uint64(len(p)), SectorCount: uint64(len(plain) / 512),
-	}
-	var image bytes.Buffer
-	image.Write(compressed.Bytes())
-	image.Write(p)
-	if err := binary.Write(&image, binary.BigEndian, footer); err != nil {
-		t.Fatal(err)
-	}
-	return image.Bytes()
 }

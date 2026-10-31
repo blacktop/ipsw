@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/blacktop/go-apfs/pkg/disk/dmg"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/dustin/go-humanize"
 )
 
 func mountWithHFSPlus(image, mountPoint string) error {
@@ -73,33 +75,58 @@ func hfsPlusImage(image string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open HFS+ DMG: %w", err)
 	}
+	var probeErrs []error
 	for idx := range d.Partitions {
 		part := &d.Partitions[idx]
 		// Sequential reads only need the current decoded chunk.
 		part.BuffersNeeded = 1
 		var signature [2]byte
 		if _, err := part.ReadAt(signature[:], 1024); err != nil {
+			probeErrs = append(probeErrs, fmt.Errorf("partition %q: %w", part.Name, err))
 			continue
 		}
 		if signature != [2]byte{'H', '+'} && signature != [2]byte{'H', 'X'} {
 			continue
 		}
-		raw, err := os.CreateTemp("", "ipsw-hfsplus-*.img")
-		if err != nil {
-			return "", err
-		}
 		// go-apfs validates the partition sector count against the image size
 		// and MaxInt64 before exposing it here.
 		size := int64(part.SectorCount) * 512
+		raw, err := createRawImage(image)
+		if err != nil {
+			return "", err
+		}
 		n, copyErr := io.Copy(raw, io.NewSectionReader(part, 0, size))
 		if copyErr == nil && n != size {
 			copyErr = io.ErrUnexpectedEOF
 		}
 		if err := errors.Join(copyErr, raw.Close()); err != nil {
 			_ = os.Remove(raw.Name())
-			return "", fmt.Errorf("failed to unpack HFS+ partition %q: %w", part.Name, err)
+			hint := "free space beside the image"
+			if filepath.Dir(raw.Name()) != filepath.Dir(image) {
+				hint = "set TMPDIR to a larger filesystem"
+			}
+			return "", fmt.Errorf("failed to unpack %s HFS+ partition %q into %s (%s): %w",
+				humanize.IBytes(uint64(size)), part.Name, filepath.Dir(raw.Name()), hint, err)
 		}
 		return raw.Name(), nil
 	}
+	if len(probeErrs) > 0 {
+		return "", fmt.Errorf("no HFS+ partition found in DMG %q: %w", image, errors.Join(probeErrs...))
+	}
 	return "", fmt.Errorf("no HFS+ partition found in DMG %q", image)
+}
+
+// createRawImage stages the decoded filesystem beside the DMG, which already
+// holds the compressed copy, and falls back to the temp dir when that
+// directory is read-only.
+func createRawImage(image string) (*os.File, error) {
+	raw, err := os.CreateTemp(filepath.Dir(image), ".ipsw-hfsplus-*.img")
+	if err == nil {
+		return raw, nil
+	}
+	raw, tmpErr := os.CreateTemp("", "ipsw-hfsplus-*.img")
+	if tmpErr != nil {
+		return nil, errors.Join(err, tmpErr)
+	}
+	return raw, nil
 }

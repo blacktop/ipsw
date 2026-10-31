@@ -62,7 +62,7 @@ loop_device=$(findmnt --noheadings --raw --output SOURCE --mountpoint "$mount_po
 [[ "$loop_device" =~ ^/dev/loop[0-9]+$ ]]
 loop_backing_file="/sys/class/block/${loop_device##*/}/loop/backing_file"
 IFS= read -r loop_backing < "$loop_backing_file"
-[[ "$loop_backing" == "$run_root/tmp/ipsw-hfsplus-"*.img* ]]
+[[ "$loop_backing" == "$run_root/tmp/.ipsw-hfsplus-"*.img* ]]
 [[ $(findmnt --noheadings --raw --output FSTYPE --mountpoint "$mount_point") == hfsplus ]]
 mount_options=$(findmnt --noheadings --raw --output OPTIONS --mountpoint "$mount_point")
 [[ ",$mount_options," == *,ro,* ]]
