@@ -2,11 +2,24 @@ package info
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+func TestGetFolderReportsDeviceTreeError(t *testing.T) {
+	dtree := devicetree.DeviceTree{}
+	inf := &Info{
+		Plists:      &plist.Plists{BuildManifest: &plist.BuildManifest{}},
+		DeviceTrees: map[string]*devicetree.DeviceTree{"DeviceTree.synthetic": &dtree},
+	}
+	if _, err := inf.GetFolder(); err == nil || !strings.Contains(err.Error(), "DeviceTree.synthetic") || !strings.Contains(err.Error(), "node children") {
+		t.Fatalf("GetFolder error = %v", err)
+	}
+}
 
 func TestKernelCacheBuildManifestFallbackForSingleDeviceIPSW(t *testing.T) {
 	inf := &Info{

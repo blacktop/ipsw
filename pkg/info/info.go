@@ -468,10 +468,10 @@ func (i *Info) GetFolder(device ...string) (string, error) {
 
 	var devs []string
 	if len(i.DeviceTrees) > 0 {
-		for _, dtree := range i.DeviceTrees {
+		for name, dtree := range i.DeviceTrees {
 			dt, err := dtree.Summary()
 			if err != nil {
-				log.Fatal(err.Error())
+				return "", fmt.Errorf("failed to summarize DeviceTree %s: %w", name, err)
 			}
 			devs = append(devs, dt.ProductType)
 		}
