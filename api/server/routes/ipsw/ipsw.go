@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -234,7 +235,14 @@ func getFsLaunchdConfig(pemDB string) gin.HandlerFunc {
 			}
 		}
 
-		ldconf, err := extract.LaunchdConfig(ipswPath, pemDbPath)
+		lookup, err := strconv.ParseBool(c.DefaultQuery("lookup", "false"))
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: "invalid lookup query parameter"})
+			return
+		}
+		config := &extract.Config{IPSW: ipswPath, PemDB: pemDbPath, Lookup: lookup}
+		defer config.Close()
+		ldconf, err := extract.LaunchdConfig(config)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return

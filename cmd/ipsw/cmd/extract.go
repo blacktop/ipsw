@@ -423,7 +423,7 @@ completed artifacts, sets complete to false, includes an error, and exits nonzer
 
 		if viper.GetBool("extract.sys-ver") {
 			log.Info("Extracting SystemVersion")
-			out, err := extract.SystemVersion(config.IPSW, config.PemDB)
+			out, err := extract.SystemVersion(config)
 			if err != nil {
 				return err
 			}

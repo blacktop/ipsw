@@ -24,6 +24,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/atomicfile"
 	fwcmd "github.com/blacktop/ipsw/internal/commands/fw"
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/download"
@@ -179,7 +180,14 @@ func DecryptPayloadWithKeys(inputPath, outputPath string, wikiKeys download.Wiki
 		if err != nil {
 			return false, err
 		}
-		if err := os.WriteFile(outputPath, data, 0644); err != nil {
+		target, err := atomicfile.Resolve(outputPath)
+		if err != nil {
+			return false, err
+		}
+		if err := atomicfile.Write(target, 0o644, func(out *os.File) error {
+			_, err := out.Write(data)
+			return err
+		}); err != nil {
 			return false, err
 		}
 		return true, nil
@@ -246,42 +254,54 @@ func isKnownKeyPart(value string) bool {
 	return len(value) > 0 && !strings.EqualFold(value, "Unknown")
 }
 
-func getFolder(c *Config) (*info.Info, string, error) {
-	if c.info == nil {
-		var err error
-		if c.Lookup && c.wikiKeys == nil {
-			fPath := filepath.Clean(c.IPSW)
-			log.Debugf("Lookup enabled, parsing IPSW path: %s", fPath)
-			log.Info("Looking up decryption keys...")
-			wkeys, lookupErr := download.LookupKeysFromPath(fPath, "", false)
-			if lookupErr != nil {
-				log.Warnf("failed to lookup keys from theapplewiki.com: %v", lookupErr)
+// loadInfo parses the IPSW metadata once. With Lookup enabled it fetches the
+// legacy firmware keys first so an encrypted DeviceTree can be read.
+func loadInfo(c *Config) (*info.Info, error) {
+	if c.info != nil {
+		return c.info, nil
+	}
+	fPath := filepath.Clean(c.IPSW)
+	if c.Lookup && c.wikiKeys == nil {
+		log.Debugf("Lookup enabled, parsing IPSW path: %s", fPath)
+		log.Info("Looking up decryption keys...")
+		wkeys, lookupErr := download.LookupKeysFromPath(fPath, "", false)
+		if lookupErr != nil {
+			log.Warnf("failed to lookup keys from theapplewiki.com: %v", lookupErr)
+		} else {
+			c.wikiKeys = wkeys // Store keys for later use in extraction
+			dtkey, keyErr := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
+			if keyErr != nil {
+				log.Warnf("failed to get DeviceTree key: %v", keyErr)
 			} else {
-				c.wikiKeys = wkeys // Store keys for later use in extraction
-				dtkey, keyErr := wkeys.GetKeyByRegex(`.*DeviceTree.*(img3|im4p)$`)
-				if keyErr != nil {
-					log.Warnf("failed to get DeviceTree key: %v", keyErr)
-				} else {
-					log.Debugf("Found DeviceTree key: %s", dtkey)
-					c.info, err = info.Parse(fPath, dtkey)
-					if err != nil {
-						return nil, "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
-					}
+				log.Debugf("Found DeviceTree key: %s", dtkey)
+				i, err := info.Parse(fPath, dtkey)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse plists in IPSW: %v", err)
 				}
-			}
-		}
-		if c.info == nil {
-			c.info, err = info.Parse(filepath.Clean(c.IPSW))
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to parse plists in IPSW: %v", err)
+				c.info = i
 			}
 		}
 	}
-	folder, err := extractionFolder(c.info, c.KernelDevice)
+	if c.info == nil {
+		i, err := info.Parse(fPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse plists in IPSW: %v", err)
+		}
+		c.info = i
+	}
+	return c.info, nil
+}
+
+func getFolder(c *Config) (*info.Info, string, error) {
+	i, err := loadInfo(c)
 	if err != nil {
-		return c.info, folder, fmt.Errorf("failed to get folder from IPSW metadata: %v", err)
+		return nil, "", err
 	}
-	return c.info, folder, nil
+	folder, err := extractionFolder(i, c.KernelDevice)
+	if err != nil {
+		return i, folder, fmt.Errorf("failed to get folder from IPSW metadata: %v", err)
+	}
+	return i, folder, nil
 }
 
 func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
@@ -431,12 +451,24 @@ func matchingZipFileName(files []*zip.File, name string) []*zip.File {
 	return matches
 }
 
-func ExtractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp) (out []string, retErr error) {
-	return extractFromDMG(ipswPath, dmgPath, destPath, pemDB, pattern, nil)
+// dmgExtractOptions selects files inside a DMG and supplies what is needed to
+// open it: the AEA PEM database and legacy firmware keys.
+type dmgExtractOptions struct {
+	pattern *regexp.Regexp
+	pemDB   string
+	keys    download.WikiFWKeys
 }
 
-func extractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.Regexp, keys download.WikiFWKeys) (out []string, retErr error) {
+// cleanupDMGFile reads retain after the later unmount defer has run.
+func cleanupDMGFile(path string, retain *bool) {
+	if !*retain {
+		_ = os.Remove(path)
+	}
+}
+
+func extractFromDMG(ipswPath, dmgPath, destPath string, opts dmgExtractOptions) (out []string, retErr error) {
 	skipCleanup := false
+	reusedAEA := false
 	tmpExtractDir := ""
 
 	// For AEA-encrypted DMGs, check if the decrypted version already exists
@@ -448,12 +480,12 @@ func extractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 		if filepath.IsAbs(decryptedPath) || filepath.Dir(decryptedPath) != "." {
 			if _, err := os.Stat(decryptedPath); err == nil {
 				dmgPath = decryptedPath
-				skipCleanup = true
+				reusedAEA = true
 			}
 		}
 	}
 
-	if !skipCleanup {
+	if !reusedAEA {
 		// If dmgPath is a bare filename (e.g. 043-....dmg.aea), treat it as an IPSW-internal
 		// identifier and always extract it into a fresh temp dir. This avoids collisions with
 		// same-named files left in the current working directory from prior runs.
@@ -490,24 +522,26 @@ func extractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 			dmgPath, err = aea.Decrypt(&aea.DecryptConfig{
 				Input:    dmgPath,
 				Output:   filepath.Dir(dmgPath),
-				PemDB:    pemDB,
+				PemDB:    opts.pemDB,
 				Proxy:    "",    // TODO: make proxy configurable
 				Insecure: false, // TODO: make insecure configurable
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse AEA encrypted DMG: %v", err)
 			}
-			defer func(path string) {
-				if !skipCleanup {
-					os.Remove(path)
-				}
-			}(dmgPath)
+			defer cleanupDMGFile(dmgPath, &skipCleanup)
 		}
 	}
 
-	if keys != nil {
-		if err := mount.DecryptDMG(dmgPath, keys); err != nil {
+	if opts.keys != nil {
+		// Decrypt into a copy so a caller-owned encrypted DMG is never replaced.
+		decrypted, err := mount.DecryptDMGCopy(dmgPath, opts.keys)
+		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt DMG %s: %w", dmgPath, err)
+		}
+		if decrypted != "" {
+			defer cleanupDMGFile(decrypted, &skipCleanup)
+			dmgPath = decrypted
 		}
 	}
 
@@ -542,7 +576,7 @@ func extractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 		rel := strings.TrimPrefix(path, mountPoint)
 		rel = strings.TrimPrefix(rel, string(os.PathSeparator))
 		rel = filepath.Clean(rel)
-		if pattern.MatchString(string(os.PathSeparator)+rel) || pattern.MatchString(rel) {
+		if opts.pattern.MatchString(string(os.PathSeparator)+rel) || opts.pattern.MatchString(rel) {
 			fname := filepath.Join(destPath, rel)
 			if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
 				return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)
@@ -614,8 +648,8 @@ func extractFromDMG(ipswPath, dmgPath, destPath, pemDB string, pattern *regexp.R
 func FirmwareType(c *Config) (string, error) {
 	var err error
 	if len(c.IPSW) > 0 {
-		// Use getFolder which handles key lookup if enabled
-		_, _, err = getFolder(c)
+		// Metadata selection must also work for Restore.plist-only IPSWs.
+		_, err = loadInfo(c)
 		if err != nil {
 			return "", err
 		}
@@ -1362,7 +1396,7 @@ func extractRemoteDMG(c *Config, zr *zip.Reader, dmgPath, destPath, pemDB string
 
 	var artifacts []string
 	for _, dmg := range extracted {
-		out, err := extractFromDMG(dmg, dmg, destPath, pemDB, pattern, c.wikiKeys)
+		out, err := extractFromDMG(dmg, dmg, destPath, dmgExtractOptions{pattern: pattern, pemDB: pemDB, keys: c.wikiKeys})
 		artifacts = append(artifacts, out...)
 		if err != nil {
 			return artifacts, err
@@ -1629,29 +1663,30 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		}
 		artifacts = append(artifacts, out...)
 		if c.DMGs { // SEARCH THE DMGs
+			dmgOpts := dmgExtractOptions{pattern: re, pemDB: c.PemDB, keys: c.wikiKeys}
 			if appOS, err := i.GetAppOsDmg(); err == nil {
-				out, err := extractFromDMG(c.IPSW, appOS, destPath, c.PemDB, re, c.wikiKeys)
+				out, err := extractFromDMG(c.IPSW, appOS, destPath, dmgOpts)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from AppOS %s: %w", appOS, err)
 				}
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				out, err := extractFromDMG(c.IPSW, systemOS, destPath, c.PemDB, re, c.wikiKeys)
+				out, err := extractFromDMG(c.IPSW, systemOS, destPath, dmgOpts)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from SystemOS %s: %w", systemOS, err)
 				}
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				out, err := extractFromDMG(c.IPSW, fsOS, destPath, c.PemDB, re, c.wikiKeys)
+				out, err := extractFromDMG(c.IPSW, fsOS, destPath, dmgOpts)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from filesystem %s: %w", fsOS, err)
 				}
 			}
 			if excOS, err := i.GetExclaveOSDmg(); err == nil {
-				out, err := extractFromDMG(c.IPSW, excOS, destPath, c.PemDB, re, c.wikiKeys)
+				out, err := extractFromDMG(c.IPSW, excOS, destPath, dmgOpts)
 				artifacts = append(artifacts, out...)
 				if err != nil {
 					return artifacts, fmt.Errorf("failed to extract files from ExclaveOS %s: %w", excOS, err)
@@ -1748,19 +1783,31 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }
 
-// LaunchdConfig extracts launchd config from an IPSW
-func LaunchdConfig(path, pemDB string) (string, error) {
-	ipswPath := filepath.Clean(path)
+func filesystemDMG(c *Config) (string, error) {
+	if len(c.FirmwareKeys) > 0 {
+		c.wikiKeys = c.FirmwareKeys
+	}
+	i, err := loadInfo(c)
+	if err != nil {
+		return "", err
+	}
+	path, err := i.GetFileSystemOsDmg()
+	if err != nil {
+		return "", fmt.Errorf("failed to get filesystem DMG path: %w", err)
+	}
+	return path, nil
+}
 
-	i, err := info.Parse(ipswPath)
+// LaunchdConfig extracts the launchd config from the IPSW's filesystem DMG,
+// decrypting legacy firmware with the configured or looked-up keys.
+func LaunchdConfig(c *Config) (string, error) {
+	fsDMG, err := filesystemDMG(c)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse IPSW: %v", err)
+		return "", err
 	}
-	fsDMG, err := i.GetFileSystemOsDmg()
-	if err != nil {
-		return "", fmt.Errorf("failed to get filesystem DMG path: %v", err)
-	}
-	extracted, err := ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`.*/sbin/launchd$`))
+	extracted, err := extractFromDMG(filepath.Clean(c.IPSW), fsDMG, os.TempDir(), dmgExtractOptions{
+		pemDB: c.PemDB, pattern: regexp.MustCompile(`.*/sbin/launchd$`), keys: c.wikiKeys,
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
 	}
@@ -1775,6 +1822,10 @@ func LaunchdConfig(path, pemDB string) (string, error) {
 	var m *macho.File
 	fat, err := macho.OpenFat(filepath.Clean(extracted[0]))
 	if err == nil {
+		defer fat.Close()
+		if len(fat.Arches) == 0 {
+			return "", fmt.Errorf("launchd universal binary has no architectures")
+		}
 		m = fat.Arches[len(fat.Arches)-1].File // grab last arch (probably arm64e)
 	} else {
 		if err == macho.ErrNotFat {
@@ -1782,12 +1833,17 @@ func LaunchdConfig(path, pemDB string) (string, error) {
 			if err != nil {
 				return "", fmt.Errorf("failed to open macho file: %v", err)
 			}
+			defer m.Close()
 		} else {
 			return "", fmt.Errorf("failed to open universal macho file: %v", err)
 		}
 	}
 
-	data, err := m.Section("__TEXT", "__config").Data()
+	section := m.Section("__TEXT", "__config")
+	if section == nil {
+		return "", fmt.Errorf("launchd has no __TEXT.__config section")
+	}
+	data, err := section.Data()
 	if err != nil {
 		return "", fmt.Errorf("failed to get launchd config: %v", err)
 	}
@@ -1795,22 +1851,18 @@ func LaunchdConfig(path, pemDB string) (string, error) {
 	return string(data), nil
 }
 
-// SystemVersion extracts the system version info from an IPSW
-func SystemVersion(path, pemDB string) (*plist.SystemVersion, error) {
-	ipswPath := filepath.Clean(path)
-
-	i, err := info.Parse(ipswPath)
+// SystemVersion extracts SystemVersion.plist from the IPSW's filesystem DMG,
+// decrypting legacy firmware with the configured or looked-up keys.
+func SystemVersion(c *Config) (*plist.SystemVersion, error) {
+	fsDMG, err := filesystemDMG(c)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+		return nil, err
 	}
-	fsDMG, err := i.GetFileSystemOsDmg()
+	extracted, err := extractFromDMG(filepath.Clean(c.IPSW), fsDMG, os.TempDir(), dmgExtractOptions{
+		pemDB: c.PemDB, pattern: regexp.MustCompile(`System/Library/CoreServices/SystemVersion.plist$`), keys: c.wikiKeys,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get filesystem DMG path: %v", err)
-	}
-
-	extracted, err := ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), pemDB, regexp.MustCompile(`System/Library/CoreServices/SystemVersion.plist$`))
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
+		return nil, fmt.Errorf("failed to extract SystemVersion.plist from %s: %w", fsDMG, err)
 	}
 
 	if len(extracted) == 0 {

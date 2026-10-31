@@ -82,9 +82,15 @@ func AddRoutes(rg *gin.RouterGroup, pemDB string) {
 	//         description: path to AEA pem DB JSON file
 	//         required: false
 	//         type: string
+	//       + name: lookup
+	//         in: query
+	//         description: look up legacy firmware decryption keys
+	//         required: false
+	//         type: boolean
 	//
 	//     Responses:
 	//       200: getFsLaunchdConfigResponse
+	//       400: genericError
 	//       500: genericError
 	dl.GET("/fs/launchd", getFsLaunchdConfig(pemDB))
 }

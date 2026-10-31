@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/testutil"
 	"github.com/blacktop/ipsw/pkg/bundle"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/img3"
@@ -57,6 +58,26 @@ func TestDecryptPayloadWithKeysImg3(t *testing.T) {
 	keys := download.WikiFWKeys{"DeviceTree": {
 		Filename: []string{filepath.Base(input)}, Iv: []string{hex.EncodeToString(iv)}, Key: []string{hex.EncodeToString(key)},
 	}}
+	target := filepath.Join(t.TempDir(), "payload")
+	if err := os.WriteFile(target, []byte("previous"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "output")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := DecryptPayloadWithKeys(input, link, keys); err != nil || !ok {
+		t.Fatalf("decrypt through output symlink: %t, %v", ok, err)
+	}
+	if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("symlink target = %q, %v", got, err)
+	}
+	if got, err := os.Readlink(link); err != nil || got != target {
+		t.Fatalf("output symlink = %q, %v", got, err)
+	}
+	if st, err := os.Stat(target); err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("output permissions changed: %v, %v", st, err)
+	}
 	output, err := decryptExtractedIM4P(input, keys)
 	if err != nil {
 		t.Fatal(err)
@@ -76,12 +97,112 @@ func TestExtractFromDMGUsesLegacyKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys := download.WikiFWKeys{"RootFS": {Filename: []string{filepath.Base(path)}, Key: []string{"00"}}}
-	_, err := extractFromDMG(path, path, t.TempDir(), "", regexp.MustCompile("test"), keys)
+	_, err := extractFromDMG(path, path, t.TempDir(), dmgExtractOptions{pattern: regexp.MustCompile("test"), keys: keys})
 	if err == nil || !strings.Contains(err.Error(), "invalid key length") {
 		t.Fatalf("legacy decryption key was not consumed: %v", err)
 	}
 	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, data) {
 		t.Fatalf("failed decryption changed the source: %v", err)
+	}
+}
+
+func TestExtractFromDMGValidKeyKeepsSource(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	filesystem := make([]byte, 1024)
+	copy(filesystem, "synthetic filesystem")
+	plain := testutil.UDIFImage(t, filesystem)
+	path := filepath.Join(t.TempDir(), "058-12345-678.dmg")
+	key := testutil.WriteEncryptedDMG(t, path, plain)
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := download.WikiFWKeys{"RootFS": {Filename: []string{filepath.Base(path)}, Key: []string{key}}}
+	for _, input := range []string{path, path + ".aea"} {
+		_, err = extractFromDMG(path, input, t.TempDir(), dmgExtractOptions{pattern: regexp.MustCompile("test"), keys: keys})
+		if err == nil || strings.Contains(err.Error(), "failed to decrypt") {
+			t.Fatalf("%s: expected the plaintext to fail at mount, got %v", input, err)
+		}
+		if after, err := os.ReadFile(path); err != nil || !bytes.Equal(after, before) {
+			t.Fatalf("%s: valid-key decryption replaced the caller's DMG: %v", input, err)
+		}
+		leftovers, err := filepath.Glob(filepath.Join(os.TempDir(), "ipsw-decrypted-*.dmg"))
+		if err != nil || len(leftovers) != 0 {
+			t.Fatalf("%s: decrypted copy was not removed: %v %v", input, leftovers, err)
+		}
+	}
+}
+
+func TestCleanupDMGFileHonorsLateRetention(t *testing.T) {
+	for _, retain := range []bool{false, true} {
+		t.Run(map[bool]string{false: "detached", true: "still mounted"}[retain], func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "decrypted.dmg")
+			if err := os.WriteFile(path, []byte("backing image"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			func() {
+				skipCleanup := false
+				defer cleanupDMGFile(path, &skipCleanup)
+				defer func() { skipCleanup = retain }()
+			}()
+			got, err := os.ReadFile(path)
+			if retain {
+				if err != nil || string(got) != "backing image" {
+					t.Fatalf("retained backing image = %q, %v", got, err)
+				}
+			} else if !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("detached backing image remains: %v", err)
+			}
+		})
+	}
+}
+
+func TestSystemFileHelpersUseConfiguredKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "synthetic.dmg")
+	data := []byte("encrcdsa synthetic encrypted DMG")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	keys := download.WikiFWKeys{"RootFS": {Filename: []string{filepath.Base(path)}, Key: []string{"00"}}}
+	metadata := map[string]*info.Info{
+		"build manifest": {Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
+			ProductBuildVersion: "99A1", SupportedProductTypes: []string{"iPhone99,1"},
+			BuildIdentities: []plist.BuildIdentity{{Manifest: map[string]plist.IdentityManifest{
+				"OS": {Info: map[string]any{"Path": path}},
+			}}},
+		}}},
+		// Pre-BuildManifest IPSWs only name the filesystem in Restore.plist.
+		"restore plist": {Plists: &plist.Plists{Restore: &plist.Restore{
+			SystemRestoreImages: map[string]string{"User": path},
+		}}},
+	}
+	for _, tc := range []struct {
+		name string
+		run  func(*Config) error
+	}{
+		{"launchd", func(c *Config) error { _, err := LaunchdConfig(c); return err }},
+		{"system version", func(c *Config) error { _, err := SystemVersion(c); return err }},
+	} {
+		for name, meta := range metadata {
+			t.Run(tc.name+"/"+name, func(t *testing.T) {
+				c := &Config{IPSW: "synthetic.ipsw", Lookup: true, FirmwareKeys: keys, info: meta}
+				if err := tc.run(c); err == nil || !strings.Contains(err.Error(), "invalid key length") {
+					t.Fatalf("configured key did not reach DMG decryption: %v", err)
+				}
+				if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, data) {
+					t.Fatalf("source changed: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestFirmwareTypeRestoreOnly(t *testing.T) {
+	c := &Config{IPSW: "synthetic.ipsw", info: &info.Info{Plists: &plist.Plists{
+		Type: "IPSW", Restore: &plist.Restore{SystemRestoreImages: map[string]string{"User": "root.dmg"}},
+	}}}
+	if got, err := FirmwareType(c); err != nil || got != "IPSW" {
+		t.Fatalf("Restore.plist-only precheck = %q, %v", got, err)
 	}
 }
 
