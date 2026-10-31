@@ -90,7 +90,7 @@
       "minimatch@3.1.5>brace-expansion": "1.1.13",
       "minimatch@5.1.9>brace-expansion": "2.0.3",
       "minimatch@9.0.7>brace-expansion": "2.0.3",
-      "node-forge": "1.4.0",
+      "node-forge": "1.4.2",
       "on-headers": "1.1.0",
       "openapi-sampler": "1.7.2",
       "express>path-to-regexp": "0.1.13",
