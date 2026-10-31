@@ -108,7 +108,7 @@ func TestReadLegacyImageTextInfoBounds(t *testing.T) {
 			bad := bytes.Clone(data)
 			tc.mutate(bad)
 			f := &File{ByteOrder: binary.LittleEndian,
-				Mappings: map[mtypes.UUID]cacheMappings{{}: {{CacheMappingInfo: CacheMappingInfo{Address: 0x1000, Size: 0x200}}}},
+				Mappings: map[mtypes.UUID]cacheMappings{{}: {{Address: 0x1000, Size: 0x200}}},
 				r:        map[mtypes.UUID]io.ReaderAt{{}: bytes.NewReader(bad)}}
 			if _, err := f.readLegacyImageTextInfo(mtypes.UUID{}, CacheImageInfo{Address: 0x1000}, int64(len(bad))); err == nil {
 				t.Fatal("accepted malformed legacy text metadata")

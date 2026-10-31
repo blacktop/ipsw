@@ -57,9 +57,8 @@ func swiftTypeFixture(t *testing.T, installName, typeName string) *gomacho.File 
 	binary.LittleEndian.PutUint32(payload[0x28:], 0x38) // descriptor -> type name
 	copy(payload[0x60:], typeName)
 	m := swiftSectionDataFixture(t, "__swift5_types", payload, 4)
-	m.AddLoad(&gomacho.IDDylib{Dylib: gomacho.Dylib{
-		DylibCmd: types.DylibCmd{LoadCmd: types.LC_ID_DYLIB}, Name: installName,
-	}})
+	m.AddLoad(&gomacho.IDDylib{
+		LoadCmd: types.LC_ID_DYLIB, Name: installName})
 	return m
 }
 
