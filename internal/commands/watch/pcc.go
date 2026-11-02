@@ -125,6 +125,9 @@ func CheckPCCVPhoneSnapshot(
 
 	if !state.Initialized && !notifyInitial {
 		for _, release := range snapshot.Releases {
+			if !release.OSAssetIsIPSW() {
+				continue
+			}
 			if digest := release.OSAssetDigest(); digest != "" {
 				known[digest] = struct{}{}
 			}
@@ -148,7 +151,7 @@ func CheckPCCVPhoneSnapshot(
 	var candidates []*download.PCCRelease
 	candidateDigests := make(map[string]struct{})
 	for _, release := range snapshot.Releases {
-		if release.Index < startIndex {
+		if release.Index < startIndex || !release.OSAssetIsIPSW() {
 			continue
 		}
 		digest := release.OSAssetDigest()

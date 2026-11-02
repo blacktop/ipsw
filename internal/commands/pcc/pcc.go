@@ -65,7 +65,7 @@ func ReleaseURLSummary(release *download.PCCRelease) string {
 		if asset.GetUrl() == "" {
 			continue
 		}
-		assetType := strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_")
+		assetType := download.PCCAssetTypeLabel(asset.GetType())
 		fmt.Fprintf(&out, "\n  %-11s  %s", assetType, asset.GetUrl())
 	}
 	return out.String()

@@ -8,7 +8,7 @@ description: Download PCC VM files
 ---
 ## ipsw download pcc
 
-Download PCC VM files
+Download PCC release assets. Set `CLOUDSDK_AUTH_ACCESS_TOKEN` to authorize downloads from Google Cloud Storage.
 
 ```
 ipsw download pcc [INDEX] [flags]

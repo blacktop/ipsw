@@ -50,6 +50,21 @@ func TestCheckPCCVPhoneSnapshotBaselinesExistingAssets(t *testing.T) {
 	}
 }
 
+func TestCheckPCCVPhoneSnapshotSkipsNonIPSWAssets(t *testing.T) {
+	t.Parallel()
+	release := testPCCRelease(4, "image")
+	release.Assets[0].FileType = pcc.ReleaseMetadata_FILE_TYPE_TARGZ
+	check := CheckPCCVPhoneSnapshot(
+		PCCVPhoneState{Initialized: true, TreeID: 7, HeadIndex: 3},
+		&download.PCCLogSnapshot{TreeID: 7, HeadIndex: 5, Releases: []*download.PCCRelease{release}},
+		false,
+		func([]*download.PCCRelease) { t.Error("attempted to resolve a non-IPSW release") },
+	)
+	if check.Pending != 0 || check.State.HeadIndex != 5 || len(check.NewReleases) != 0 {
+		t.Fatalf("non-IPSW release blocked the cursor: %+v", check)
+	}
+}
+
 func TestCheckPCCVPhoneSnapshotUsesLogHeadInsteadOfReleaseDate(t *testing.T) {
 	t.Parallel()
 

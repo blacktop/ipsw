@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/asn1"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -31,7 +32,7 @@ import (
 
 const bagURL = "https://init-kt-prod.ess.apple.com/init/getBag?ix=5&p=atresearch"
 
-const pccLogLeavesBatchSize uint64 = 3000
+const pccLogLeavesBatchSize uint64 = 10000
 
 const (
 	cloudOSInfoAppID   = "com.apple.cloudos.cloudOSInfo"
@@ -95,6 +96,27 @@ type Ticket struct {
 	Version        int
 	ApTicket       asn1.RawValue
 	CryptexTickets []asn1.RawValue `asn1:"set"`
+}
+
+func decodePCCTicket(raw []byte) (Ticket, error) {
+	var header struct{ Version int }
+	ticket := Ticket{Raw: asn1.RawContent(raw)}
+	rest, err := asn1.Unmarshal(raw, &header)
+	if err != nil {
+		return ticket, err
+	}
+	if len(rest) != 0 {
+		return ticket, fmt.Errorf("trailing release data")
+	}
+	ticket.Version = header.Version
+	if header.Version != 1 {
+		return ticket, nil
+	}
+	var v1 Ticket
+	if _, err := asn1.Unmarshal(raw, &v1); err != nil {
+		return ticket, err
+	}
+	return v1, nil
 }
 
 var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
@@ -228,7 +250,7 @@ func (r *PCCRelease) VRE() VRESignals {
 	return s
 }
 
-// OSAssetURL returns the URL of the ASSET_TYPE_OS asset (the IPSW).
+// OSAssetURL returns the URL of the first ASSET_TYPE_OS asset.
 func (r *PCCRelease) OSAssetURL() string {
 	for _, a := range r.GetAssets() {
 		if a.GetType() == pcc.ReleaseMetadata_ASSET_TYPE_OS {
@@ -236,6 +258,16 @@ func (r *PCCRelease) OSAssetURL() string {
 		}
 	}
 	return ""
+}
+
+// OSAssetIsIPSW reports whether the OS asset supports ZIP-based firmware inspection.
+func (r *PCCRelease) OSAssetIsIPSW() bool {
+	for _, asset := range r.GetAssets() {
+		if asset.GetType() == pcc.ReleaseMetadata_ASSET_TYPE_OS {
+			return asset.GetUrl() != "" && assetExt(asset) == ".ipsw"
+		}
+	}
+	return false
 }
 
 // OSAssetDigest returns the SHA256 hex digest of the OS asset, which is the
@@ -336,9 +368,7 @@ func (cr *pccCachedRelease) toRelease() (*PCCRelease, error) {
 	// A release kept despite an unparseable ticket (parsePCCReleaseLeaf) caches
 	// the raw ticket bytes verbatim; preserve them on reload rather than failing
 	// the whole cache load — the ticket is display-only.
-	if _, err := asn1.Unmarshal(cr.TicketBytes, &r.Ticket); err != nil {
-		r.Ticket = Ticket{Raw: asn1.RawContent(cr.TicketBytes)}
-	}
+	r.Ticket, _ = decodePCCTicket(cr.TicketBytes)
 	return r, nil
 }
 
@@ -443,7 +473,7 @@ func resolveOSAssetField[T any](
 	// already has a value loaded from cache.
 	allResolved := true
 	for _, r := range releases {
-		if r.OSAssetDigest() != "" && !isResolved(get(r)) {
+		if r.OSAssetIsIPSW() && r.OSAssetDigest() != "" && !isResolved(get(r)) {
 			allResolved = false
 			break
 		}
@@ -454,6 +484,9 @@ func resolveOSAssetField[T any](
 
 	byDigest := make(map[string][]*PCCRelease)
 	for _, r := range releases {
+		if !r.OSAssetIsIPSW() {
+			continue
+		}
 		if d := r.OSAssetDigest(); d != "" {
 			byDigest[d] = append(byDigest[d], r)
 		}
@@ -573,22 +606,34 @@ func (r *PCCRelease) String() string {
 	out.WriteString(fmt.Sprintf(colorField("Schema")+": %s\n", string(r.SchemaVersion.String())))
 	out.WriteString(colorField("Assets\n"))
 	for _, asset := range r.GetAssets() {
-		out.WriteString(fmt.Sprintf("    [%s]\n", colorTypeField(strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"))))
+		out.WriteString(fmt.Sprintf("    [%s]\n", colorTypeField(PCCAssetTypeLabel(asset.GetType()))))
 		out.WriteString(fmt.Sprintf(colorField("        Variant")+": %s\n", colorName(asset.GetVariant())))
 		out.WriteString(fmt.Sprintf(colorField("        Digest")+":  %s (%s)\n", colorHash(hex.EncodeToString(asset.Digest.GetValue())), strings.TrimPrefix(asset.Digest.GetDigestAlg().String(), "DIGEST_ALG_")))
 		out.WriteString(fmt.Sprintf(colorField("        URL")+":     %s\n", asset.GetUrl()))
 	}
+	if refs := r.GetReferences(); len(refs) > 0 {
+		out.WriteString(colorField("References\n"))
+		for _, ref := range refs {
+			fmt.Fprintf(&out, "    %s: %s\n", ref.GetName(), ref.GetUrl())
+		}
+	}
 	out.WriteString(colorField("Tickets\n"))
-	hash := sha256.New()
-	hash.Write(r.Ticket.ApTicket.Bytes)
-	out.WriteString(fmt.Sprintf(colorField("    OS")+": %s\n", colorHash(hex.EncodeToString(hash.Sum(nil)))))
+	if r.Ticket.Version == 1 && len(r.Ticket.ApTicket.Bytes) > 0 {
+		hash := sha256.Sum256(r.Ticket.ApTicket.Bytes)
+		out.WriteString(fmt.Sprintf(colorField("    OS")+": %s\n", colorHash(hex.EncodeToString(hash[:]))))
+	} else if r.Ticket.Version != 0 {
+		fmt.Fprintf(&out, "    (release schema %d; ticket details unavailable)\n", r.Ticket.Version)
+	} else {
+		out.WriteString("    (ticket details unavailable)\n")
+	}
 	out.WriteString(fmt.Sprintf("        [%s: %s]\n", colorCreateTime("created"), r.ReleaseCreationTime().Format("2006-01-02 15:04:05")))
 	out.WriteString(fmt.Sprintf("        [%s: %s]\n", colorExpireTime("expires"), time.UnixMilli(int64(r.ExpiryMS)).Format("2006-01-02 15:04:05")))
-	out.WriteString(colorField("    Cryptexes\n"))
-	for i, ct := range r.Ticket.CryptexTickets {
-		hash.Reset()
-		hash.Write(ct.Bytes)
-		out.WriteString(fmt.Sprintf("        %d) %s\n", i, colorHash(hex.EncodeToString(hash.Sum(nil)))))
+	if r.Ticket.Version == 1 && len(r.Ticket.CryptexTickets) > 0 {
+		out.WriteString(colorField("    Cryptexes\n"))
+		for i, ct := range r.Ticket.CryptexTickets {
+			hash := sha256.Sum256(ct.Bytes)
+			out.WriteString(fmt.Sprintf("        %d) %s\n", i, colorHash(hex.EncodeToString(hash[:]))))
+		}
 	}
 	out.WriteString(colorField("DarwinInit:\n"))
 	if r.GetDarwinInit() == nil {
@@ -611,17 +656,28 @@ func (r *PCCRelease) String() string {
 
 // DownloadContext downloads a PCC release and cancels its requests when ctx is done.
 func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, insecure, skipAll, restartAll bool) error {
+	transport := &pccGCSAuthTransport{
+		base:  newPCCAssetHTTPTransport(proxy, insecure),
+		token: os.Getenv("CLOUDSDK_AUTH_ACCESS_TOKEN"),
+	}
+	return r.downloadContext(ctx, output, proxy, insecure, skipAll, restartAll, transport)
+}
+
+func (r *PCCRelease) downloadContext(ctx context.Context, output, proxy string, insecure, skipAll, restartAll bool, transport *pccGCSAuthTransport) error {
+	client := &http.Client{Timeout: 10 * time.Second, Transport: transport}
+	defer client.CloseIdleConnections()
+	names := pccAssetFilenames(r.GetAssets())
+	requests := make([]*FileRequest, len(r.GetAssets()))
+	for i, asset := range r.GetAssets() {
+		request, err := pccAssetRequest(asset, filepath.Join(output, names[i]))
+		if err != nil {
+			return err
+		}
+		requests[i] = request
+	}
 	// Preflight: HEAD every asset before downloading anything. The newest
 	// releases sometimes 403 on the OS IPSW before CDN sync — fail now
 	// rather than after pulling several GB of other assets.
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			Proxy:           GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		},
-	}
-	defer client.CloseIdleConnections()
 	for _, asset := range r.GetAssets() {
 		req, err := http.NewRequestWithContext(ctx, http.MethodHead, asset.GetUrl(), nil)
 		if err != nil {
@@ -633,8 +689,12 @@ func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, 
 		}
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
+			gcs := isPCCGCSURL(req.URL) || (resp.Request != nil && isPCCGCSURL(resp.Request.URL))
+			if gcs && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) {
+				return fmt.Errorf("asset %s unavailable (HTTP %d): set CLOUDSDK_AUTH_ACCESS_TOKEN to a Google Cloud access token authorized for this object", PCCAssetTypeLabel(asset.GetType()), resp.StatusCode)
+			}
 			return fmt.Errorf("asset %s unavailable (HTTP %d) — newest releases may not be on the CDN yet; try an older release or retry later",
-				strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"), resp.StatusCode)
+				PCCAssetTypeLabel(asset.GetType()), resp.StatusCode)
 		}
 	}
 
@@ -658,19 +718,20 @@ func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, 
 	}
 	skipped := false
 	downloader := NewDownloadWithProfile(AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
+	// GET redirects can differ from HEAD redirects. Apply scoped credentials
+	// throughout the transfer when a token is supplied.
+	if transport.token != "" {
+		downloader.client = client
+	}
 	defer downloader.Close()
-	for _, asset := range r.GetAssets() {
-		filePath := filepath.Join(output, strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_")+assetExt(asset))
-		request, err := pccAssetRequest(asset, filePath)
-		if err != nil {
-			return err
-		}
+	for i, asset := range r.GetAssets() {
+		request := requests[i]
 		pinst.ReleaseAssets = append(pinst.ReleaseAssets, struct {
 			File    string `plist:"file,omitempty"`
 			Type    string `plist:"type,omitempty"`
 			Variant string `plist:"variant,omitempty"`
 		}{
-			File:    filepath.Base(filePath),
+			File:    names[i],
 			Type:    asset.GetType().String(),
 			Variant: asset.GetVariant(),
 		})
@@ -733,6 +794,74 @@ func pccAssetRequest(asset *pcc.ReleaseMetadata_Asset, destName string) (*FileRe
 	return request, nil
 }
 
+// PCCAssetTypeLabel keeps future asset types identifiable without inventing a name.
+func PCCAssetTypeLabel(typ pcc.ReleaseMetadata_AssetType) string {
+	if name, ok := pcc.ReleaseMetadata_AssetType_name[int32(typ)]; ok {
+		return strings.TrimPrefix(name, "ASSET_TYPE_")
+	}
+	return fmt.Sprintf("UNKNOWN_%d", typ)
+}
+
+// Keep established names when unique; the immutable asset order disambiguates duplicates.
+func pccAssetFilenames(assets []*pcc.ReleaseMetadata_Asset) []string {
+	names := make([]string, len(assets))
+	counts := make(map[string]int, len(assets))
+	for i, asset := range assets {
+		names[i] = PCCAssetTypeLabel(asset.GetType()) + assetExt(asset)
+		counts[names[i]]++
+	}
+	for i, asset := range assets {
+		if counts[names[i]] > 1 {
+			names[i] = fmt.Sprintf("%s_%d%s", PCCAssetTypeLabel(asset.GetType()), i+1, assetExt(asset))
+		}
+	}
+	return names
+}
+
+func isPCCGCSURL(u *url.URL) bool {
+	if u == nil || u.Scheme != "https" || u.User != nil || (u.Port() != "" && u.Port() != "443") {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "storage.googleapis.com" || strings.HasSuffix(host, ".storage.googleapis.com")
+}
+
+func newPCCAssetHTTPTransport(proxy string, insecure bool) *http.Transport {
+	transport := newAppleHTTPTransport(proxy, insecure)
+	// The scoped auth wrapper is a custom go-download transport, so retain
+	// the engine's bounded I/O and HTTP/1.1 connection policy here.
+	transport.DialContext = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	transport.TLSHandshakeTimeout = 15 * time.Second
+	transport.ResponseHeaderTimeout = 30 * time.Second
+	transport.IdleConnTimeout = 90 * time.Second
+	transport.MaxIdleConnsPerHost = MaxParts + 1
+	var protocols http.Protocols
+	protocols.SetHTTP1(true)
+	transport.Protocols = &protocols
+	return transport
+}
+
+// Apply credentials at each HTTP hop, including redirects and range requests.
+type pccGCSAuthTransport struct {
+	base  http.RoundTripper
+	token string
+}
+
+func (t *pccGCSAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Del("Authorization")
+	if t.token != "" && isPCCGCSURL(req.URL) {
+		req.Header.Set("Authorization", "Bearer "+t.token)
+	}
+	return t.base.RoundTrip(req)
+}
+
+func (t *pccGCSAuthTransport) CloseIdleConnections() {
+	if base, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		base.CloseIdleConnections()
+	}
+}
+
 func assetTypeExt(typ pcc.ReleaseMetadata_AssetType) string {
 	switch typ {
 	case pcc.ReleaseMetadata_ASSET_TYPE_OS:
@@ -757,6 +886,16 @@ func assetExt(asset *pcc.ReleaseMetadata_Asset) string {
 		return ".dmg"
 	case pcc.ReleaseMetadata_FILE_TYPE_APPLEARCHIVE:
 		return ".aar"
+	case pcc.ReleaseMetadata_FILE_TYPE_TARGZ:
+		return ".tar.gz"
+	}
+	if u, err := url.Parse(asset.GetUrl()); err == nil {
+		if strings.HasSuffix(u.Path, ".tar.gz") || strings.HasSuffix(u.Path, ".tgz") {
+			return ".tar.gz"
+		}
+	}
+	if asset.GetFileType() != pcc.ReleaseMetadata_FILE_TYPE_UNSPECIFIED {
+		return ""
 	}
 	return assetTypeExt(asset.GetType())
 }
@@ -877,9 +1016,9 @@ func parsePCCReleaseLeaf(leaf *pcc.LogLeavesResponse_Leaf) (*PCCRelease, pccRele
 	// model already exists), so when the ASN.1 won't decode we keep the raw
 	// bytes and the release stays downloadable and cacheable — only the ticket
 	// hashes are unavailable. Dropping it would silently hide a fetchable build.
-	if _, err := asn1.Unmarshal(leaf.GetRawData(), &release.Ticket); err != nil {
+	release.Ticket, err = decodePCCTicket(leaf.GetRawData())
+	if err != nil {
 		log.WithFields(leafLogFields(leaf, atLeaf)).Warnf("PCC release leaf has unparseable ticket; keeping release, ticket hashes unavailable: %v", err)
-		release.Ticket = Ticket{Raw: asn1.RawContent(leaf.GetRawData())}
 	}
 
 	return release, pccReleaseNotSkipped, nil
@@ -990,8 +1129,8 @@ type PCCLogSnapshot struct {
 
 // GetPCCReleases returns parsed releases from Apple's PCC AT transparency
 // log, using the on-disk pcc_log.json cache for incremental fetch. Steady
-// state is two POSTs (ListTrees + LogHead) instead of the full ~15-batch
-// replay of the entire log every invocation.
+// state is two POSTs (ListTrees + LogHead) instead of replaying the entire
+// log on every invocation.
 func GetPCCReleases(proxy string, insecure bool, progress func(done, total uint64)) ([]*PCCRelease, error) {
 	snapshot, err := GetPCCLogSnapshot(context.Background(), proxy, insecure, progress)
 	if err != nil {
@@ -1175,6 +1314,7 @@ func fetchPCCLogLeaves(ctx context.Context, client *http.Client, url string, tre
 		RequestUuid:     requestUUID,
 		StartMergeGroup: 0,
 		EndMergeGroup:   uint32(tree.GetMergeGroups()),
+		DataType:        pcc.ATLogDataType_RELEASE,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal LogLeavesRequest: %v", err)

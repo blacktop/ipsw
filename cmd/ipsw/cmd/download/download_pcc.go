@@ -86,6 +86,7 @@ var downloadPccCmd = &cobra.Command{
 	Use:     "pcc [INDEX]",
 	Aliases: []string{"p", "vre", "pccvre"},
 	Short:   "Download PCC VM files",
+	Long:    "Download PCC release assets. Set CLOUDSDK_AUTH_ACCESS_TOKEN to authorize downloads from Google Cloud Storage.",
 	Args:    cobra.MaximumNArgs(1),
 	Example: heredoc.Doc(`
 		# Show available PCC releases info
@@ -260,7 +261,7 @@ var downloadPccCmd = &cobra.Command{
 				fmt.Println(release)
 				if release.Version != nil {
 					utils.Indent(log.WithFields(pccVersionFields(*release.Version)).Info, 1)("OS IPSW")
-				} else if len(releases) == 1 {
+				} else if len(releases) == 1 && release.OSAssetIsIPSW() {
 					if v, err := pccVersionFetcher(proxy, insecure)(release.OSAssetURL()); err == nil {
 						utils.Indent(log.WithFields(pccVersionFields(v)).Info, 1)("OS IPSW")
 					}
