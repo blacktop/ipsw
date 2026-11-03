@@ -49,6 +49,7 @@ func init() {
 	aeaCmd.Flags().StringP("key-val", "b", "", "Base64 encoded symmetric encryption key")
 	aeaCmd.Flags().StringP("pem", "p", "", "AEA private_key.pem file")
 	aeaCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
+	aeaCmd.Flags().String("auth-data", "", "AEA auth data file")
 	aeaCmd.Flags().BoolP("encrypt", "e", false, "AEA encrypt file")
 	aeaCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	aeaCmd.Flags().Bool("insecure", false, "Allow insecure connections")
@@ -62,6 +63,7 @@ func init() {
 	viper.BindPFlag("fw.aea.key-val", aeaCmd.Flags().Lookup("key-val"))
 	viper.BindPFlag("fw.aea.pem", aeaCmd.Flags().Lookup("pem"))
 	viper.BindPFlag("fw.aea.pem-db", aeaCmd.Flags().Lookup("pem-db"))
+	viper.BindPFlag("fw.aea.auth-data", aeaCmd.Flags().Lookup("auth-data"))
 	viper.BindPFlag("fw.aea.encrypt", aeaCmd.Flags().Lookup("encrypt"))
 	viper.BindPFlag("fw.aea.proxy", aeaCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("fw.aea.insecure", aeaCmd.Flags().Lookup("insecure"))
@@ -76,6 +78,7 @@ var aeaCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var pemData []byte
+		var authData []byte
 
 		// flags
 		fcsKey := viper.GetBool("fw.aea.fcs-key")
@@ -85,6 +88,7 @@ var aeaCmd = &cobra.Command{
 		showInfo := viper.GetBool("fw.aea.info")
 		pemFile := viper.GetString("fw.aea.pem")
 		pemDB := viper.GetString("fw.aea.pem-db")
+		authDataFile := viper.GetString("fw.aea.auth-data")
 		doEncrypt := viper.GetBool("fw.aea.encrypt")
 		proxy := viper.GetString("fw.aea.proxy")
 		insecure := viper.GetBool("fw.aea.insecure")
@@ -179,9 +183,16 @@ var aeaCmd = &cobra.Command{
 			if base64Key == "" {
 				return fmt.Errorf("must provide a base64 encoded symmetric encryption key via --key-val")
 			}
+			if authDataFile != "" {
+				authData, err = os.ReadFile(authDataFile)
+				if err != nil {
+					return fmt.Errorf("failed to read auth data file: %v", err)
+				}
+			}
 			if err := aea.Encrypt(args[0], &aea.EncryptConfig{
 				Output:    output,
 				B64SymKey: base64Key,
+				AuthData:  authData,
 			}); err != nil {
 				return fmt.Errorf("failed to encrypt AEA: %v", err)
 			}
