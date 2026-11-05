@@ -55,6 +55,7 @@ func init() {
 	aeaCmd.Flags().Bool("insecure", false, "Allow insecure connections")
 	aeaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	aeaCmd.MarkFlagDirname("output")
+	aeaCmd.MarkFlagFilename("auth-data")
 	aeaCmd.MarkFlagsMutuallyExclusive("info", "fcs-key", "key")
 	viper.BindPFlag("fw.aea.id", aeaCmd.Flags().Lookup("id"))
 	viper.BindPFlag("fw.aea.info", aeaCmd.Flags().Lookup("info"))
@@ -94,6 +95,12 @@ var aeaCmd = &cobra.Command{
 		insecure := viper.GetBool("fw.aea.insecure")
 		output := viper.GetString("fw.aea.output")
 		// validate flags
+		if authDataFile != "" && !doEncrypt {
+			return fmt.Errorf("--auth-data requires --encrypt")
+		}
+		if doEncrypt && (showID || showInfo || fcsKey || adKey) {
+			return fmt.Errorf("--encrypt cannot be combined with --id, --info, --fcs-key or --key")
+		}
 		if (adKey || showID || showInfo) && output != "" {
 			return fmt.Errorf("--output flag is not valid with --id, --info or --key flags")
 		} else if (adKey || showID || showInfo) && (fcsKey || base64Key != "") {
@@ -186,7 +193,7 @@ var aeaCmd = &cobra.Command{
 			if authDataFile != "" {
 				authData, err = os.ReadFile(authDataFile)
 				if err != nil {
-					return fmt.Errorf("failed to read auth data file: %v", err)
+					return fmt.Errorf("failed to read auth data file: %w", err)
 				}
 			}
 			if err := aea.Encrypt(args[0], &aea.EncryptConfig{
@@ -194,7 +201,7 @@ var aeaCmd = &cobra.Command{
 				B64SymKey: base64Key,
 				AuthData:  authData,
 			}); err != nil {
-				return fmt.Errorf("failed to encrypt AEA: %v", err)
+				return fmt.Errorf("failed to encrypt AEA: %w", err)
 			}
 		} else {
 			if pemFile != "" {

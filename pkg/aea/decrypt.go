@@ -179,6 +179,17 @@ func getHMAC(key, data, salt []byte) (HMAC, error) {
 	return HMAC(mac.Sum(nil)), nil
 }
 
+func getRootHeaderHMAC(key, data []byte, clusterMAC HMAC, authData io.Reader, authSize uint32) (HMAC, error) {
+	mac := hmac.New(sha256.New, key)
+	mac.Write(clusterMAC[:])
+	if _, err := io.CopyN(mac, authData, int64(authSize)); err != nil {
+		return HMAC{}, fmt.Errorf("failed to read auth data: %w", err)
+	}
+	mac.Write(data)
+	mac.Write(binary.LittleEndian.AppendUint64(nil, uint64(len(clusterMAC))+uint64(authSize)))
+	return HMAC(mac.Sum(nil)), nil
+}
+
 // bufferPool is used to reuse byte slices for segment data to reduce allocations
 type bufferPool struct {
 	pool sync.Pool
@@ -514,13 +525,22 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 		return "", fmt.Errorf("invalid profile: %d; expected %d", hdr.ProfileID(), SymmetricEncryption)
 	}
 
-	authData := make([]byte, hdr.AuthDataLength)
-	if _, err := f.Read(authData); err != nil {
-		return "", fmt.Errorf("failed to read auth data: %v", err)
+	authOffset := int64(binary.Size(hdr))
+	authSize := int64(hdr.AuthDataLength)
+	finfo, err := f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("failed to get input file info: %w", err)
+	}
+	if finfo.Size() < authOffset+authSize+32+int64(binary.Size(encRootHeader{})) {
+		return "", fmt.Errorf("truncated AEA prologue: %w", io.ErrUnexpectedEOF)
+	}
+	authData := io.NewSectionReader(f, authOffset, authSize)
+	if _, err := f.Seek(authOffset+authSize, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to seek past auth data: %w", err)
 	}
 
 	mainSalt := make([]byte, 32)
-	if _, err := f.Read(mainSalt); err != nil {
+	if _, err := io.ReadFull(f, mainSalt); err != nil {
 		return "", fmt.Errorf("failed to read main salt: %v", err)
 	}
 
@@ -550,19 +570,15 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 	); err != nil {
 		return "", fmt.Errorf("failed to derive root header key: %v", err)
 	}
-	// Build HMAC salt without allocation
-	hmacSalt := make([]byte, len(encRootHdr.ClusterHmac)+len(authData))
-	copy(hmacSalt, encRootHdr.ClusterHmac[:])
-	copy(hmacSalt[len(encRootHdr.ClusterHmac):], authData)
 	// verify root header HMAC
-	rhmac, err := getHMAC(rootHdrKey.MAC[:], encRootHdr.Data[:], hmacSalt)
+	rhmac, err := getRootHeaderHMAC(rootHdrKey.MAC[:], encRootHdr.Data[:], encRootHdr.ClusterHmac, authData, hdr.AuthDataLength)
 	if err != nil {
 		return "", fmt.Errorf("failed to get encrypted root header HMAC: %v", err)
 	}
 	if !hmac.Equal(encRootHdr.Hmac[:], rhmac[:]) {
 		return "", fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac)
 	}
-	rootHdrData, err := decryptCTR(append(encRootHdr.Data[:], authData...), rootHdrKey.Key[:], rootHdrKey.IV[:])
+	rootHdrData, err := decryptCTR(encRootHdr.Data[:], rootHdrKey.Key[:], rootHdrKey.IV[:])
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt root header: %v", err)
 	}
@@ -581,7 +597,7 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 		return "", fmt.Errorf("failed to decrypt clusters: %v", err)
 	}
 
-	finfo, err := of.Stat()
+	finfo, err = of.Stat()
 	if err != nil {
 		return "", fmt.Errorf("failed to get output file info: %v", err)
 	}
@@ -605,31 +621,31 @@ type DecryptConfig struct {
 }
 
 func Decrypt(c *DecryptConfig) (string, error) {
-	metadata, err := Info(c.Input)
-	if err != nil {
-		return "", fmt.Errorf("failed to Decrypt AEA: %v", err)
-	}
-
-	if encKey, ok := metadata["encryption_key"]; ok {
-		c.symEncKey, err = hex.DecodeString(string(encKey))
+	var err error
+	if c.B64SymKey != "" {
+		c.symEncKey, err = base64.StdEncoding.DecodeString(c.B64SymKey)
 		if err != nil {
-			return "", fmt.Errorf("failed to decode hex sym key: %v", err)
+			return "", fmt.Errorf("failed to decode base64 sym key: %w", err)
 		}
-		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
-	} else if c.B64SymKey == "" {
-		c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB, c.Proxy, c.Insecure)
-		if err != nil {
-			return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %v", err)
-		}
-		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
 	} else {
-		c.symEncKey, err = base64.StdEncoding.WithPadding(base64.StdPadding).DecodeString(c.B64SymKey)
+		metadata, err := Info(c.Input)
 		if err != nil {
-			return "", fmt.Errorf("failed to decode base64 sym key: %v", err)
+			return "", fmt.Errorf("failed to Decrypt AEA: %w", err)
 		}
+		if encKey, ok := metadata["encryption_key"]; ok {
+			c.symEncKey, err = hex.DecodeString(string(encKey))
+			if err != nil {
+				return "", fmt.Errorf("failed to decode hex sym key: %w", err)
+			}
+		} else {
+			c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB, c.Proxy, c.Insecure)
+			if err != nil {
+				return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %w", err)
+			}
+		}
+		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
 	}
 
-	// if true { // uncomment this is to test the pure Go implementation on darwin
 	if _, err := os.Stat(aeaBinPath); os.IsNotExist(err) { // 'aea' binary NOT found (linux/windows)
 		log.Info("Using pure Go implementation for AEA decryption")
 		return decrypt(c.Input, filepath.Join(c.Output, filepath.Base(strings.TrimSuffix(c.Input, filepath.Ext(c.Input)))), c.symEncKey)

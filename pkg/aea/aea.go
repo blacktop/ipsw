@@ -231,7 +231,9 @@ func (md Metadata) DecryptFCS(pemData []byte, pemDB string, proxy string, insecu
 }
 
 func Info(in string) (Metadata, error) {
-	var metadata Metadata
+	// Structured metadata is small. Opaque auth data can be larger and is
+	// streamed by decryption when an explicit symmetric key is provided.
+	const maxMetadataSize = 16 << 20
 	f, err := os.Open(in)
 	if err != nil {
 		return nil, err
@@ -247,29 +249,41 @@ func Info(in string) (Metadata, error) {
 		return nil, fmt.Errorf("invalid AEA header: found '%s' expected 'AEA1'", string(hdr.Magic[:]))
 	}
 
-	metadata = make(map[string][]byte)
+	if hdr.AuthDataLength > maxMetadataSize {
+		return nil, fmt.Errorf("AEA metadata exceeds %d bytes", maxMetadataSize)
+	}
+	finfo, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if int64(hdr.AuthDataLength) > finfo.Size()-int64(binary.Size(hdr)) {
+		return nil, fmt.Errorf("truncated AEA metadata: %w", io.ErrUnexpectedEOF)
+	}
+	metadata := make(Metadata)
 	mdr := io.NewSectionReader(f, int64(binary.Size(hdr)), int64(hdr.AuthDataLength))
 
 	// parse key-value pairs
-	for {
+	for remaining := hdr.AuthDataLength; remaining > 0; {
+		if remaining < 4 {
+			return nil, fmt.Errorf("truncated AEA metadata length: %w", io.ErrUnexpectedEOF)
+		}
 		var length uint32
-		err := binary.Read(mdr, binary.LittleEndian, &length)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
+		if err := binary.Read(mdr, binary.LittleEndian, &length); err != nil {
 			return nil, err
 		}
-
-		keyval := make([]byte, length-uint32(binary.Size(length)))
-		if _, err = mdr.Read(keyval); err != nil {
-			if err == io.EOF {
-				break
-			}
+		remaining -= 4
+		if length < 5 || length-4 > remaining {
+			return nil, fmt.Errorf("invalid AEA metadata entry length %d", length)
+		}
+		keyval := make([]byte, length-4)
+		if _, err := io.ReadFull(mdr, keyval); err != nil {
 			return nil, err
 		}
-
-		k, v, _ := bytes.Cut(keyval, []byte{0x00})
+		remaining -= length - 4
+		k, v, found := bytes.Cut(keyval, []byte{0x00})
+		if !found {
+			return nil, fmt.Errorf("invalid AEA metadata entry: missing key separator")
+		}
 		metadata[string(k)] = v
 	}
 

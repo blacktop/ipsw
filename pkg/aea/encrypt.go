@@ -13,7 +13,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"slices"
 
 	"github.com/apex/log"
 	"github.com/blacktop/lzfse-cgo"
@@ -250,7 +249,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to encrypt root header: %w", err)
 	}
-	rootHdrHMAC, err := getHMAC(rootHdrKey.MAC[:], encRootHdr, slices.Concat(nextClusterMac[:], conf.AuthData))
+	rootHdrHMAC, err := getRootHeaderHMAC(rootHdrKey.MAC[:], encRootHdr, nextClusterMac, bytes.NewReader(conf.AuthData), uint32(len(conf.AuthData)))
 	if err != nil {
 		return fmt.Errorf("failed to get root header HMAC: %w", err)
 	}
