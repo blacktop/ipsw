@@ -236,7 +236,7 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 	segKeyInfoBuf := make([]byte, len(SegmentKeyInfo)+4)
 	copy(segKeyInfoBuf, SegmentKeyInfo)
 
-	for {
+	for totalSize < rootHdr.FileSize {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -461,9 +461,6 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 		clusterMAC = nextClusterMac
 		cindex++
 
-		if totalSize >= rootHdr.FileSize {
-			break
-		}
 	}
 
 	/* padding key */
