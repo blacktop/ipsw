@@ -144,3 +144,38 @@ func TestEncryptFailurePreservesOutput(t *testing.T) {
 		t.Fatalf("temporary output leaked: %v", entries)
 	}
 }
+
+func TestEncryptPreservesOutputPermissions(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "synthetic.bin")
+	if err := os.WriteFile(in, []byte("payload"), 0o666); err != nil {
+		t.Fatal(err)
+	}
+	mode := func(name string) os.FileMode {
+		t.Helper()
+		info, err := os.Stat(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return info.Mode().Perm()
+	}
+	archive := in + ".aea"
+	conf := &EncryptConfig{Output: dir, SymmetricKey: make([]byte, 32)}
+	want := mode(in)
+	if err := Encrypt(in, conf); err != nil {
+		t.Fatal(err)
+	}
+	if got := mode(archive); got != want {
+		t.Fatalf("new archive mode = %04o; want %04o", got, want)
+	}
+	if err := os.Chmod(archive, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	want = mode(archive)
+	if err := Encrypt(in, conf); err != nil {
+		t.Fatal(err)
+	}
+	if got := mode(archive); got != want {
+		t.Fatalf("replacement archive mode = %04o; want %04o", got, want)
+	}
+}

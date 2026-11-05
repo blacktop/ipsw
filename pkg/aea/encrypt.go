@@ -118,7 +118,12 @@ func encrypt(in string, conf *EncryptConfig) error {
 	if err := os.MkdirAll(filepath.Dir(fname), 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
-	out, err := os.CreateTemp(filepath.Dir(fname), ".ipsw-aea-*")
+	tempDir, err := os.MkdirTemp(filepath.Dir(fname), ".ipsw-aea-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary output directory: %w", err)
+	}
+	defer os.Remove(tempDir)
+	out, err := os.OpenFile(filepath.Join(tempDir, "archive"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
@@ -273,6 +278,15 @@ func encrypt(in string, conf *EncryptConfig) error {
 	copy(root.Data[:], encRootHdr)
 	if err := binary.Write(out, binary.LittleEndian, root); err != nil {
 		return fmt.Errorf("failed to write encrypted root header: %w", err)
+	}
+	if existing, err := os.Stat(fname); err == nil {
+		if existing.Mode().IsRegular() {
+			if err := out.Chmod(existing.Mode().Perm()); err != nil {
+				return fmt.Errorf("failed to preserve output permissions: %w", err)
+			}
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to get output permissions: %w", err)
 	}
 	if err := out.Close(); err != nil {
 		return fmt.Errorf("failed to close output file: %w", err)
