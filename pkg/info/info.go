@@ -444,8 +444,34 @@ func (i *Info) GetCPU(board string) string {
 	return ""
 }
 
-// GetFolder returns a folder name for all the devices included in an IPSW
+// GetFolder returns a folder name for all the devices included in an IPSW.
+//
+// The name is built from firmware metadata, which is untrusted input, so it is
+// rejected unless it is a single path component that callers can safely join
+// onto an output directory.
 func (i *Info) GetFolder(device ...string) (string, error) {
+	folder, err := i.folderName(device...)
+	if err != nil {
+		return "", err
+	}
+	if err := checkFolderName(folder); err != nil {
+		return "", err
+	}
+	return folder, nil
+}
+
+// checkFolderName rejects output folder names that are not a single path
+// component. Anything else would let a crafted BuildManifest, DeviceTree or
+// OTA Info.plist redirect extraction outside the chosen output directory.
+func checkFolderName(name string) error {
+	if !utils.IsSafePathComponent(name) {
+		return fmt.Errorf("firmware metadata produced unsafe output folder name %q: "+
+			"refusing to write outside the output directory", name)
+	}
+	return nil
+}
+
+func (i *Info) folderName(device ...string) (string, error) {
 	if i.Plists.BuildManifest == nil {
 		if i.Plists.Type == "OTA" && i.Plists.OTAInfo.CFBundleName == "SimulatorRuntimeAsset" {
 			typ, found := strings.CutPrefix(i.Plists.OTAInfo.CFBundleIdentifier, "com.apple.MobileAsset.")
@@ -500,9 +526,16 @@ func (i *Info) GetFolders() ([]string, error) {
 	}
 	var folders []string
 	if len(i.DeviceTrees) > 0 {
-		for _, dtree := range i.DeviceTrees {
-			dt, _ := dtree.Summary()
-			folders = append(folders, fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion))
+		for name, dtree := range i.DeviceTrees {
+			dt, err := dtree.Summary()
+			if err != nil {
+				return nil, fmt.Errorf("failed to summarize DeviceTree %s: %w", name, err)
+			}
+			folder := fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+			if err := checkFolderName(folder); err != nil {
+				return nil, err
+			}
+			folders = append(folders, folder)
 		}
 		return folders, nil
 	}
@@ -516,11 +549,18 @@ func (i *Info) GetFolderForFile(fileName string) (string, error) {
 	}
 	if len(i.DeviceTrees) > 0 {
 		files := i.getManifestPaths()
-		for _, dtree := range i.DeviceTrees {
-			dt, _ := dtree.Summary()
+		for name, dtree := range i.DeviceTrees {
+			dt, err := dtree.Summary()
+			if err != nil {
+				return "", fmt.Errorf("failed to summarize DeviceTree %s: %w", name, err)
+			}
 			for _, file := range files[strings.ToLower(dt.BoardConfig)] {
 				if strings.Contains(fileName, filepath.Base(file)) {
-					return fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion), nil
+					folder := fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+					if err := checkFolderName(folder); err != nil {
+						return "", err
+					}
+					return folder, nil
 				}
 			}
 		}
@@ -543,41 +583,28 @@ func (i *Info) getManifestPaths() map[string][]string {
 	return files
 }
 
-type folder struct {
-	Name         string
-	KernelCaches []string
-}
-
-func (i *Info) getFolders() ([]folder, error) {
-	if i.Plists.BuildManifest == nil {
-		return nil, fmt.Errorf("no BuildManifest.plist found")
-	}
-	if len(i.DeviceTrees) > 0 {
-		var fs []folder
-		kcs := i.Plists.BuildManifest.GetKernelCaches()
-		for _, dtree := range i.DeviceTrees {
-			dt, _ := dtree.Summary()
-			fs = append(fs, folder{
-				Name:         fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion),
-				KernelCaches: kcs[strings.ToLower(dt.BoardConfig)],
-			})
-		}
-		return fs, nil
-	}
-	return nil, fmt.Errorf("no devices found")
-}
-
 // GetKernelCacheFolders returns the folders belonging to a KernelCache
 func (i *Info) GetKernelCacheFolders(kc string) ([]string, error) {
-	var folders []string
-	fds, err := i.getFolders()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get folders: %v", err)
+	if i.Plists.BuildManifest == nil {
+		return nil, fmt.Errorf("failed to get folders: no BuildManifest.plist found")
 	}
-	for _, folder := range fds {
-		for _, kcache := range folder.KernelCaches {
+	if len(i.DeviceTrees) == 0 {
+		return nil, fmt.Errorf("failed to get folders: no devices found")
+	}
+	var folders []string
+	kcs := i.Plists.BuildManifest.GetKernelCaches()
+	for name, dtree := range i.DeviceTrees {
+		dt, err := dtree.Summary()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get folders: failed to summarize DeviceTree %s: %v", name, err)
+		}
+		folderName := fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+		if err := checkFolderName(folderName); err != nil {
+			return nil, fmt.Errorf("failed to get folders: %v", err)
+		}
+		for _, kcache := range kcs[strings.ToLower(dt.BoardConfig)] {
 			if strings.HasSuffix(kc, kcache) {
-				folders = append(folders, folder.Name)
+				folders = append(folders, folderName)
 			}
 		}
 	}
@@ -767,11 +794,11 @@ func getAbbreviatedDevList(devices []string) string {
 	devList.WriteString(currentDev)
 
 	for _, dev := range devices[1:] {
-		if strings.HasPrefix(dev, devPrefix) {
-			devList.WriteString(fmt.Sprintf("_%s", strings.Split(dev, ",")[1]))
+		if _, model, ok := strings.Cut(dev, ","); ok && strings.HasPrefix(dev, devPrefix) {
+			devList.WriteString("_" + model)
 		} else {
 			currentDev = dev
-			devPrefix = strings.Split(currentDev, ",")[0]
+			devPrefix, _, _ = strings.Cut(currentDev, ",")
 			devList.WriteString("_" + currentDev)
 		}
 	}
@@ -795,11 +822,11 @@ func getAbbreviatedDevListFolder(devices []string) string {
 	devList.WriteString(currentDev)
 
 	for _, dev := range devices[1:] {
-		if strings.HasPrefix(dev, devPrefix) {
-			devList.WriteString(fmt.Sprintf("_%s", strings.Split(dev, ",")[1]))
+		if _, model, ok := strings.Cut(dev, ","); ok && strings.HasPrefix(dev, devPrefix) {
+			devList.WriteString("_" + model)
 		} else {
 			currentDev = dev
-			devPrefix = strings.Split(currentDev, ",")[0]
+			devPrefix, _, _ = strings.Cut(currentDev, ",")
 			devList.WriteString("_" + currentDev)
 		}
 	}

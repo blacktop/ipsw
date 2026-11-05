@@ -2,6 +2,7 @@ package diff
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,29 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
+
+func TestGetInfoRejectsTraversingMetadata(t *testing.T) {
+	root := t.TempDir()
+	paths := make([]string, 2)
+	for idx, build := range []string{"A", "x/../../escaped"} {
+		paths[idx] = filepath.Join(root, fmt.Sprintf("input-%d.ipsw", idx))
+		manifest := fmt.Sprintf(`<plist version="1.0"><dict><key>ProductVersion</key><string>18.0</string><key>ProductBuildVersion</key><string>%s</string><key>SupportedProductTypes</key><array><string>iPhone17,1</string></array><key>BuildIdentities</key><array/></dict></plist>`, build)
+		writeMinimalIPSWZip(t, paths[idx], "BuildManifest.plist", manifest)
+	}
+	for _, oldBad := range []bool{true, false} {
+		t.Run(map[bool]string{true: "old", false: "new"}[oldBad], func(t *testing.T) {
+			oldPath, newPath := paths[0], paths[1]
+			if oldBad {
+				oldPath, newPath = newPath, oldPath
+			}
+			d := New(&Config{IpswOld: oldPath, IpswNew: newPath})
+			d.tmpDir = t.TempDir()
+			if err := d.getInfo(); err == nil || !strings.Contains(err.Error(), "unsafe output folder name") {
+				t.Fatalf("getInfo() = %v; want unsafe folder error", err)
+			}
+		})
+	}
+}
 
 type fakeVolumeFileSession struct {
 	roots    map[string]string

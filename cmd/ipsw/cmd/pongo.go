@@ -94,7 +94,7 @@ var pongoCmd = &cobra.Command{
 			}
 			folder, err := i.GetFolder()
 			if err != nil {
-				log.Errorf("failed to get folder from remote zip metadata: %v", err)
+				return fmt.Errorf("failed to get folder from remote zip metadata: %w", err)
 			}
 			destPath = filepath.Join(filepath.Clean(viper.GetString("pongo.output")), folder)
 
@@ -129,7 +129,7 @@ var pongoCmd = &cobra.Command{
 			}
 			folder, err := i.GetFolder()
 			if err != nil {
-				log.Errorf("failed to get folder from remote zip metadata: %v", err)
+				return fmt.Errorf("failed to get folder from IPSW metadata: %w", err)
 			}
 			destPath = filepath.Join(filepath.Clean(viper.GetString("pongo.output")), folder)
 

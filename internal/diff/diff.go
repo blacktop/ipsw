@@ -337,10 +337,18 @@ func (d *Diff) getInfo() (err error) {
 			return fmt.Errorf("'New' OTA: %w", err)
 		}
 
+		if err := configureOTAContext(&d.Old, oldInfo, d.tmpDir); err != nil {
+			oldOTA.Close()
+			newOTA.Close()
+			return fmt.Errorf("'Old' OTA: %w", err)
+		}
+		if err := configureOTAContext(&d.New, newInfo, d.tmpDir); err != nil {
+			oldOTA.Close()
+			newOTA.Close()
+			return fmt.Errorf("'New' OTA: %w", err)
+		}
 		d.Old.otaFile = oldOTA
 		d.New.otaFile = newOTA
-		configureOTAContext(&d.Old, oldInfo, d.tmpDir)
-		configureOTAContext(&d.New, newInfo, d.tmpDir)
 
 		if isMacOSOTA(oldInfo) || isMacOSOTA(newInfo) {
 			d.Old.IsMacOS = true
@@ -399,7 +407,7 @@ func (d *Diff) getInfo() (err error) {
 	d.Old.Build = d.Old.Info.Plists.BuildManifest.ProductBuildVersion
 	d.Old.Folder, err = d.Old.Info.GetFolder()
 	if err != nil {
-		log.Errorf("failed to get folder from 'Old' IPSW metadata: %v", err)
+		return fmt.Errorf("failed to get folder from 'Old' IPSW metadata: %w", err)
 	}
 	d.Old.Folder = filepath.Join(d.tmpDir, d.Old.Folder)
 
@@ -407,7 +415,7 @@ func (d *Diff) getInfo() (err error) {
 	d.New.Build = d.New.Info.Plists.BuildManifest.ProductBuildVersion
 	d.New.Folder, err = d.New.Info.GetFolder()
 	if err != nil {
-		log.Errorf("failed to get folder from 'New' IPSW metadata: %v", err)
+		return fmt.Errorf("failed to get folder from 'New' IPSW metadata: %w", err)
 	}
 	d.New.Folder = filepath.Join(d.tmpDir, d.New.Folder)
 

@@ -300,7 +300,9 @@ func TestConfigureOTAContextFallbackFolderIncludesProduct(t *testing.T) {
 		},
 	}
 
-	configureOTAContext(ctx, inf, tmpDir)
+	if err := configureOTAContext(ctx, inf, tmpDir); err != nil {
+		t.Fatal(err)
+	}
 
 	if ctx.InputMode != inputModeOTA {
 		t.Fatalf("InputMode = %v, want %v", ctx.InputMode, inputModeOTA)
@@ -315,6 +317,28 @@ func TestConfigureOTAContextFallbackFolderIncludesProduct(t *testing.T) {
 	wantFolder := filepath.Join(tmpDir, "23F5043k__iPhone18,1")
 	if ctx.Folder != wantFolder {
 		t.Fatalf("Folder = %q, want %q", ctx.Folder, wantFolder)
+	}
+}
+
+func TestConfigureOTAContextRejectsTraversal(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		plists *plist.Plists
+	}{
+		{"manifest", &plist.Plists{BuildManifest: &plist.BuildManifest{
+			ProductBuildVersion: "x/../../escaped", SupportedProductTypes: []string{"iPhone17,1"},
+		}}},
+		{"fallback build", &plist.Plists{AssetDataInfo: &plist.AssetDataInfo{Build: "../../escaped"}}},
+		{"fallback product", &plist.Plists{AssetDataInfo: &plist.AssetDataInfo{Build: "A", ProductType: "x/../../escaped"}}},
+		{"nested mount path", &plist.Plists{AssetDataInfo: &plist.AssetDataInfo{Build: "A/cryptex-system-arm64e.dmg.mount/redirect"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &Context{}
+			err := configureOTAContext(ctx, &info.Info{Plists: tc.plists}, t.TempDir())
+			if err == nil || ctx.Folder != "" {
+				t.Fatalf("unsafe OTA folder = %q, error = %v", ctx.Folder, err)
+			}
+		})
 	}
 }
 

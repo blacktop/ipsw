@@ -159,6 +159,12 @@ func ReverseBytes(a []byte) []byte {
 	return a
 }
 
+// IsSafePathComponent reports whether name is one nonempty path component.
+// Reject both separator forms so metadata is safe on every supported platform.
+func IsSafePathComponent(name string) bool {
+	return name != "." && filepath.IsLocal(name) && !strings.ContainsAny(name, "/\\\x00")
+}
+
 // SanitizeArchivePath joins an untrusted archive entry name to a destination
 // directory and verifies the result stays within that directory. Returns an
 // error if the entry name would escape via path traversal (zip-slip / tar-slip).

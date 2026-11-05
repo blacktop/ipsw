@@ -288,37 +288,34 @@ func isMacOSOTA(inf *info.Info) bool {
 // info. Handles both BuildManifest-present and absent cases.
 func configureOTAContext(
 	ctx *Context, inf *info.Info, tmpDir string,
-) {
+) error {
 	ctx.Info = inf
 	ctx.InputMode = inputModeOTA
 
+	var folderName string
 	if inf.Plists.BuildManifest != nil {
 		ctx.Version = inf.Plists.BuildManifest.ProductVersion
 		ctx.Build = inf.Plists.BuildManifest.ProductBuildVersion
-		folder, err := inf.GetFolder()
+		var err error
+		folderName, err = inf.GetFolder()
 		if err != nil {
-			log.WithError(err).Warn(
-				"failed to get folder from OTA BuildManifest",
-			)
-			ctx.Folder = filepath.Join(
-				tmpDir, ctx.Build,
-			)
-		} else {
-			ctx.Folder = filepath.Join(tmpDir, folder)
+			return fmt.Errorf("failed to get folder from OTA BuildManifest: %w", err)
 		}
-		return
+	} else {
+		// Fallback: derive version/build from OTA-specific plists.
+		var product string
+		ctx.Version, ctx.Build, product = otaVersionBuildProduct(inf)
+		// Include product to avoid collisions when both sides share a build.
+		folderName = ctx.Build
+		if product != "" {
+			folderName += "__" + product
+		}
 	}
-
-	// Fallback: derive version/build from OTA-specific plists.
-	var product string
-	ctx.Version, ctx.Build, product = otaVersionBuildProduct(inf)
-	// Include product in folder name to avoid collisions when
-	// both sides share a build string.
-	folderName := ctx.Build
-	if product != "" {
-		folderName = ctx.Build + "__" + product
+	if !utils.IsSafePathComponent(folderName) {
+		return fmt.Errorf("unsafe OTA output folder name %q", folderName)
 	}
 	ctx.Folder = filepath.Join(tmpDir, folderName)
+	return nil
 }
 
 // ensureOTAPayloadFilesystem materializes the OTA payload-backed

@@ -901,3 +901,42 @@ func testKernelBuildIdentity(deviceClass, kernelPath string) plist.BuildIdentity
 		},
 	}
 }
+
+func TestSearchRefusesTraversingMetadataFolder(t *testing.T) {
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	for name, data := range map[string]string{
+		"BuildManifest.plist": `<plist version="1.0"><dict><key>ProductVersion</key><string>18.0</string><key>ProductBuildVersion</key><string>A</string><key>SupportedProductTypes</key><array><string>x/../../escaped</string></array></dict></plist>`,
+		"ipsw_poc_pwned.txt":  "written outside the extraction directory",
+	} {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(data)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, remote := range []bool{false, true} {
+		t.Run(map[bool]string{false: "local", true: "remote"}[remote], func(t *testing.T) {
+			c, _ := exclaveTestSource(t, archive.Bytes(), remote)
+			defer c.Close()
+			root := t.TempDir()
+			c.Pattern = "pwned"
+			c.Output = filepath.Join(root, "out")
+			out, err := Search(c)
+			if err == nil || !strings.Contains(err.Error(), "unsafe output folder name") {
+				t.Fatalf("Search() = %v, %v; want unsafe folder error", out, err)
+			}
+			if _, err := os.Stat(filepath.Join(root, "escaped")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("file escaped the output directory: %v", err)
+			}
+			if _, err := os.Stat(c.Output); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("output directory created: %v", err)
+			}
+		})
+	}
+}
