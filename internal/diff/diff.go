@@ -320,32 +320,26 @@ func (d *Diff) getInfo() (err error) {
 	// Classify symmetrically.
 	switch {
 	case oldOTA != nil && newOTA != nil:
-		if d.conf.Device != "" {
+		closeBoth := func(err error) error {
 			oldOTA.Close()
 			newOTA.Close()
-			return fmt.Errorf("--device selects IPSW build identities and cannot be used with OTA diffs")
+			return err
+		}
+		if d.conf.Device != "" {
+			return closeBoth(fmt.Errorf("--device selects IPSW build identities and cannot be used with OTA diffs"))
 		}
 		// Both are OTAs — validate scope (Phase 1: full OTAs only).
 		if err := validateOTAScope(oldInfo); err != nil {
-			oldOTA.Close()
-			newOTA.Close()
-			return fmt.Errorf("'Old' OTA: %w", err)
+			return closeBoth(fmt.Errorf("'Old' OTA: %w", err))
 		}
 		if err := validateOTAScope(newInfo); err != nil {
-			oldOTA.Close()
-			newOTA.Close()
-			return fmt.Errorf("'New' OTA: %w", err)
+			return closeBoth(fmt.Errorf("'New' OTA: %w", err))
 		}
-
 		if err := configureOTAContext(&d.Old, oldInfo, d.tmpDir); err != nil {
-			oldOTA.Close()
-			newOTA.Close()
-			return fmt.Errorf("'Old' OTA: %w", err)
+			return closeBoth(fmt.Errorf("'Old' OTA: %w", err))
 		}
 		if err := configureOTAContext(&d.New, newInfo, d.tmpDir); err != nil {
-			oldOTA.Close()
-			newOTA.Close()
-			return fmt.Errorf("'New' OTA: %w", err)
+			return closeBoth(fmt.Errorf("'New' OTA: %w", err))
 		}
 		d.Old.otaFile = oldOTA
 		d.New.otaFile = newOTA
@@ -382,42 +376,12 @@ func (d *Diff) getInfo() (err error) {
 	}
 
 	// IPSW mode.
-	d.Old.InputMode = inputModeIPSW
-	d.New.InputMode = inputModeIPSW
-
-	d.Old.Info, err = info.Parse(d.Old.IPSWPath)
-	if err != nil {
-		return fmt.Errorf("failed to parse 'Old' IPSW: %v", err)
+	if err := d.openIPSW("Old", &d.Old); err != nil {
+		return err
 	}
-	d.New.Info, err = info.Parse(d.New.IPSWPath)
-	if err != nil {
-		return fmt.Errorf("failed to parse 'New' IPSW: %v", err)
+	if err := d.openIPSW("New", &d.New); err != nil {
+		return err
 	}
-
-	d.Old.Info, err = selectDiffDevice(d.Old.Info, d.conf.Device)
-	if err != nil {
-		return fmt.Errorf("Old IPSW: %w", err)
-	}
-	d.New.Info, err = selectDiffDevice(d.New.Info, d.conf.Device)
-	if err != nil {
-		return fmt.Errorf("New IPSW: %w", err)
-	}
-
-	d.Old.Version = d.Old.Info.Plists.BuildManifest.ProductVersion
-	d.Old.Build = d.Old.Info.Plists.BuildManifest.ProductBuildVersion
-	d.Old.Folder, err = d.Old.Info.GetFolder()
-	if err != nil {
-		return fmt.Errorf("failed to get folder from 'Old' IPSW metadata: %w", err)
-	}
-	d.Old.Folder = filepath.Join(d.tmpDir, d.Old.Folder)
-
-	d.New.Version = d.New.Info.Plists.BuildManifest.ProductVersion
-	d.New.Build = d.New.Info.Plists.BuildManifest.ProductBuildVersion
-	d.New.Folder, err = d.New.Info.GetFolder()
-	if err != nil {
-		return fmt.Errorf("failed to get folder from 'New' IPSW metadata: %w", err)
-	}
-	d.New.Folder = filepath.Join(d.tmpDir, d.New.Folder)
 
 	if d.Title == "" {
 		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
@@ -431,6 +395,37 @@ func (d *Diff) getInfo() (err error) {
 		d.New.IsMacOS = true
 	}
 
+	return nil
+}
+
+// openIPSW parses one IPSW input, applies --device, and derives its version,
+// build and output folder.
+func (d *Diff) openIPSW(label string, ctx *Context) error {
+	ctx.InputMode = inputModeIPSW
+	inf, err := info.Parse(ctx.IPSWPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse '%s' IPSW: %v", label, err)
+	}
+	if ctx.Info, err = selectDiffDevice(inf, d.conf.Device); err != nil {
+		return fmt.Errorf("%s IPSW: %w", label, err)
+	}
+	if err := setManifestContext(ctx, d.tmpDir); err != nil {
+		return fmt.Errorf("'%s' IPSW: %w", label, err)
+	}
+	return nil
+}
+
+// setManifestContext fills ctx's version, build and output folder from the
+// BuildManifest of ctx.Info.
+func setManifestContext(ctx *Context, tmpDir string) error {
+	manifest := ctx.Info.Plists.BuildManifest
+	ctx.Version = manifest.ProductVersion
+	ctx.Build = manifest.ProductBuildVersion
+	folder, err := ctx.Info.GetFolder()
+	if err != nil {
+		return fmt.Errorf("failed to get output folder from BuildManifest: %w", err)
+	}
+	ctx.Folder = filepath.Join(tmpDir, folder)
 	return nil
 }
 

@@ -16,11 +16,12 @@ func TestGetFolderReportsDeviceTreeError(t *testing.T) {
 		Plists:      &plist.Plists{BuildManifest: &plist.BuildManifest{}},
 		DeviceTrees: map[string]*devicetree.DeviceTree{"DeviceTree.synthetic": &dtree},
 	}
-	if _, err := inf.GetFolder(); err == nil || !strings.Contains(err.Error(), "DeviceTree.synthetic") || !strings.Contains(err.Error(), "node children") {
-		t.Fatalf("GetFolder error = %v", err)
-	}
-	if _, err := inf.GetKernelCacheFolders("kernelcache.synthetic"); err == nil || !strings.Contains(err.Error(), "DeviceTree.synthetic") || !strings.Contains(err.Error(), "node children") {
-		t.Fatalf("GetKernelCacheFolders error = %v", err)
+	_, folderErr := inf.GetFolder()
+	_, kernelErr := inf.GetKernelCacheFolders("kernelcache.synthetic")
+	for api, err := range map[string]error{"GetFolder": folderErr, "GetKernelCacheFolders": kernelErr} {
+		if err == nil || !strings.Contains(err.Error(), "DeviceTree.synthetic") || !strings.Contains(err.Error(), "node children") {
+			t.Fatalf("%s error = %v", api, err)
+		}
 	}
 }
 
@@ -192,115 +193,89 @@ func TestGetFolderSimulatorRuntimeUsesAssetType(t *testing.T) {
 	}
 }
 
-func TestGetFolderRejectsPathTraversal(t *testing.T) {
-	tests := []struct {
-		name    string
-		build   string
-		devices []string
-	}{
-		{name: "relative escape", build: "A", devices: []string{"x/../../escaped"}},
-		{name: "absolute escape", build: "A", devices: []string{"x/.." + strings.Repeat("/..", 40) + "/tmp/escaped"}},
-		{name: "backslash", build: "A", devices: []string{`x\..\..\escaped`}},
-		{name: "build with separator", build: "22A3354/../..", devices: []string{"iPhone17,1"}},
-		{name: "nul byte", build: "22A3354\x00", devices: []string{"iPhone17,1"}},
+// requireUnsafeFolder asserts a folder API refused a metadata-derived name.
+// The predicate itself is covered by utils.TestValidatePathComponent.
+func requireUnsafeFolder(t *testing.T, api string, folders []string, err error) {
+	t.Helper()
+	if err == nil || !strings.Contains(err.Error(), "unsafe output folder name") || folders != nil {
+		t.Fatalf("%s = %q, %v; want unsafe folder error", api, folders, err)
 	}
-	for _, tt := range tests {
+}
+
+func folderOrNil(folder string) []string {
+	if folder == "" {
+		return nil
+	}
+	return []string{folder}
+}
+
+func TestGetFolderValidatesMetadata(t *testing.T) {
+	manifest := func(build string, devices ...string) *plist.Plists {
+		return &plist.Plists{BuildManifest: &plist.BuildManifest{ProductBuildVersion: build, SupportedProductTypes: devices}}
+	}
+	for _, tt := range []struct {
+		name   string
+		plists *plist.Plists
+		want   string // empty means GetFolder must refuse the name
+	}{
+		{"normal", manifest("22A3354", "iPhone17,1"), "22A3354__iPhone17,1"},
+		{"device escape", manifest("A", "x/../../escaped"), ""},
+		{"build escape", manifest("22A3354/../..", "iPhone17,1"), ""},
+		{"simulator escape", &plist.Plists{Type: "OTA", OTAInfo: &plist.OTAInfo{
+			CFBundleName:          "SimulatorRuntimeAsset",
+			CFBundleIdentifier:    "com.apple.MobileAsset.iOSSimulatorRuntime",
+			MobileAssetProperties: types.Asset{SimulatorVersion: "../../escaped", Build: "22C150"},
+		}}, ""},
+	} {
 		t.Run(tt.name, func(t *testing.T) {
-			inf := &Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
-				ProductBuildVersion:   tt.build,
-				SupportedProductTypes: tt.devices,
-			}}}
-			folder, err := inf.GetFolder()
-			if err == nil || !strings.Contains(err.Error(), "unsafe output folder name") {
-				t.Fatalf("GetFolder() = %q, %v; want unsafe folder error", folder, err)
-			}
-			if folder != "" {
-				t.Fatalf("GetFolder() returned %q alongside an error", folder)
+			folder, err := (&Info{Plists: tt.plists}).GetFolder()
+			if tt.want == "" {
+				requireUnsafeFolder(t, "GetFolder()", folderOrNil(folder), err)
+			} else if err != nil || folder != tt.want {
+				t.Fatalf("GetFolder() = %q, %v; want %q", folder, err, tt.want)
 			}
 		})
 	}
 }
 
-func TestGetFolderAcceptsNormalMetadata(t *testing.T) {
-	inf := &Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
-		ProductBuildVersion:   "22A3354",
-		SupportedProductTypes: []string{"iPhone17,1"},
-	}}}
-	folder, err := inf.GetFolder()
-	if err != nil || folder != "22A3354__iPhone17,1" {
-		t.Fatalf("GetFolder() = %q, %v", folder, err)
-	}
-}
-
-func TestGetFolderRejectsTraversingSimulatorMetadata(t *testing.T) {
-	inf := &Info{Plists: &plist.Plists{
-		Type: "OTA",
-		OTAInfo: &plist.OTAInfo{
-			CFBundleName:       "SimulatorRuntimeAsset",
-			CFBundleIdentifier: "com.apple.MobileAsset.iOSSimulatorRuntime",
-			MobileAssetProperties: types.Asset{
-				SimulatorVersion: "../../escaped",
-				Build:            "22C150",
-			},
-		},
-	}}
-	if folder, err := inf.GetFolder(); err == nil || !strings.Contains(err.Error(), "unsafe output folder name") {
-		t.Fatalf("GetFolder() = %q, %v; want unsafe folder error", folder, err)
-	}
-}
-
 func TestDeviceTreeFolderAPIsValidateMetadata(t *testing.T) {
+	const board = "n66ap"
 	for _, tt := range []struct {
-		name, product, board, build string
-		want                        string
-		checkGroup                  bool
+		name, product, build string
+		want                 string // per-device folder; empty means refused
+		wantGroup            string // GetFolder; empty means refused
 	}{
-		{"normal", "iPhone8,2", "n66ap", "A", "iPhone8,2_N66AP_A", false},
-		{"product traversal", "x/../../escaped", "n66ap", "A", "", false},
-		{"board traversal", "iPhone8,2", "n66ap/../../escaped", "A", "", false},
-		{"build traversal", "iPhone8,2", "n66ap", "A/../../escaped", "", false},
-		{"group traversal", "x/../../escaped", "n66ap", "22A3354/../..", "", true},
+		{"normal", "iPhone8,2", "A", "iPhone8,2_N66AP_A", "A__iPhone8,2"},
+		{"product traversal", "x/../../escaped", "A", "", "A__0,0"},
+		{"build traversal", "iPhone8,2", "22A3354/../..", "", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dtree := devicetree.DeviceTree{"device-tree": devicetree.Properties{
-				"children": []devicetree.DeviceTree{}, "model": tt.product, "compatible": []string{tt.board},
+				"children": []devicetree.DeviceTree{}, "model": tt.product, "compatible": []string{board},
 			}}
 			inf := &Info{
 				Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{
 					ProductBuildVersion: tt.build,
-					BuildIdentities:     []plist.BuildIdentity{testBuildIdentity(tt.product, tt.board, "kernelcache.synthetic")},
+					BuildIdentities:     []plist.BuildIdentity{testBuildIdentity(tt.product, board, "kernelcache.synthetic")},
 				}},
 				DeviceTrees: map[string]*devicetree.DeviceTree{"DeviceTree.synthetic": &dtree},
 			}
-			check := func(api string, folders []string, err error) {
+			check := func(api string, folders []string, err error, want string) {
 				t.Helper()
-				if tt.want == "" {
-					if err == nil || !strings.Contains(err.Error(), "unsafe output folder name") || folders != nil {
-						t.Fatalf("%s() = %q, %v; want unsafe folder error", api, folders, err)
-					}
-				} else if err != nil || !slices.Equal(folders, []string{tt.want}) {
-					t.Fatalf("%s() = %q, %v; want %q", api, folders, err, tt.want)
+				if want == "" {
+					requireUnsafeFolder(t, api, folders, err)
+				} else if err != nil || !slices.Equal(folders, []string{want}) {
+					t.Fatalf("%s = %q, %v; want %q", api, folders, err, want)
 				}
 			}
 			folders, err := inf.GetFolders()
-			check("GetFolders", folders, err)
+			check("GetFolders()", folders, err, tt.want)
 			folders, err = inf.GetKernelCacheFolders("Firmware/kernelcache.synthetic")
-			check("GetKernelCacheFolders", folders, err)
+			check("GetKernelCacheFolders()", folders, err, tt.want)
 			folder, err := inf.GetFolderForFile("Firmware/kernelcache.synthetic")
-			if err != nil {
-				if folder != "" {
-					t.Fatalf("GetFolderForFile returned %q alongside an error", folder)
-				}
-				check("GetFolderForFile", nil, err)
-			} else {
-				check("GetFolderForFile", []string{folder}, nil)
-			}
-			if tt.checkGroup {
-				folder, err := inf.GetFolder()
-				if err == nil || !strings.Contains(err.Error(), "unsafe output folder name") || folder != "" {
-					t.Fatalf("GetFolder() = %q, %v; want unsafe folder error", folder, err)
-				}
-			}
+			check("GetFolderForFile()", folderOrNil(folder), err, tt.want)
+			folder, err = inf.GetFolder()
+			check("GetFolder()", folderOrNil(folder), err, tt.wantGroup)
 		})
 	}
 }

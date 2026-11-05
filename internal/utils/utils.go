@@ -159,10 +159,15 @@ func ReverseBytes(a []byte) []byte {
 	return a
 }
 
-// IsSafePathComponent reports whether name is one nonempty path component.
-// Reject both separator forms so metadata is safe on every supported platform.
-func IsSafePathComponent(name string) bool {
-	return name != "." && filepath.IsLocal(name) && !strings.ContainsAny(name, "/\\\x00")
+// ValidatePathComponent rejects names that are not exactly one local path
+// component. Names derived from untrusted input must pass before being joined
+// onto an output directory, or a "../" sequence escapes it. filepath.IsLocal
+// alone accepts ".", "a/b", "a\b" and embedded NULs, so every clause is needed.
+func ValidatePathComponent(name string) error {
+	if name == "." || !filepath.IsLocal(name) || strings.ContainsAny(name, "/\\\x00") {
+		return fmt.Errorf("%q is not a single path component", name)
+	}
+	return nil
 }
 
 // SanitizeArchivePath joins an untrusted archive entry name to a destination

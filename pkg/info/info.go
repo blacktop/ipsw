@@ -184,7 +184,7 @@ func (i *Info) String() string {
 				}
 			}
 			iStr.WriteString(fmt.Sprintf("\n%s\n", prodName))
-			iStr.WriteString(fmt.Sprintf(" > %s_%s_%s\n", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion))
+			iStr.WriteString(fmt.Sprintf(" > %s\n", deviceTreeFolderName(dt, i.Plists.BuildManifest.ProductBuildVersion)))
 			if !dt.Timestamp.IsZero() {
 				iStr.WriteString(fmt.Sprintf("   - TimeStamp: %s\n", dt.Timestamp.Format("02 Jan 2006 15:04:05 MST")))
 			}
@@ -464,11 +464,42 @@ func (i *Info) GetFolder(device ...string) (string, error) {
 // component. Anything else would let a crafted BuildManifest, DeviceTree or
 // OTA Info.plist redirect extraction outside the chosen output directory.
 func checkFolderName(name string) error {
-	if !utils.IsSafePathComponent(name) {
-		return fmt.Errorf("firmware metadata produced unsafe output folder name %q: "+
-			"refusing to write outside the output directory", name)
+	if err := utils.ValidatePathComponent(name); err != nil {
+		return fmt.Errorf("firmware metadata produced unsafe output folder name: %w", err)
 	}
 	return nil
+}
+
+func deviceTreeFolderName(dt *devicetree.Summary, build string) string {
+	return fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), build)
+}
+
+// deviceFolder is the validated per-device output folder for one DeviceTree.
+type deviceFolder struct {
+	name  string
+	board string
+}
+
+func (i *Info) deviceFolders() ([]deviceFolder, error) {
+	if i.Plists.BuildManifest == nil {
+		return nil, fmt.Errorf("no BuildManifest.plist found")
+	}
+	if len(i.DeviceTrees) == 0 {
+		return nil, fmt.Errorf("no devices found")
+	}
+	var folders []deviceFolder
+	for name, dtree := range i.DeviceTrees {
+		dt, err := dtree.Summary()
+		if err != nil {
+			return nil, fmt.Errorf("failed to summarize DeviceTree %s: %w", name, err)
+		}
+		folder := deviceTreeFolderName(dt, i.Plists.BuildManifest.ProductBuildVersion)
+		if err := checkFolderName(folder); err != nil {
+			return nil, err
+		}
+		folders = append(folders, deviceFolder{name: folder, board: strings.ToLower(dt.BoardConfig)})
+	}
+	return folders, nil
 }
 
 func (i *Info) folderName(device ...string) (string, error) {
@@ -521,47 +552,28 @@ func (i *Info) folderName(device ...string) (string, error) {
 
 // GetFolders returns a list of the IPSW name folders
 func (i *Info) GetFolders() ([]string, error) {
-	if i.Plists.BuildManifest == nil {
-		return nil, fmt.Errorf("no BuildManifest.plist found")
+	devs, err := i.deviceFolders()
+	if err != nil {
+		return nil, err
 	}
-	var folders []string
-	if len(i.DeviceTrees) > 0 {
-		for name, dtree := range i.DeviceTrees {
-			dt, err := dtree.Summary()
-			if err != nil {
-				return nil, fmt.Errorf("failed to summarize DeviceTree %s: %w", name, err)
-			}
-			folder := fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
-			if err := checkFolderName(folder); err != nil {
-				return nil, err
-			}
-			folders = append(folders, folder)
-		}
-		return folders, nil
+	folders := make([]string, 0, len(devs))
+	for _, dev := range devs {
+		folders = append(folders, dev.name)
 	}
-	return nil, fmt.Errorf("no devices found")
+	return folders, nil
 }
 
 // GetFolderForFile returns a list of the IPSW name folders for a given file
 func (i *Info) GetFolderForFile(fileName string) (string, error) {
-	if i.Plists.BuildManifest == nil {
-		return "", fmt.Errorf("no BuildManifest.plist found")
+	devs, err := i.deviceFolders()
+	if err != nil {
+		return "", err
 	}
-	if len(i.DeviceTrees) > 0 {
-		files := i.getManifestPaths()
-		for name, dtree := range i.DeviceTrees {
-			dt, err := dtree.Summary()
-			if err != nil {
-				return "", fmt.Errorf("failed to summarize DeviceTree %s: %w", name, err)
-			}
-			for _, file := range files[strings.ToLower(dt.BoardConfig)] {
-				if strings.Contains(fileName, filepath.Base(file)) {
-					folder := fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
-					if err := checkFolderName(folder); err != nil {
-						return "", err
-					}
-					return folder, nil
-				}
+	files := i.getManifestPaths()
+	for _, dev := range devs {
+		for _, file := range files[dev.board] {
+			if strings.Contains(fileName, filepath.Base(file)) {
+				return dev.name, nil
 			}
 		}
 	}
@@ -585,26 +597,16 @@ func (i *Info) getManifestPaths() map[string][]string {
 
 // GetKernelCacheFolders returns the folders belonging to a KernelCache
 func (i *Info) GetKernelCacheFolders(kc string) ([]string, error) {
-	if i.Plists.BuildManifest == nil {
-		return nil, fmt.Errorf("failed to get folders: no BuildManifest.plist found")
-	}
-	if len(i.DeviceTrees) == 0 {
-		return nil, fmt.Errorf("failed to get folders: no devices found")
+	devs, err := i.deviceFolders()
+	if err != nil {
+		return nil, err
 	}
 	var folders []string
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
-	for name, dtree := range i.DeviceTrees {
-		dt, err := dtree.Summary()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get folders: failed to summarize DeviceTree %s: %v", name, err)
-		}
-		folderName := fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
-		if err := checkFolderName(folderName); err != nil {
-			return nil, fmt.Errorf("failed to get folders: %v", err)
-		}
-		for _, kcache := range kcs[strings.ToLower(dt.BoardConfig)] {
+	for _, dev := range devs {
+		for _, kcache := range kcs[dev.board] {
 			if strings.HasSuffix(kc, kcache) {
-				folders = append(folders, folderName)
+				folders = append(folders, dev.name)
 			}
 		}
 	}
@@ -789,17 +791,15 @@ func getAbbreviatedDevList(devices []string) string {
 		return devices[0]
 	}
 
-	currentDev := devices[0]
-	devPrefix, _, _ := strings.Cut(currentDev, ",")
-	devList.WriteString(currentDev)
+	devPrefix, _, _ := strings.Cut(devices[0], ",")
+	devList.WriteString(devices[0])
 
 	for _, dev := range devices[1:] {
 		if _, model, ok := strings.Cut(dev, ","); ok && strings.HasPrefix(dev, devPrefix) {
 			devList.WriteString("_" + model)
 		} else {
-			currentDev = dev
-			devPrefix, _, _ = strings.Cut(currentDev, ",")
-			devList.WriteString("_" + currentDev)
+			devPrefix, _, _ = strings.Cut(dev, ",")
+			devList.WriteString("_" + dev)
 		}
 	}
 
@@ -807,31 +807,10 @@ func getAbbreviatedDevList(devices []string) string {
 }
 
 func getAbbreviatedDevListFolder(devices []string) string {
-	var devList strings.Builder
-
-	if len(devices) == 0 {
-		return ""
-	} else if len(devices) == 1 {
-		return devices[0]
-	} else if strings.Contains(devices[0], "Mac") {
+	if len(devices) > 1 && strings.Contains(devices[0], "Mac") {
 		return "MacOS"
 	}
-
-	currentDev := devices[0]
-	devPrefix, _, _ := strings.Cut(currentDev, ",")
-	devList.WriteString(currentDev)
-
-	for _, dev := range devices[1:] {
-		if _, model, ok := strings.Cut(dev, ","); ok && strings.HasPrefix(dev, devPrefix) {
-			devList.WriteString("_" + model)
-		} else {
-			currentDev = dev
-			devPrefix, _, _ = strings.Cut(currentDev, ",")
-			devList.WriteString("_" + currentDev)
-		}
-	}
-
-	return devList.String()
+	return getAbbreviatedDevList(devices)
 }
 
 // Parse parses plist files in a local ipsw file

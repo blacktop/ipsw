@@ -292,29 +292,22 @@ func configureOTAContext(
 	ctx.Info = inf
 	ctx.InputMode = inputModeOTA
 
-	var folderName string
 	if inf.Plists.BuildManifest != nil {
-		ctx.Version = inf.Plists.BuildManifest.ProductVersion
-		ctx.Build = inf.Plists.BuildManifest.ProductBuildVersion
-		var err error
-		folderName, err = inf.GetFolder()
-		if err != nil {
-			return fmt.Errorf("failed to get folder from OTA BuildManifest: %w", err)
-		}
-	} else {
-		// Fallback: derive version/build from OTA-specific plists.
-		var product string
-		ctx.Version, ctx.Build, product = otaVersionBuildProduct(inf)
-		// Include product to avoid collisions when both sides share a build.
-		folderName = ctx.Build
-		if product != "" {
-			folderName += "__" + product
-		}
+		return setManifestContext(ctx, tmpDir)
 	}
-	if !utils.IsSafePathComponent(folderName) {
-		return fmt.Errorf("unsafe OTA output folder name %q", folderName)
+
+	// Fallback: derive version/build from OTA-specific plists.
+	var product string
+	ctx.Version, ctx.Build, product = otaVersionBuildProduct(inf)
+	// Include product to avoid collisions when both sides share a build.
+	folder := ctx.Build
+	if product != "" {
+		folder += "__" + product
 	}
-	ctx.Folder = filepath.Join(tmpDir, folderName)
+	if err := utils.ValidatePathComponent(folder); err != nil {
+		return fmt.Errorf("OTA metadata produced unsafe output folder name: %w", err)
+	}
+	ctx.Folder = filepath.Join(tmpDir, folder)
 	return nil
 }
 

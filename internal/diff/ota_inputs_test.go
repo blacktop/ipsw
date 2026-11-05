@@ -328,14 +328,13 @@ func TestConfigureOTAContextRejectsTraversal(t *testing.T) {
 		{"manifest", &plist.Plists{BuildManifest: &plist.BuildManifest{
 			ProductBuildVersion: "x/../../escaped", SupportedProductTypes: []string{"iPhone17,1"},
 		}}},
-		{"fallback build", &plist.Plists{AssetDataInfo: &plist.AssetDataInfo{Build: "../../escaped"}}},
-		{"fallback product", &plist.Plists{AssetDataInfo: &plist.AssetDataInfo{Build: "A", ProductType: "x/../../escaped"}}},
+		{"fallback", &plist.Plists{AssetDataInfo: &plist.AssetDataInfo{Build: "A", ProductType: "x/../../escaped"}}},
 		{"nested mount path", &plist.Plists{AssetDataInfo: &plist.AssetDataInfo{Build: "A/cryptex-system-arm64e.dmg.mount/redirect"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := &Context{}
 			err := configureOTAContext(ctx, &info.Info{Plists: tc.plists}, t.TempDir())
-			if err == nil || ctx.Folder != "" {
+			if err == nil || !strings.Contains(err.Error(), "unsafe output folder name") || ctx.Folder != "" {
 				t.Fatalf("unsafe OTA folder = %q, error = %v", ctx.Folder, err)
 			}
 		})

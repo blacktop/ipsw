@@ -183,3 +183,16 @@ func TestDifference(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePathComponent(t *testing.T) {
+	for _, name := range []string{"22A3354__iPhone17,1", "A..B", "iPhone8,2_N66AP_A"} {
+		if err := ValidatePathComponent(name); err != nil {
+			t.Errorf("ValidatePathComponent(%q) = %v, want nil", name, err)
+		}
+	}
+	for _, name := range []string{"", ".", "..", "/abs", "a/b", `a\b`, "a\x00b", "x/../../escaped", "../up"} {
+		if err := ValidatePathComponent(name); err == nil {
+			t.Errorf("ValidatePathComponent(%q) = nil, want error", name)
+		}
+	}
+}

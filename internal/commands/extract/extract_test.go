@@ -352,20 +352,17 @@ func TestExclaveRetainsSavedBundleOnCoreFailure(t *testing.T) {
 	}
 }
 
-func exclaveTestArchive(t *testing.T, runtime []byte) []byte {
+type zipEntry struct {
+	name string
+	data []byte
+}
+
+// zipArchive stores entries uncompressed, in order, and returns the archive bytes.
+func zipArchive(t *testing.T, entries []zipEntry) []byte {
 	t.Helper()
 	var archive bytes.Buffer
 	zw := zip.NewWriter(&archive)
-	for _, entry := range []struct {
-		name string
-		data []byte
-	}{
-		{"BuildManifest.plist", []byte(`<plist version="1.0"><dict><key>ProductVersion</key><string>99.0</string><key>ProductBuildVersion</key><string>99A1</string><key>SupportedProductTypes</key><array><string>iPhone99,1</string></array></dict></plist>`)},
-		{"Restore.plist", []byte(`<plist version="1.0"><dict><key>SupportedProductTypes</key><array><string>iPhone99,1</string></array></dict></plist>`)},
-		{"Firmware/exclavecore_bundle.runtime.im4p", runtime},
-		// A large STORE member makes unintended restore downloads measurable.
-		{"Firmware/exclavecore_bundle.restore.im4p", bytes.Repeat([]byte("restore"), 1<<20)},
-	} {
+	for _, entry := range entries {
 		w, err := zw.CreateHeader(&zip.FileHeader{Name: entry.name, Method: zip.Store})
 		if err != nil {
 			t.Fatal(err)
@@ -378,6 +375,17 @@ func exclaveTestArchive(t *testing.T, runtime []byte) []byte {
 		t.Fatal(err)
 	}
 	return archive.Bytes()
+}
+
+func exclaveTestArchive(t *testing.T, runtime []byte) []byte {
+	t.Helper()
+	return zipArchive(t, []zipEntry{
+		{"BuildManifest.plist", []byte(`<plist version="1.0"><dict><key>ProductVersion</key><string>99.0</string><key>ProductBuildVersion</key><string>99A1</string><key>SupportedProductTypes</key><array><string>iPhone99,1</string></array></dict></plist>`)},
+		{"Restore.plist", []byte(`<plist version="1.0"><dict><key>SupportedProductTypes</key><array><string>iPhone99,1</string></array></dict></plist>`)},
+		{"Firmware/exclavecore_bundle.runtime.im4p", runtime},
+		// A large STORE member makes unintended restore downloads measurable.
+		{"Firmware/exclavecore_bundle.restore.im4p", bytes.Repeat([]byte("restore"), 1<<20)},
+	})
 }
 
 type countingZipResponse struct {
@@ -903,26 +911,13 @@ func testKernelBuildIdentity(deviceClass, kernelPath string) plist.BuildIdentity
 }
 
 func TestSearchRefusesTraversingMetadataFolder(t *testing.T) {
-	var archive bytes.Buffer
-	zw := zip.NewWriter(&archive)
-	for name, data := range map[string]string{
-		"BuildManifest.plist": `<plist version="1.0"><dict><key>ProductVersion</key><string>18.0</string><key>ProductBuildVersion</key><string>A</string><key>SupportedProductTypes</key><array><string>x/../../escaped</string></array></dict></plist>`,
-		"ipsw_poc_pwned.txt":  "written outside the extraction directory",
-	} {
-		w, err := zw.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := w.Write([]byte(data)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatal(err)
-	}
+	archive := zipArchive(t, []zipEntry{
+		{"BuildManifest.plist", []byte(`<plist version="1.0"><dict><key>ProductVersion</key><string>18.0</string><key>ProductBuildVersion</key><string>A</string><key>SupportedProductTypes</key><array><string>x/../../escaped</string></array></dict></plist>`)},
+		{"ipsw_poc_pwned.txt", []byte("written outside the extraction directory")},
+	})
 	for _, remote := range []bool{false, true} {
 		t.Run(map[bool]string{false: "local", true: "remote"}[remote], func(t *testing.T) {
-			c, _ := exclaveTestSource(t, archive.Bytes(), remote)
+			c, _ := exclaveTestSource(t, archive, remote)
 			defer c.Close()
 			root := t.TempDir()
 			c.Pattern = "pwned"
