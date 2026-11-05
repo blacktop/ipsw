@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func fileDigest(t *testing.T, name string) []byte {
+func fileDigest(t testing.TB, name string) []byte {
 	t.Helper()
 	f, err := os.Open(name)
 	if err != nil {

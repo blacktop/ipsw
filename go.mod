@@ -72,7 +72,6 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/twmb/murmur3 v1.2.2
 	github.com/ulikunitz/xz v0.5.17
 	github.com/unicorn-engine/unicorn v0.0.0-20260217064959-7c5db94191de
 	github.com/vbauerster/cupwriter v0.0.5

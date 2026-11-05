@@ -15,16 +15,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/apex/log"
 	"github.com/blacktop/lzfse-cgo"
-	"github.com/twmb/murmur3"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/sync/errgroup"
 )
@@ -181,312 +180,366 @@ func getRootHeaderHMAC(key, data []byte, clusterMAC HMAC, authData io.Reader, au
 	return HMAC(mac.Sum(nil)), nil
 }
 
-// bufferPool is used to reuse byte slices for segment data to reduce allocations
-type bufferPool struct {
-	pool sync.Pool
-}
-
-func newBufferPool() *bufferPool {
-	return &bufferPool{
-		pool: sync.Pool{
-			New: func() any {
-				// Start with a reasonable default size; will grow as needed
-				b := make([]byte, 0, 1<<20) // 1MB initial capacity
-				return &b
-			},
-		},
+// AEA uses MurmurHash2's 64-bit variant, not MurmurHash3.
+func murmur64(data []byte) uint64 {
+	const multiplier uint64 = 0xc6a4a7935bd1e995
+	h := uint64(0xE2236FDC26A5F6D2) ^ uint64(len(data))*multiplier
+	for len(data) >= 8 {
+		k := binary.LittleEndian.Uint64(data)
+		k *= multiplier
+		k ^= k >> 47
+		k *= multiplier
+		h = (h ^ k) * multiplier
+		data = data[8:]
 	}
-}
-
-func (p *bufferPool) get(size int) []byte {
-	buf := p.pool.Get().(*[]byte)
-	if cap(*buf) < size {
-		// Need a larger buffer
-		*buf = make([]byte, size)
-	} else {
-		*buf = (*buf)[:size]
+	for i, b := range data {
+		h ^= uint64(b) << (8 * i)
 	}
-	return *buf
+	if len(data) != 0 {
+		h *= multiplier
+	}
+	h ^= h >> 47
+	h *= multiplier
+	return h ^ (h >> 47)
 }
 
-func (p *bufferPool) put(buf []byte) {
-	// Keep the buffer for reuse
-	b := buf[:0]
-	p.pool.Put(&b)
+// The LZBITMAP wrapper discards out_len. Chunk headers carry the same output
+// lengths that the C decoder sums, so validate them before reusing a buffer.
+func validateLZBitmapSize(data []byte, remaining int) error {
+	if len(data) < 4 || binary.LittleEndian.Uint32(data) != 0x094d425a {
+		return fmt.Errorf("invalid LZBITMAP magic")
+	}
+	data = data[4:]
+	for len(data) >= 6 {
+		compressed := int(data[0]) | int(data[1])<<8 | int(data[2])<<16
+		decoded := int(data[3]) | int(data[4])<<8 | int(data[5])<<16
+		if compressed < 6 || compressed > len(data) || decoded > 0x8000 || decoded > remaining {
+			return fmt.Errorf("invalid LZBITMAP chunk size")
+		}
+		remaining -= decoded
+		data = data[compressed:]
+		if decoded == 0 {
+			if remaining != 0 {
+				return fmt.Errorf("short LZBITMAP output: missing %d bytes", remaining)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("missing LZBITMAP terminator")
 }
 
-func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mainKey []byte, clusterMAC HMAC, rootHdr RootHeader) error {
-	// Limit concurrent goroutines to prevent resource exhaustion
-	// Use fewer workers to reduce peak memory (each worker holds ~2MB for segment + decomp)
-	maxWorkers := min(runtime.GOMAXPROCS(0), 4)
+const (
+	// Limits exposed by Apple's AEAContext setters.
+	maxAEASegmentSize        = 256 << 20
+	maxAEASegmentsPerCluster = 256 << 10
+	decryptMemoryBudget      = 32 << 20
+	maxDecryptWorkers        = 8
+)
 
-	// Buffer pool for segment data to reduce allocations
-	segPool := newBufferPool()
-	decompPool := newBufferPool()
+type decryptSegment struct {
+	cluster, index uint32
+	header         SegmentHeader
+	mac            HMAC
+	clusterPRK     []byte
+	input, output  int64
+}
 
-	segmentHeaderSize := checksumSize[rootHdr.Checksum] + 8
-	cindex := uint32(0)
-	totalSize := uint64(0)
+type segmentDecoder struct {
+	data, decoded, scratch []byte
+}
 
-	// Pre-allocate reusable buffers for cluster-level data
-	encSegmentHdrData := make([]byte, segmentHeaderSize*rootHdr.SegmentsPerCluster)
-	segmentMacData := make([]byte, 32*rootHdr.SegmentsPerCluster)
-	segmentMACs := make([]HMAC, rootHdr.SegmentsPerCluster)
-	segmentHdrs := make([]SegmentHeader, rootHdr.SegmentsPerCluster)
+type decryptedSegment struct {
+	data   []byte
+	offset int64
+	done   chan struct{}
+}
 
-	// Pre-allocate segment key info buffer
-	segKeyInfoBuf := make([]byte, len(SegmentKeyInfo)+4)
-	copy(segKeyInfoBuf, SegmentKeyInfo)
+func (d *segmentDecoder) decrypt(r io.ReaderAt, job decryptSegment, compression compressionType, checksum checksumType) ([]byte, error) {
+	size := int(job.header.CompressedSize)
+	if cap(d.data) < size {
+		d.data = make([]byte, size)
+	}
+	data := d.data[:size]
+	if _, err := r.ReadAt(data, job.input); err != nil {
+		return nil, fmt.Errorf("failed to read segment data: %w", err)
+	}
+	var keyInfo [len(SegmentKeyInfo) + 4]byte
+	copy(keyInfo[:], SegmentKeyInfo)
+	binary.LittleEndian.PutUint32(keyInfo[len(SegmentKeyInfo):], job.index)
+	var key headerKey
+	if err := binary.Read(hkdf.Expand(sha256.New, job.clusterPRK, keyInfo[:]), binary.LittleEndian, &key); err != nil {
+		return nil, fmt.Errorf("failed to derive segment key: %w", err)
+	}
+	mac := getHMAC(key.MAC[:], data, nil)
+	if !hmac.Equal(job.mac[:], mac[:]) {
+		return nil, fmt.Errorf("invalid segment #%d HMAC: %x; expected %x", job.index, job.mac, mac)
+	}
+	if err := decryptCTRInPlace(data, key.Key[:], key.IV[:]); err != nil {
+		return nil, fmt.Errorf("failed to decrypt segment data: %w", err)
+	}
 
-	for totalSize < rootHdr.FileSize {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
+	plain := data
+	if job.header.CompressedSize != job.header.DecompressedSize {
+		size := int(job.header.DecompressedSize)
+		// Buffer decoders may report a full destination after truncating an
+		// overlong stream. One extra byte makes that distinguishable.
+		if cap(d.decoded) < size+1 {
+			d.decoded = make([]byte, size+1)
+		}
+		plain = d.decoded[:size]
+		switch compression {
+		case LZBITMAP:
+			if err := validateLZBitmapSize(data, size); err != nil {
+				return nil, err
+			}
+			if status := lzfse.LzBitMapDecompress(data, plain); status != 0 {
+				return nil, fmt.Errorf("failed to decompress LZBITMAP segment %d: status %d", job.index, status)
+			}
+		case LZFSE:
+			if d.scratch == nil {
+				d.scratch = make([]byte, lzfse.DecodeScratchSize())
+			}
+			if n := lzfse.DecodeBufferWithScratch(data, d.decoded[:size+1], d.scratch); n != size {
+				return nil, fmt.Errorf("invalid LZFSE segment %d size: got %d; expected %d", job.index, n, size)
+			}
+		case LZMA:
+			if n := lzfse.DecodeLZVNBuffer(data, d.decoded[:size+1]); n != uint(size) {
+				return nil, fmt.Errorf("invalid LZVN segment %d size: got %d; expected %d", job.index, n, size)
+			}
+		case ZLIB:
+			zr, err := zlib.NewReader(bytes.NewReader(data))
+			if err != nil {
+				return nil, fmt.Errorf("failed to create zlib reader: %w", err)
+			}
+			defer zr.Close()
+			if _, err := io.ReadFull(zr, plain); err != nil {
+				return nil, fmt.Errorf("failed to read zlib decompressed data: %w", err)
+			}
+			var extra [1]byte
+			if n, err := zr.Read(extra[:]); n != 0 || err != io.EOF {
+				return nil, fmt.Errorf("invalid zlib segment %d size or checksum", job.index)
+			}
 		default:
+			return nil, fmt.Errorf("unsupported compression type: %s", compression)
 		}
+	}
 
-		// Create a new errgroup for each cluster to avoid context reuse issues
-		eg, egCtx := errgroup.WithContext(ctx)
-		eg.SetLimit(maxWorkers)
-		_ = egCtx // used for cancellation propagation via errgroup
+	switch checksum {
+	case None:
+	case Sha256:
+		if computed := sha256.Sum256(plain); computed != job.header.Checksum {
+			return nil, fmt.Errorf("invalid SHA256 checksum for segment %d (cluster %d): expected %x; got %x", job.index, job.cluster, job.header.Checksum, computed)
+		}
+	case Murmur:
+		expected := binary.LittleEndian.Uint64(job.header.Checksum[:8])
+		if computed := murmur64(plain); computed != expected {
+			return nil, fmt.Errorf("invalid MURMUR checksum for segment %d (cluster %d): expected %x; got %x", job.index, job.cluster, expected, computed)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported checksum type: %d", checksum)
+	}
+	return plain, nil
+}
 
-		clusterKey, err := deriveKey(mainKey, []byte{},
-			binary.LittleEndian.AppendUint32(
-				[]byte(ClusterKeyInfo),
-				uint32(cindex),
-			))
+func verifyPadding(ctx context.Context, r io.ReaderAt, offset, size int64, mainKey []byte, expected HMAC) error {
+	if size == 0 {
+		return nil
+	}
+	var key headerKey
+	if err := binary.Read(hkdf.New(sha256.New, mainKey, nil, []byte(PaddingKeyInfo)), binary.LittleEndian, &key); err != nil {
+		return fmt.Errorf("failed to derive padding key: %w", err)
+	}
+	mac := hmac.New(sha256.New, key.MAC[:])
+	var buf [32 << 10]byte
+	for size > 0 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		n := min(size, int64(len(buf)))
+		if _, err := r.ReadAt(buf[:n], offset); err != nil {
+			return fmt.Errorf("failed to read padding data: %w", err)
+		}
+		mac.Write(buf[:n])
+		offset += n
+		size -= n
+	}
+	if actual := mac.Sum(nil); !hmac.Equal(expected[:], actual) {
+		return fmt.Errorf("invalid padding HMAC: %x; expected %x", actual, expected)
+	}
+	return nil
+}
+
+func queueDecryptSegments(ctx context.Context, r *os.File, jobs chan<- decryptSegment, mainKey []byte, clusterMAC HMAC, root RootHeader, archiveSize int64, checksumBytes uint32) error {
+	entrySize := int(checksumBytes) + 8
+	headersSize := entrySize * int(root.SegmentsPerCluster)
+	clusterHeader := make([]byte, headersSize+32+32*int(root.SegmentsPerCluster))
+	var output uint64
+	for cluster := uint32(0); output < root.FileSize; cluster++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		clusterKey, material, err := clusterKeyMaterial(mainKey, cluster)
 		if err != nil {
-			return fmt.Errorf("failed to derive cluster key: %v", err)
+			return err
 		}
-
-		// read segment headers
-		var clusterHeaderKey headerKey
-		if err := binary.Read(
-			hkdf.New(sha256.New, clusterKey, []byte{}, []byte(ClusterKeyMaterialInfo)),
-			binary.LittleEndian,
-			&clusterHeaderKey,
-		); err != nil {
-			return fmt.Errorf("failed to derive cluster header key: %v", err)
+		if _, err := io.ReadFull(r, clusterHeader); err != nil {
+			return fmt.Errorf("failed to read cluster %d header: %w", cluster, err)
 		}
-		if _, err := io.ReadFull(r, encSegmentHdrData); err != nil {
-			return fmt.Errorf("failed to read encrypted segment headers data: %v", err)
+		headers, macs := clusterHeader[:headersSize], clusterHeader[headersSize:]
+		mac := getHMAC(material.MAC[:], headers, macs)
+		if !hmac.Equal(clusterMAC[:], mac[:]) {
+			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cluster, clusterMAC, mac)
 		}
-		var nextClusterMac HMAC
-		if err := binary.Read(r, binary.LittleEndian, &nextClusterMac); err != nil {
-			return fmt.Errorf("failed to read next cluster HMAC: %v", err)
+		copy(clusterMAC[:], macs[:32])
+		if err := decryptCTRInPlace(headers, material.Key[:], material.IV[:]); err != nil {
+			return fmt.Errorf("failed to decrypt segment headers: %w", err)
 		}
-		if _, err := io.ReadFull(r, segmentMacData); err != nil {
-			return fmt.Errorf("failed to read segment HMAC data: %v", err)
-		}
-
-		// Build salt for HMAC without allocating (reuse existing slices)
-		hmacSalt := make([]byte, len(nextClusterMac)+len(segmentMacData))
-		copy(hmacSalt, nextClusterMac[:])
-		copy(hmacSalt[len(nextClusterMac):], segmentMacData)
-
-		shmac := getHMAC(clusterHeaderKey.MAC[:], encSegmentHdrData, hmacSalt)
-		if !hmac.Equal(clusterMAC[:], shmac[:]) {
-			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cindex, clusterMAC, shmac)
-		}
-		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
-			return fmt.Errorf("failed to read segment HMACs: %v", err)
-		}
-		segmentHdrData, err := cryptCTR(encSegmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
+		input, err := r.Seek(0, io.SeekCurrent)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt segment headers: %v", err)
+			return fmt.Errorf("failed to locate cluster data: %w", err)
 		}
-		if err := binary.Read(bytes.NewReader(segmentHdrData), binary.LittleEndian, segmentHdrs); err != nil {
-			return fmt.Errorf("failed to read segment headers: %v", err)
-		}
-
-		// decrypt segments with limited concurrency
-		currentClusterIdx := cindex // capture for goroutines
-		for idx, seg := range segmentHdrs {
-			if seg.DecompressedSize == 0 {
+		prk := hkdf.Extract(sha256.New, clusterKey, nil)
+		for index := uint32(0); index < root.SegmentsPerCluster; index++ {
+			entry := headers[int(index)*entrySize : (int(index)+1)*entrySize]
+			job := decryptSegment{cluster: cluster, index: index, clusterPRK: prk, input: input, output: int64(output)}
+			job.header.DecompressedSize = binary.LittleEndian.Uint32(entry)
+			job.header.CompressedSize = binary.LittleEndian.Uint32(entry[4:])
+			copy(job.header.Checksum[:], entry[8:])
+			copy(job.mac[:], macs[32+32*int(index):32+32*(int(index)+1)])
+			expected := min(uint64(root.SegmentSize), root.FileSize-output)
+			if uint64(job.header.DecompressedSize) != expected {
+				return fmt.Errorf("invalid segment %d (cluster %d) size: %d; expected %d", index, cluster, job.header.DecompressedSize, expected)
+			}
+			compressed := int64(job.header.CompressedSize)
+			if expected == 0 {
+				if compressed != 0 {
+					return fmt.Errorf("nonempty unused segment %d (cluster %d)", index, cluster)
+				}
 				continue
 			}
-			totalSize += uint64(seg.DecompressedSize)
-
-			// Read segment data (must be done sequentially from the reader)
-			// Get buffer from pool instead of allocating
-			segmentData := segPool.get(int(seg.CompressedSize))
-			if _, err = io.ReadFull(r, segmentData); err != nil {
-				segPool.put(segmentData)
-				return fmt.Errorf("failed to read segment data: %v", err)
+			if compressed == 0 || compressed > int64(root.SegmentSize) || input > archiveSize || compressed > archiveSize-input {
+				return fmt.Errorf("invalid compressed size for segment %d (cluster %d): %d", index, cluster, compressed)
 			}
-
-			// Capture loop variables for goroutine
-			segIdx := idx
-			segHdr := seg
-			segData := segmentData
-			segMAC := segmentMACs[idx]
-			clKey := clusterKey // capture cluster key for this cluster
-
-			eg.Go(func() error {
-				// Ensure we return the buffer to the pool when done
-				defer segPool.put(segData)
-
-				pos := int64(currentClusterIdx)*int64(rootHdr.SegmentSize)*int64(rootHdr.SegmentsPerCluster) +
-					int64(segIdx)*int64(rootHdr.SegmentSize)
-
-				// Derive segment key
-				keyInfo := make([]byte, len(SegmentKeyInfo)+4)
-				copy(keyInfo, SegmentKeyInfo)
-				binary.LittleEndian.PutUint32(keyInfo[len(SegmentKeyInfo):], uint32(segIdx))
-
-				var segmentKey headerKey
-				if err := binary.Read(
-					hkdf.New(sha256.New, clKey, []byte{}, keyInfo),
-					binary.LittleEndian,
-					&segmentKey,
-				); err != nil {
-					return fmt.Errorf("failed to derive segment key: %v", err)
-				}
-
-				// Verify HMAC
-				shmac := getHMAC(segmentKey.MAC[:], segData, nil)
-				if !hmac.Equal(segMAC[:], shmac[:]) {
-					return fmt.Errorf("invalid segment #%d HMAC: %x; expected %x", segIdx, segMAC, shmac)
-				}
-
-				// Decrypt in-place to avoid allocation
-				if err := decryptCTRInPlace(segData, segmentKey.Key[:], segmentKey.IV[:]); err != nil {
-					return fmt.Errorf("failed to decrypt segment data: %v", err)
-				}
-
-				// Handle uncompressed data
-				if segHdr.DecompressedSize == segHdr.CompressedSize {
-					if _, err := outfile.WriteAt(segData, pos); err != nil {
-						return fmt.Errorf("failed to write uncompressed decrypted data to file: %v", err)
-					}
-					return nil
-				}
-
-				// Decompress - use pool for buffers where we control allocation
-				var decomp []byte
-				var decompFromPool bool
-				switch rootHdr.Compression {
-				case NONE:
-					decomp = segData
-				case LZBITMAP:
-					decomp = decompPool.get(int(segHdr.DecompressedSize))
-					decompFromPool = true
-					lzfse.LzBitMapDecompress(segData, decomp)
-				case LZFSE:
-					// Use our own decodeLZFSE that takes a pre-allocated buffer
-					decomp = decompPool.get(int(segHdr.DecompressedSize))
-					decompFromPool = true
-					n := decodeLZFSE(segData, decomp)
-					if n == 0 {
-						decompPool.put(decomp)
-						return fmt.Errorf("failed to decompress LZFSE segment %d", segIdx)
-					}
-					decomp = decomp[:n]
-				case LZMA:
-					decomp = decompPool.get(int(segHdr.DecompressedSize))
-					decompFromPool = true
-					lzfse.DecodeLZVNBuffer(segData, decomp)
-				case ZLIB:
-					// Use pool buffer and read into it
-					decomp = decompPool.get(int(segHdr.DecompressedSize))
-					decompFromPool = true
-					zr, err := zlib.NewReader(bytes.NewReader(segData))
-					if err != nil {
-						decompPool.put(decomp)
-						return fmt.Errorf("failed to create zlib reader: %v", err)
-					}
-					n, err := io.ReadFull(zr, decomp)
-					zr.Close()
-					if err != nil && err != io.ErrUnexpectedEOF {
-						decompPool.put(decomp)
-						return fmt.Errorf("failed to read zlib decompressed data: %v", err)
-					}
-					decomp = decomp[:n]
-				default:
-					return fmt.Errorf("unsupported compression type: %s", rootHdr.Compression)
-				}
-
-				// Verify checksum
-				switch rootHdr.Checksum {
-				case None:
-					// no checksum
-				case Sha256:
-					computed := sha256.Sum256(decomp)
-					if computed != segHdr.Checksum {
-						if decompFromPool {
-							decompPool.put(decomp)
-						}
-						return fmt.Errorf("invalid SHA256 checksum for segment %d (cluster %d): expected %x; got %x", segIdx, currentClusterIdx, segHdr.Checksum, computed)
-					}
-				case Murmur:
-					computed := murmur3.SeedSum64(0xE2236FDC26A5F6D2, decomp)
-					expected := binary.LittleEndian.Uint64(segHdr.Checksum[:8])
-					if computed != expected {
-						if decompFromPool {
-							decompPool.put(decomp)
-						}
-						return fmt.Errorf("invalid MURMUR checksum for segment %d (cluster %d): expected %x; got %x", segIdx, currentClusterIdx, expected, computed)
-					}
-				default:
-					if decompFromPool {
-						decompPool.put(decomp)
-					}
-					return fmt.Errorf("unsupported checksum type: %d", rootHdr.Checksum)
-				}
-
-				// Write decompressed data to file
-				if _, err := outfile.WriteAt(decomp, pos); err != nil {
-					if decompFromPool {
-						decompPool.put(decomp)
-					}
-					return fmt.Errorf("failed to write decompressed decrypted data to file: %v", err)
-				}
-
-				// Return decompression buffer to pool
-				if decompFromPool {
-					decompPool.put(decomp)
-				}
-				return nil
-			})
+			select {
+			case jobs <- job:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			input += compressed
+			output += expected
 		}
-
-		if err := eg.Wait(); err != nil {
-			return fmt.Errorf("failed to decrypt cluster #%d: %v", cindex, err)
+		if _, err := r.Seek(input, io.SeekStart); err != nil {
+			return fmt.Errorf("failed to seek to next cluster: %w", err)
 		}
-
-		clusterMAC = nextClusterMac
-		cindex++
-
 	}
-
-	/* padding key */
-	var paddingKey headerKey
-	if err := binary.Read(
-		hkdf.New(sha256.New, mainKey, []byte{}, []byte(PaddingKeyInfo)),
-		binary.LittleEndian,
-		&paddingKey,
-	); err != nil {
-		return fmt.Errorf("failed to derive padding key: %v", err)
-	}
-	paddingData, err := io.ReadAll(r)
+	paddingOffset, err := r.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return fmt.Errorf("failed to read padding data: %v", err)
+		return fmt.Errorf("failed to locate padding: %w", err)
 	}
-	if len(paddingData) != 0 {
-		decryptedPadding, err := cryptCTR(paddingData, paddingKey.Key[:], paddingKey.IV[:])
+	return verifyPadding(ctx, r, paddingOffset, archiveSize-paddingOffset, mainKey, clusterMAC)
+}
+
+func decryptClusters(ctx context.Context, r *os.File, outfile *os.File, mainKey []byte, clusterMAC HMAC, root RootHeader) error {
+	checksumBytes, ok := checksumSize[root.Checksum]
+	if !ok {
+		return fmt.Errorf("unsupported checksum type: %d", root.Checksum)
+	}
+	if root.FileSize > math.MaxInt64 || root.SegmentSize == 0 || root.SegmentSize > maxAEASegmentSize || root.SegmentsPerCluster == 0 || root.SegmentsPerCluster > maxAEASegmentsPerCluster {
+		return fmt.Errorf("invalid AEA root dimensions")
+	}
+	clusterSize := uint64(root.SegmentSize) * uint64(root.SegmentsPerCluster)
+	if root.FileSize > 0 && (root.FileSize-1)/clusterSize >= 1<<32 {
+		return fmt.Errorf("too many AEA clusters")
+	}
+	info, err := r.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to get encrypted file size: %w", err)
+	}
+	if root.EncyptedSize != uint64(info.Size()) {
+		return fmt.Errorf("invalid encrypted file size: %d; expected %d", info.Size(), root.EncyptedSize)
+	}
+	if root.FileSize == 0 {
+		offset, err := r.Seek(0, io.SeekCurrent)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt segment data: %v", err)
+			return err
 		}
-		log.Debugf("PADDING:\n%s", hex.Dump(decryptedPadding))
-		phmac := hmac.New(sha256.New, paddingKey.MAC[:])
-		if _, err := phmac.Write(paddingData); err != nil {
-			return fmt.Errorf("failed to write padding data HMAC: %v", err)
-		}
-		if !hmac.Equal(clusterMAC[:], phmac.Sum(nil)) {
-			return fmt.Errorf("invalid padding HMAC: %x; expected %x", phmac.Sum(nil), paddingKey.IV)
-		}
+		return verifyPadding(ctx, r, offset, info.Size()-offset, mainKey, clusterMAC)
 	}
 
+	// Larger valid AppleArchive blocks may exceed the budget for one worker.
+	// Limit concurrency rather than rejecting those archives.
+	workerBytes := 2*uint64(root.SegmentSize) + 1 + uint64(lzfse.DecodeScratchSize())
+	workers := min(runtime.GOMAXPROCS(0), maxDecryptWorkers, max(1, int(decryptMemoryBudget/workerBytes)))
+	workers = int(min(uint64(workers), (root.FileSize-1)/uint64(root.SegmentSize)+1))
+	group, groupCtx := errgroup.WithContext(ctx)
+	jobs := make(chan decryptSegment)
+	results := make(chan decryptedSegment)
+	for range workers {
+		group.Go(func() error {
+			var decoder segmentDecoder
+			done := make(chan struct{})
+			for {
+				select {
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				case job, ok := <-jobs:
+					if !ok {
+						return nil
+					}
+					plain, err := decoder.decrypt(r, job, root.Compression, root.Checksum)
+					if err != nil {
+						return fmt.Errorf("failed to decrypt cluster #%d: %w", job.cluster, err)
+					}
+					select {
+					case results <- decryptedSegment{data: plain, offset: job.output, done: done}:
+					case <-groupCtx.Done():
+						return groupCtx.Err()
+					}
+					select {
+					case <-done:
+					case <-groupCtx.Done():
+						return groupCtx.Err()
+					}
+				}
+			}
+		})
+	}
+	group.Go(func() error {
+		defer close(jobs)
+		return queueDecryptSegments(groupCtx, r, jobs, mainKey, clusterMAC, root, info.Size(), checksumBytes)
+	})
+	group.Go(func() error {
+		pending := make(map[int64]decryptedSegment, workers)
+		var next int64
+		for next < int64(root.FileSize) {
+			select {
+			case <-groupCtx.Done():
+				return groupCtx.Err()
+			case result := <-results:
+				pending[result.offset] = result
+			}
+			for {
+				result, ok := pending[next]
+				if !ok {
+					break
+				}
+				if _, err := outfile.Write(result.data); err != nil {
+					return fmt.Errorf("failed to write decompressed decrypted data to file: %w", err)
+				}
+				delete(pending, next)
+				next += int64(len(result.data))
+				select {
+				case result.done <- struct{}{}:
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				}
+			}
+		}
+		return nil
+	})
+	if err := group.Wait(); err != nil {
+		return err
+	}
 	return nil
 }
 
