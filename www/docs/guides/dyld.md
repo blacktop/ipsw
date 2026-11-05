@@ -160,6 +160,12 @@ In macOS12+/iOS15+ caches replaced this data with `prebuilt loader sets` which c
 
 ### **dyld extract**
 
+Cached images may mix segment-relative and cache-file-relative section offsets, as in
+`libcorecrypto.dylib` on newer firmware. Export normalizes file-backed offsets using the owning
+segment's VM layout, preserves zero-fill sections, and rejects inconsistent or overflowing
+ranges. Original cache bytes and section VM addresses are unchanged. Both `dyld extract` and
+`dyld macho --extract` use this normalization.
+
 Extract a dylib from *dyld_shared_cache*
 
 ```bash
