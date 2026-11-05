@@ -537,10 +537,7 @@ func decryptClusters(ctx context.Context, r *os.File, outfile *os.File, mainKey 
 		}
 		return nil
 	})
-	if err := group.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return group.Wait()
 }
 
 func decrypt(in, out string, symmetricKey []byte) (string, error) {
