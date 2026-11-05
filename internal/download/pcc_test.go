@@ -292,7 +292,9 @@ func TestPCCDownloadAuthenticatesRedirectedGCSAsset(t *testing.T) {
 			})}
 			release := &PCCRelease{Index: 1, Assets: []*pcc.ReleaseMetadata_Asset{{Type: pcc.ReleaseMetadata_ASSET_TYPE_OS, FileType: pcc.ReleaseMetadata_FILE_TYPE_TARGZ, Url: origin}}}
 			output := t.TempDir()
-			if err := release.downloadContext(t.Context(), output, "", false, false, false, transport); err != nil {
+			downloader := NewDownloadWithProfile(AppleCDNProfile, "", false, false, false, false)
+			t.Cleanup(downloader.Close)
+			if err := release.downloadContext(t.Context(), output, transport, downloader); err != nil {
 				t.Fatal(err)
 			}
 			data, err := os.ReadFile(filepath.Join(output, "OS.tar.gz"))

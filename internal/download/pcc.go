@@ -368,7 +368,11 @@ func (cr *pccCachedRelease) toRelease() (*PCCRelease, error) {
 	// A release kept despite an unparseable ticket (parsePCCReleaseLeaf) caches
 	// the raw ticket bytes verbatim; preserve them on reload rather than failing
 	// the whole cache load — the ticket is display-only.
-	r.Ticket, _ = decodePCCTicket(cr.TicketBytes)
+	var err error
+	r.Ticket, err = decodePCCTicket(cr.TicketBytes)
+	if err != nil {
+		log.WithError(err).Debugf("cached PCC release %d has an unparseable ticket; keeping raw bytes", cr.Index)
+	}
 	return r, nil
 }
 
@@ -660,10 +664,12 @@ func (r *PCCRelease) DownloadContext(ctx context.Context, output, proxy string, 
 		base:  newPCCAssetHTTPTransport(proxy, insecure),
 		token: os.Getenv("CLOUDSDK_AUTH_ACCESS_TOKEN"),
 	}
-	return r.downloadContext(ctx, output, proxy, insecure, skipAll, restartAll, transport)
+	downloader := NewDownloadWithProfile(AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
+	defer downloader.Close()
+	return r.downloadContext(ctx, output, transport, downloader)
 }
 
-func (r *PCCRelease) downloadContext(ctx context.Context, output, proxy string, insecure, skipAll, restartAll bool, transport *pccGCSAuthTransport) error {
+func (r *PCCRelease) downloadContext(ctx context.Context, output string, transport *pccGCSAuthTransport, downloader *Download) error {
 	client := &http.Client{Timeout: 10 * time.Second, Transport: transport}
 	defer client.CloseIdleConnections()
 	names := pccAssetFilenames(r.GetAssets())
@@ -691,7 +697,13 @@ func (r *PCCRelease) downloadContext(ctx context.Context, output, proxy string, 
 		if resp.StatusCode != http.StatusOK {
 			gcs := isPCCGCSURL(req.URL) || (resp.Request != nil && isPCCGCSURL(resp.Request.URL))
 			if gcs && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) {
-				return fmt.Errorf("asset %s unavailable (HTTP %d): set CLOUDSDK_AUTH_ACCESS_TOKEN to a Google Cloud access token authorized for this object", PCCAssetTypeLabel(asset.GetType()), resp.StatusCode)
+				hint := "set CLOUDSDK_AUTH_ACCESS_TOKEN to a Google Cloud access token authorized for this object"
+				if transport.token != "" {
+					hint = "Google Cloud Storage rejected CLOUDSDK_AUTH_ACCESS_TOKEN; " +
+						"refresh it (gcloud auth print-access-token) and confirm it is authorized for this object"
+				}
+				return fmt.Errorf("asset %s unavailable (HTTP %d): %s",
+					PCCAssetTypeLabel(asset.GetType()), resp.StatusCode, hint)
 			}
 			return fmt.Errorf("asset %s unavailable (HTTP %d) — newest releases may not be on the CDN yet; try an older release or retry later",
 				PCCAssetTypeLabel(asset.GetType()), resp.StatusCode)
@@ -717,13 +729,11 @@ func (r *PCCRelease) downloadContext(ctx context.Context, output, proxy string, 
 		ReleaseID: releaseID,
 	}
 	skipped := false
-	downloader := NewDownloadWithProfile(AppleCDNProfile, proxy, insecure, skipAll, restartAll, false)
 	// GET redirects can differ from HEAD redirects. Apply scoped credentials
 	// throughout the transfer when a token is supplied.
 	if transport.token != "" {
 		downloader.client = client
 	}
-	defer downloader.Close()
 	for i, asset := range r.GetAssets() {
 		request := requests[i]
 		pinst.ReleaseAssets = append(pinst.ReleaseAssets, struct {
@@ -784,11 +794,11 @@ func pccAssetRequest(asset *pcc.ReleaseMetadata_Asset, destName string) (*FileRe
 	}
 	if digest.GetDigestAlg() != pcc.ReleaseMetadata_DIGEST_ALG_SHA256 {
 		return nil, fmt.Errorf("asset %s uses unsupported digest algorithm %s",
-			strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"), digest.GetDigestAlg())
+			PCCAssetTypeLabel(asset.GetType()), digest.GetDigestAlg())
 	}
 	if len(value) != sha256.Size {
 		return nil, fmt.Errorf("asset %s has invalid SHA-256 digest length %d",
-			strings.TrimPrefix(asset.GetType().String(), "ASSET_TYPE_"), len(value))
+			PCCAssetTypeLabel(asset.GetType()), len(value))
 	}
 	request.SHA256 = hex.EncodeToString(value)
 	return request, nil
