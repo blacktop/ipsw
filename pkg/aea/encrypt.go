@@ -2,8 +2,6 @@ package aea
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -50,16 +48,6 @@ func generateRandomHMAC() (HMAC, error) {
 		return [32]byte{}, fmt.Errorf("failed to generate random HMAC: %v", err)
 	}
 	return HMAC(salt), nil
-}
-
-func encryptCTR(plaintext, key, iv []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new AES cipher: %v", err)
-	}
-	ciphertext := make([]byte, len(plaintext))
-	cipher.NewCTR(block, iv).XORKeyStream(ciphertext, plaintext)
-	return ciphertext, nil
 }
 
 func clusterKeyMaterial(mainKey []byte, index uint32) ([]byte, headerKey, error) {
@@ -178,7 +166,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 				binary.LittleEndian, &segmentKey); err != nil {
 				return fmt.Errorf("failed to derive segment key: %w", err)
 			}
-			encryptedSegment, err := encryptCTR(comp, segmentKey.Key[:], segmentKey.IV[:])
+			encryptedSegment, err := cryptCTR(comp, segmentKey.Key[:], segmentKey.IV[:])
 			if err != nil {
 				return fmt.Errorf("failed to encrypt segment: %w", err)
 			}
@@ -186,16 +174,13 @@ func encrypt(in string, conf *EncryptConfig) error {
 				return fmt.Errorf("failed to write segment: %w", err)
 			}
 			fileSize += int64(len(encryptedSegment))
-			segmentMACs[j], err = getHMAC(segmentKey.MAC[:], encryptedSegment, nil)
-			if err != nil {
-				return fmt.Errorf("failed to get segment HMAC: %w", err)
-			}
+			segmentMACs[j] = getHMAC(segmentKey.MAC[:], encryptedSegment, nil)
 		}
 
 		if _, err := binary.Encode(clusterHeader[:segmentHeadersSize], binary.LittleEndian, segmentHdrs); err != nil {
 			return fmt.Errorf("failed to encode segment headers: %w", err)
 		}
-		encryptedHeaders, err := encryptCTR(clusterHeader[:segmentHeadersSize], clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
+		encryptedHeaders, err := cryptCTR(clusterHeader[:segmentHeadersSize], clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
 		if err != nil {
 			return fmt.Errorf("failed to encrypt segment headers: %w", err)
 		}
@@ -223,10 +208,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 		if err != nil {
 			return err
 		}
-		mac, err := getHMAC(clusterHeaderKey.MAC[:], clusterHeader[:segmentHeadersSize], clusterHeader[segmentHeadersSize:])
-		if err != nil {
-			return fmt.Errorf("failed to get cluster HMAC: %w", err)
-		}
+		mac := getHMAC(clusterHeaderKey.MAC[:], clusterHeader[:segmentHeadersSize], clusterHeader[segmentHeadersSize:])
 		if _, err := out.WriteAt(nextClusterMac[:], lastClusterOffset+int64(segmentHeadersSize)); err != nil {
 			return fmt.Errorf("failed to write next cluster HMAC: %w", err)
 		}
@@ -250,7 +232,7 @@ func encrypt(in string, conf *EncryptConfig) error {
 	if err := binary.Write(rootHdrData, binary.LittleEndian, rootHeader); err != nil {
 		return fmt.Errorf("failed to write root header: %w", err)
 	}
-	encRootHdr, err := encryptCTR(rootHdrData.Bytes(), rootHdrKey.Key[:], rootHdrKey.IV[:])
+	encRootHdr, err := cryptCTR(rootHdrData.Bytes(), rootHdrKey.Key[:], rootHdrKey.IV[:])
 	if err != nil {
 		return fmt.Errorf("failed to encrypt root header: %w", err)
 	}

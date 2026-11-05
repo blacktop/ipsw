@@ -126,14 +126,14 @@ type SegmentHeader struct {
 	Checksum         [32]byte
 }
 
-func decryptCTR(ciphertext, key, iv []byte) ([]byte, error) {
+func cryptCTR(data, key, iv []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new AES cipher: %v", err)
 	}
-	plaintext := make([]byte, len(ciphertext))
-	cipher.NewCTR(block, iv).XORKeyStream(plaintext, ciphertext)
-	return plaintext, nil
+	result := make([]byte, len(data))
+	cipher.NewCTR(block, iv).XORKeyStream(result, data)
+	return result, nil
 }
 
 // decryptCTRInPlace decrypts ciphertext in-place, modifying the input slice
@@ -158,25 +158,16 @@ func deriveKey(inkey, salt, info []byte) ([]byte, error) {
 	return key, nil
 }
 
-func getHMAC(key, data, salt []byte) (HMAC, error) {
+func getHMAC(key, data, salt []byte) HMAC {
 	mac := hmac.New(sha256.New, key)
-	// Write salt first
 	if len(salt) > 0 {
-		if _, err := mac.Write(salt); err != nil {
-			return HMAC{}, fmt.Errorf("failed to write salt to HMAC: %v", err)
-		}
+		mac.Write(salt)
 	}
-	// Write data
-	if _, err := mac.Write(data); err != nil {
-		return HMAC{}, fmt.Errorf("failed to write data to HMAC: %v", err)
-	}
-	// Write salt length as uint64
+	mac.Write(data)
 	var lenBuf [8]byte
 	binary.LittleEndian.PutUint64(lenBuf[:], uint64(len(salt)))
-	if _, err := mac.Write(lenBuf[:]); err != nil {
-		return HMAC{}, fmt.Errorf("failed to write length to HMAC: %v", err)
-	}
-	return HMAC(mac.Sum(nil)), nil
+	mac.Write(lenBuf[:])
+	return HMAC(mac.Sum(nil))
 }
 
 func getRootHeaderHMAC(key, data []byte, clusterMAC HMAC, authData io.Reader, authSize uint32) (HMAC, error) {
@@ -293,17 +284,14 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 		copy(hmacSalt, nextClusterMac[:])
 		copy(hmacSalt[len(nextClusterMac):], segmentMacData)
 
-		shmac, err := getHMAC(clusterHeaderKey.MAC[:], encSegmentHdrData, hmacSalt)
-		if err != nil {
-			return fmt.Errorf("failed to get HMAC for encrypted segment headers data: %v", err)
-		}
+		shmac := getHMAC(clusterHeaderKey.MAC[:], encSegmentHdrData, hmacSalt)
 		if !hmac.Equal(clusterMAC[:], shmac[:]) {
 			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cindex, clusterMAC, shmac)
 		}
 		if err := binary.Read(bytes.NewReader(segmentMacData), binary.LittleEndian, &segmentMACs); err != nil {
 			return fmt.Errorf("failed to read segment HMACs: %v", err)
 		}
-		segmentHdrData, err := decryptCTR(encSegmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
+		segmentHdrData, err := cryptCTR(encSegmentHdrData, clusterHeaderKey.Key[:], clusterHeaderKey.IV[:])
 		if err != nil {
 			return fmt.Errorf("failed to decrypt segment headers: %v", err)
 		}
@@ -356,10 +344,7 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 				}
 
 				// Verify HMAC
-				shmac, err := getHMAC(segmentKey.MAC[:], segData, nil)
-				if err != nil {
-					return fmt.Errorf("failed to get HMAC for segment header: %v", err)
-				}
+				shmac := getHMAC(segmentKey.MAC[:], segData, nil)
 				if !hmac.Equal(segMAC[:], shmac[:]) {
 					return fmt.Errorf("invalid segment #%d HMAC: %x; expected %x", segIdx, segMAC, shmac)
 				}
@@ -488,7 +473,7 @@ func decryptClusters(ctx context.Context, r io.ReadSeeker, outfile *os.File, mai
 		return fmt.Errorf("failed to read padding data: %v", err)
 	}
 	if len(paddingData) != 0 {
-		decryptedPadding, err := decryptCTR(paddingData, paddingKey.Key[:], paddingKey.IV[:])
+		decryptedPadding, err := cryptCTR(paddingData, paddingKey.Key[:], paddingKey.IV[:])
 		if err != nil {
 			return fmt.Errorf("failed to decrypt segment data: %v", err)
 		}
@@ -578,7 +563,7 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 	if !hmac.Equal(encRootHdr.Hmac[:], rhmac[:]) {
 		return "", fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac)
 	}
-	rootHdrData, err := decryptCTR(encRootHdr.Data[:], rootHdrKey.Key[:], rootHdrKey.IV[:])
+	rootHdrData, err := cryptCTR(encRootHdr.Data[:], rootHdrKey.Key[:], rootHdrKey.IV[:])
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt root header: %v", err)
 	}
