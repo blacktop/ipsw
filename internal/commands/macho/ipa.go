@@ -10,7 +10,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
 
@@ -60,8 +59,8 @@ func OpenIPAMachO(ipaPath, arch string) (_ *MachO, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse %q: %w", info.Name, err)
 	}
-	name := app.CFBundleExecutable
-	if err := utils.ValidatePathComponent(name); err != nil {
+	name, err := app.ExecutableName()
+	if err != nil {
 		return nil, fmt.Errorf("invalid CFBundleExecutable in %q: %w", info.Name, err)
 	}
 	name = path.Join(path.Dir(info.Name), name)

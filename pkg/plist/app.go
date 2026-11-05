@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // AppInfo is the Info.plist object found in .app files
@@ -82,6 +83,16 @@ func ParseAppInfo(data []byte) (*AppInfo, error) {
 	return i, nil
 }
 
+// ExecutableName returns the bundle's executable filename after checking that
+// it is one local path component. Metadata-only bundles may omit the field;
+// callers that need an executable receive an error for an empty value.
+func (a *AppInfo) ExecutableName() (string, error) {
+	if err := utils.ValidatePathComponent(a.CFBundleExecutable); err != nil {
+		return "", err
+	}
+	return a.CFBundleExecutable, nil
+}
+
 // GetBinaryInApp returns the binary path of the given .app
 func GetBinaryInApp(path string) (string, error) {
 	if filepath.Ext(path) == ".app" {
@@ -96,7 +107,11 @@ func GetBinaryInApp(path string) (string, error) {
 				return "", fmt.Errorf("failed to parse %s: %w", infoPath, err)
 			}
 			if ainfo.CFBundleExecutable != "" {
-				return filepath.Join(path, ainfo.CFBundleExecutable), nil
+				name, err := ainfo.ExecutableName()
+				if err != nil {
+					return "", fmt.Errorf("invalid CFBundleExecutable in %s: %w", infoPath, err)
+				}
+				return filepath.Join(path, name), nil
 			}
 			return "", fmt.Errorf("failed to find CFBundleExecutable in %s", infoPath)
 		} else if _, err := os.Stat(filepath.Join(path, "Contents", "Info.plist")); err == nil { // MacOS
@@ -110,7 +125,11 @@ func GetBinaryInApp(path string) (string, error) {
 				return "", fmt.Errorf("failed to parse %s: %w", infoPath, err)
 			}
 			if ainfo.CFBundleExecutable != "" {
-				return filepath.Join(path, "Contents", "MacOS", ainfo.CFBundleExecutable), nil
+				name, err := ainfo.ExecutableName()
+				if err != nil {
+					return "", fmt.Errorf("invalid CFBundleExecutable in %s: %w", infoPath, err)
+				}
+				return filepath.Join(path, "Contents", "MacOS", name), nil
 			}
 			return "", fmt.Errorf("failed to find CFBundleExecutable in %s", infoPath)
 		}

@@ -178,9 +178,13 @@ func CreateCodeResources(dir string) error {
 				return fmt.Errorf("failed to parse %s: %w", path, err)
 			}
 			if ainfo.CFBundleExecutable != "" {
+				name, err := ainfo.ExecutableName()
+				if err != nil {
+					return fmt.Errorf("invalid CFBundleExecutable in %s: %w", path, err)
+				}
 				before, _, ok := strings.Cut(path, ".framework/")
 				if ok {
-					fwpath = filepath.Join(before+".framework/", ainfo.CFBundleExecutable)
+					fwpath = filepath.Join(before+".framework/", name)
 				}
 			}
 		} else {
