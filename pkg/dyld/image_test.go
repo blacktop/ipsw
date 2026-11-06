@@ -5,6 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -13,6 +16,239 @@ import (
 	"github.com/blacktop/go-macho"
 	mtypes "github.com/blacktop/go-macho/types"
 )
+
+func TestNormalizeCacheSectionOffsets(t *testing.T) {
+	// Layout values from libcorecrypto.dylib in iOS 27.3 (24C5037i), without firmware bytes.
+	const base = 0x1d5112000
+	const fileOffset = 0x4d12000
+	for _, tt := range []struct {
+		name   string
+		addr   uint64
+		size   uint64
+		offset uint32
+		flags  mtypes.SectionFlag
+		want   uint32
+	}{
+		{"corecrypto relative text", base + 0xc00, 0x8c420, 0xc00, 0, fileOffset + 0xc00},
+		{"absolute text", base + 0xc00, 0x8c420, fileOffset + 0xc00, 0, fileOffset + 0xc00},
+		{"relative offset overlapping another segment", base + 0x8d020, 16, 0x8d020, 0, fileOffset + 0x8d020},
+		{"zero sized boundary", base + 0xb4fe0, 0, 0xb4fe0, 0, fileOffset + 0xb4fe0},
+		{"absent zero sized section", 0, 0, 0, 0, 0},
+		{"zero fill", base + 0xb5000, 0x1000, 0, mtypes.Zerofill, 0},
+		{"zero fill with stale offset", base + 0xb5000, 0x1000, 0x1234, mtypes.Zerofill, 0},
+		{"large zero fill", base + 0xb5000, 0x1000, 0, mtypes.GbZerofill, 0},
+		{"thread local zero fill", base + 0xb5000, 0x1000, 0, mtypes.ThreadLocalZerofill, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			section := &mtypes.Section{SectionHeader: mtypes.SectionHeader{
+				Seg: "__TEXT", Name: "__text", Addr: tt.addr, Size: tt.size,
+				Offset: tt.offset, Flags: tt.flags,
+			}}
+			m := &macho.File{
+				FileTOC: macho.FileTOC{
+					Loads: []macho.Load{
+						&macho.Segment{SegmentHeader: macho.SegmentHeader{
+							Name: "__TEXT", Addr: base, Offset: fileOffset, Memsz: 0xb6000, Filesz: 0xb4fe0,
+						}},
+						&macho.Segment{SegmentHeader: macho.SegmentHeader{
+							Name: "__LINKEDIT", Addr: base + 0x100000, Offset: 0x80000, Memsz: 0x10000, Filesz: 0x10000,
+						}},
+					},
+					Sections: []*mtypes.Section{section},
+				},
+			}
+			if err := normalizeCacheSectionOffsets(m); err != nil {
+				t.Fatal(err)
+			}
+			if section.Offset != tt.want {
+				t.Fatalf("offset = %#x, want %#x", section.Offset, tt.want)
+			}
+			if section.Addr != tt.addr || section.Size != tt.size || section.Flags != tt.flags {
+				t.Fatal("normalization changed section VM layout")
+			}
+			if err := normalizeCacheSectionOffsets(m); err != nil || section.Offset != tt.want {
+				t.Fatalf("normalization is not idempotent: %v", err)
+			}
+		})
+	}
+}
+
+func TestNormalizeCacheSectionOffsetsRejectsInvalidLayout(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		seg    string
+		addr   uint64
+		size   uint64
+		offset uint32
+		segOff uint64
+	}{
+		{"missing segment", "__MISSING", 0x1100, 1, 0x100, 0x2000},
+		{"before segment", "__TEXT", 0xfff, 1, 0, 0x2000},
+		{"beyond segment", "__TEXT", 0x1201, 0, 0x201, 0x2000},
+		{"beyond file backing", "__TEXT", 0x1180, 0x81, 0x180, 0x2000},
+		{"overflowing size", "__TEXT", 0x1180, math.MaxUint64, 0x180, 0x2000},
+		{"wrong source offset", "__TEXT", 0x1100, 1, 0x80, 0x2000},
+		{"overflowing file offset", "__TEXT", 0x1100, 1, 0x100, math.MaxUint64},
+		{"overflowing section offset", "__TEXT", 0x1100, 1, 0x100, math.MaxUint32},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &macho.File{FileTOC: macho.FileTOC{
+				Loads: []macho.Load{&macho.Segment{SegmentHeader: macho.SegmentHeader{
+					Name: "__TEXT", Addr: 0x1000, Memsz: 0x300, Filesz: 0x200, Offset: tt.segOff,
+				}}},
+				Sections: []*mtypes.Section{{SectionHeader: mtypes.SectionHeader{
+					Seg: tt.seg, Name: "__text", Addr: tt.addr, Size: tt.size, Offset: tt.offset,
+				}}},
+			}}
+			if err := normalizeCacheSectionOffsets(m); err == nil {
+				t.Fatal("expected invalid-layout error")
+			}
+		})
+	}
+}
+
+func TestExportMachoMixedSectionOffsets(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		textOffset uint32
+		dataOffset uint64
+	}{
+		{"relative text", 0xc00, 0x3000},
+		{"relative text overlapping data file range", 0xc00, 0xb00},
+		{"absolute text", 0x1c00, 0x3000},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			const base = uint64(0x180000000)
+			const textOffset = uint64(0x1000)
+			const linkeditOffset = uint64(0x4000)
+			cacheBytes := make([]byte, 0x5000)
+			textBytes := []byte{0x1f, 0x20, 0x03, 0xd5}
+			dataBytes := []byte{0xaa, 0xbb, 0xcc, 0xdd}
+			imageUUID := mtypes.UUID{1, 2, 3, 4}
+			var commands bytes.Buffer
+			write := func(value any) {
+				t.Helper()
+				if err := binary.Write(&commands, binary.LittleEndian, value); err != nil {
+					t.Fatal(err)
+				}
+			}
+			segment := func(name string, addr, offset, size uint64, section *mtypes.Section64) {
+				t.Helper()
+				seg := mtypes.Segment64{
+					LoadCmd: mtypes.LC_SEGMENT_64, Len: uint32(binary.Size(mtypes.Segment64{})),
+					Addr: addr, Offset: offset, Memsz: size, Filesz: size,
+				}
+				copy(seg.Name[:], name)
+				if section != nil {
+					seg.Nsect = 1
+					seg.Len += uint32(binary.Size(*section))
+					copy(section.Seg[:], name)
+				}
+				write(seg)
+				if section != nil {
+					write(*section)
+				}
+			}
+			text := mtypes.Section64{
+				Addr: base + 0xc00, Size: uint64(len(textBytes)), Offset: tt.textOffset,
+			}
+			copy(text.Name[:], "__text")
+			data := mtypes.Section64{
+				Addr: base + 0x4040, Size: uint64(len(dataBytes)), Offset: uint32(tt.dataOffset + 0x40),
+			}
+			copy(data.Name[:], "__const")
+			segment("__TEXT", base, textOffset, 0x1000, &text)
+			segment("__DATA_CONST", base+0x4000, tt.dataOffset, 0x200, &data)
+			segment("__LINKEDIT", base+0x8000, linkeditOffset, 0x100, nil)
+			write(mtypes.UUIDCmd{LoadCmd: mtypes.LC_UUID, Len: 24, UUID: imageUUID})
+			write(mtypes.SymtabCmd{
+				LoadCmd: mtypes.LC_SYMTAB, Len: 24,
+				Symoff: uint32(linkeditOffset), Stroff: uint32(linkeditOffset + 0x80), Strsize: 1,
+			})
+			write(mtypes.DysymtabCmd{LoadCmd: mtypes.LC_DYSYMTAB, Len: 80})
+			header := mtypes.FileHeader{
+				Magic: mtypes.Magic64, CPU: mtypes.CPUArm64, SubCPU: 2, Type: mtypes.MH_DYLIB,
+				NCommands: 6, SizeCommands: uint32(commands.Len()), Flags: mtypes.DylibInCache,
+			}
+			headerSize := header.Put(cacheBytes[textOffset:], binary.LittleEndian)
+			copy(cacheBytes[textOffset+uint64(headerSize):], commands.Bytes())
+			copy(cacheBytes[textOffset+0xc00:], textBytes)
+			copy(cacheBytes[tt.dataOffset+0x40:], dataBytes)
+			original := bytes.Clone(cacheBytes)
+			cache := fileWithSharedRegionStart(base)
+			cache.ByteOrder = binary.LittleEndian
+			cache.Mappings = map[mtypes.UUID]cacheMappings{cache.UUID: {
+				{Address: base, Size: 0x1000, FileOffset: textOffset},
+				{Address: base + 0x4000, Size: 0x200, FileOffset: tt.dataOffset},
+				{Address: base + 0x8000, Size: 0x100, FileOffset: linkeditOffset},
+			}}
+			cache.r = map[mtypes.UUID]io.ReaderAt{cache.UUID: bytes.NewReader(cacheBytes)}
+			image := &CacheImage{
+				Name: "/usr/lib/libSynthetic.dylib", cache: cache, cuuid: cache.UUID,
+				LoadAddress: base, TextSegmentSize: 0x1000,
+			}
+			cache.Images = cacheImages{image}
+			m, err := image.GetMacho()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer m.Close()
+			if got := m.Section("__TEXT", "__text").Offset; got != tt.textOffset {
+				t.Fatalf("inspection changed original text offset: %#x", got)
+			}
+			path := filepath.Join(t.TempDir(), "libSynthetic.dylib")
+			if err := ExportMacho(m, path, nil, base, nil); err != nil {
+				t.Fatal(err)
+			}
+			exported, err := macho.Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer exported.Close()
+			if exported.UUID().UUID != imageUUID {
+				t.Fatal("export changed image UUID")
+			}
+			for _, want := range []struct {
+				seg, name string
+				addr      uint64
+				data      []byte
+			}{
+				{"__TEXT", "__text", text.Addr, textBytes},
+				{"__DATA_CONST", "__const", data.Addr, dataBytes},
+			} {
+				section := exported.Section(want.seg, want.name)
+				if section == nil {
+					t.Fatalf("export lost %s.%s", want.seg, want.name)
+				}
+				got, err := section.Data()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if section.Addr != want.addr || !bytes.Equal(got, want.data) {
+					t.Fatalf("%s.%s: address = %#x, bytes = %x; want %#x, %x",
+						want.seg, want.name, section.Addr, got, want.addr, want.data)
+				}
+			}
+			if !bytes.Equal(cacheBytes, original) {
+				t.Fatal("export changed original cache bytes")
+			}
+		})
+	}
+}
+
+func TestExportMachoRejectsInvalidSectionsBeforeWriting(t *testing.T) {
+	m := &macho.File{FileTOC: macho.FileTOC{Sections: []*mtypes.Section{
+		{SectionHeader: mtypes.SectionHeader{Seg: "__TEXT", Name: "__text", Size: 1}},
+	}}}
+	path := filepath.Join(t.TempDir(), "invalid.dylib")
+	err := ExportMacho(m, path, nil, 0, nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid cached sections: __TEXT.__text") {
+		t.Fatalf("expected contextual invalid-section error, got %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("invalid export created an output file: %v", err)
+	}
+}
 
 func TestPartialRelativeSelectorBaseSkipsLibObjC(t *testing.T) {
 	for _, name := range []string{"/usr/lib/libobjc.A.dylib", "/System/ExclaveKit/usr/lib/libobjc.A.dylib", "/System/NewKit/usr/lib/LIBOBJC.A.DYLIB"} {

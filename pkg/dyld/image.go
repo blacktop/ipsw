@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/pkg/swift"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
@@ -577,6 +579,55 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 	}
 
 	return i.m, nil
+}
+
+// ExportMacho exports a cached image after normalizing its mixed section-offset conventions.
+// Normalization updates the parsed file's section offsets in place, leaving VM layout and
+// cache bytes unchanged. Keep this adaptation at export time rather than in GetMacho or
+// GetPartialMacho, which must still support inspecting the original cached image.
+func ExportMacho(m *macho.File, path string, dcf *fixupchains.DyldChainedFixups, baseAddress uint64, locals []macho.Symbol, opts ...macho.ExportOption) error {
+	if err := normalizeCacheSectionOffsets(m); err != nil {
+		return fmt.Errorf("invalid cached sections: %w", err)
+	}
+	return m.Export(path, dcf, baseAddress, locals, opts...)
+}
+
+// Some cached images, notably libcorecrypto.dylib, use segment-relative offsets in __TEXT
+// while other sections retain cache-file-relative offsets. go-macho remaps source file
+// offsets, so interpreting a relative offset as absolute can fail or silently select an
+// unrelated segment. Derive the source offset from the owning segment's VM layout instead.
+func normalizeCacheSectionOffsets(m *macho.File) error {
+	for _, section := range m.Sections {
+		// dyld can retain empty placeholders, such as __auth_stubs, without a file offset.
+		if section.Size == 0 && section.Offset == 0 {
+			continue
+		}
+		segment := m.Segment(section.Seg)
+		if segment == nil || section.Addr < segment.Addr {
+			return fmt.Errorf("%s.%s has no containing segment", section.Seg, section.Name)
+		}
+		delta := section.Addr - segment.Addr
+		if delta > segment.Memsz || section.Size > segment.Memsz-delta {
+			return fmt.Errorf("%s.%s exceeds its segment's VM range", section.Seg, section.Name)
+		}
+		if section.Flags.IsZerofill() || section.Flags.IsGbZerofill() || section.Flags.IsThreadLocalZerofill() {
+			section.Offset = 0
+			continue
+		}
+		if delta > segment.Filesz || section.Size > segment.Filesz-delta {
+			return fmt.Errorf("%s.%s exceeds its segment's file-backed range", section.Seg, section.Name)
+		}
+		// Section file offsets are 32-bit even in a 64-bit Mach-O.
+		if segment.Offset > math.MaxUint32 || delta > math.MaxUint32-segment.Offset {
+			return fmt.Errorf("%s.%s cache offset exceeds uint32", section.Seg, section.Name)
+		}
+		offset := segment.Offset + delta
+		if uint64(section.Offset) != offset && uint64(section.Offset) != delta {
+			return fmt.Errorf("%s.%s offset %#x disagrees with its segment's VM layout", section.Seg, section.Name, section.Offset)
+		}
+		section.Offset = uint32(offset)
+	}
+	return nil
 }
 
 // GetPartialMacho parses dyld image as a partial MachO (fast)

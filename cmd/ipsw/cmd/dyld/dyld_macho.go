@@ -231,7 +231,7 @@ var MachoCmd = &cobra.Command{
 						// 	fmt.Println(c)
 						// }
 
-						err = m.Export(fname, dcf, m.GetBaseAddress(), image.GetLocalSymbolsAsMachoSymbols())
+						err = dyld.ExportMacho(m, fname, dcf, m.GetBaseAddress(), image.GetLocalSymbolsAsMachoSymbols())
 						if err != nil {
 							return fmt.Errorf("failed to export entry MachO %s; %v", image.Name, err)
 						}
