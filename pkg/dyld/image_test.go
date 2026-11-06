@@ -18,9 +18,8 @@ import (
 )
 
 func TestNormalizeCacheSectionOffsets(t *testing.T) {
-	// Layout values from libcorecrypto.dylib in iOS 27.3 (24C5037i), without firmware bytes.
-	const base = 0x1d5112000
-	const fileOffset = 0x4d12000
+	const base = 0x180000000
+	const fileOffset = 0x10000
 	for _, tt := range []struct {
 		name   string
 		addr   uint64
@@ -29,15 +28,15 @@ func TestNormalizeCacheSectionOffsets(t *testing.T) {
 		flags  mtypes.SectionFlag
 		want   uint32
 	}{
-		{"corecrypto relative text", base + 0xc00, 0x8c420, 0xc00, 0, fileOffset + 0xc00},
-		{"absolute text", base + 0xc00, 0x8c420, fileOffset + 0xc00, 0, fileOffset + 0xc00},
-		{"relative offset overlapping another segment", base + 0x8d020, 16, 0x8d020, 0, fileOffset + 0x8d020},
-		{"zero sized boundary", base + 0xb4fe0, 0, 0xb4fe0, 0, fileOffset + 0xb4fe0},
+		{"relative text", base + 0x400, 0x100, 0x400, 0, fileOffset + 0x400},
+		{"absolute text", base + 0x400, 0x100, fileOffset + 0x400, 0, fileOffset + 0x400},
+		{"relative offset overlapping another segment", base + 0x1200, 16, 0x1200, 0, fileOffset + 0x1200},
+		{"zero sized boundary", base + 0x1800, 0, 0x1800, 0, fileOffset + 0x1800},
 		{"absent zero sized section", 0, 0, 0, 0, 0},
-		{"zero fill", base + 0xb5000, 0x1000, 0, mtypes.Zerofill, 0},
-		{"zero fill with stale offset", base + 0xb5000, 0x1000, 0x1234, mtypes.Zerofill, 0},
-		{"large zero fill", base + 0xb5000, 0x1000, 0, mtypes.GbZerofill, 0},
-		{"thread local zero fill", base + 0xb5000, 0x1000, 0, mtypes.ThreadLocalZerofill, 0},
+		{"zero fill", base + 0x2000, 0x1000, 0, mtypes.Zerofill, 0},
+		{"zero fill with stale offset", base + 0x2000, 0x1000, 0x1234, mtypes.Zerofill, 0},
+		{"large zero fill", base + 0x2000, 0x1000, 0, mtypes.GbZerofill, 0},
+		{"thread local zero fill", base + 0x2000, 0x1000, 0, mtypes.ThreadLocalZerofill, 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			section := &mtypes.Section{SectionHeader: mtypes.SectionHeader{
@@ -48,10 +47,10 @@ func TestNormalizeCacheSectionOffsets(t *testing.T) {
 				FileTOC: macho.FileTOC{
 					Loads: []macho.Load{
 						&macho.Segment{SegmentHeader: macho.SegmentHeader{
-							Name: "__TEXT", Addr: base, Offset: fileOffset, Memsz: 0xb6000, Filesz: 0xb4fe0,
+							Name: "__TEXT", Addr: base, Offset: fileOffset, Memsz: 0x3000, Filesz: 0x1800,
 						}},
 						&macho.Segment{SegmentHeader: macho.SegmentHeader{
-							Name: "__LINKEDIT", Addr: base + 0x100000, Offset: 0x80000, Memsz: 0x10000, Filesz: 0x10000,
+							Name: "__LINKEDIT", Addr: base + 0x4000, Offset: 0x1000, Memsz: 0x1000, Filesz: 0x1000,
 						}},
 					},
 					Sections: []*mtypes.Section{section},
