@@ -17,18 +17,19 @@ ipsw fw aea <AEA> [flags]
 ### Options
 
 ```
-  -e, --encrypt          AEA encrypt file
-  -f, --fcs-key          Get fcs-key JSON
-  -h, --help             help for aea
-      --id               Print AEA file ID
-  -i, --info             Print info
-      --insecure         Allow insecure connections
-  -k, --key              Get archive decryption key
-  -b, --key-val string   Base64 encoded symmetric encryption key
-  -o, --output string    Folder to extract files to
-  -p, --pem string       AEA private_key.pem file
-      --pem-db string    AEA pem DB JSON file
-      --proxy string     HTTP/HTTPS proxy
+      --auth-data string   AEA auth data file
+  -e, --encrypt            AEA encrypt file
+  -f, --fcs-key            Get fcs-key JSON
+  -h, --help               help for aea
+      --id                 Print AEA file ID
+  -i, --info               Print info
+      --insecure           Allow insecure connections
+  -k, --key                Get archive decryption key
+  -b, --key-val string     Base64 encoded symmetric encryption key
+  -o, --output string      Folder to extract files to
+  -p, --pem string         AEA private_key.pem file
+      --pem-db string      AEA pem DB JSON file
+      --proxy string       HTTP/HTTPS proxy
 ```
 
 ### Options inherited from parent commands
