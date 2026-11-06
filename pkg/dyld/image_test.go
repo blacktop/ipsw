@@ -39,22 +39,17 @@ func TestNormalizeCacheSectionOffsets(t *testing.T) {
 		{"thread local zero fill", base + 0x2000, 0x1000, 0, mtypes.ThreadLocalZerofill, 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			section := &mtypes.Section{SectionHeader: mtypes.SectionHeader{
+			section := &mtypes.Section{
 				Seg: "__TEXT", Name: "__text", Addr: tt.addr, Size: tt.size,
-				Offset: tt.offset, Flags: tt.flags,
-			}}
+				Offset: tt.offset, Flags: tt.flags}
 			m := &macho.File{
-				FileTOC: macho.FileTOC{
-					Loads: []macho.Load{
-						&macho.Segment{SegmentHeader: macho.SegmentHeader{
-							Name: "__TEXT", Addr: base, Offset: fileOffset, Memsz: 0x3000, Filesz: 0x1800,
-						}},
-						&macho.Segment{SegmentHeader: macho.SegmentHeader{
-							Name: "__LINKEDIT", Addr: base + 0x4000, Offset: 0x1000, Memsz: 0x1000, Filesz: 0x1000,
-						}},
-					},
-					Sections: []*mtypes.Section{section},
+				Loads: []macho.Load{
+					&macho.Segment{
+						Name: "__TEXT", Addr: base, Offset: fileOffset, Memsz: 0x3000, Filesz: 0x1800},
+					&macho.Segment{
+						Name: "__LINKEDIT", Addr: base + 0x4000, Offset: 0x1000, Memsz: 0x1000, Filesz: 0x1000},
 				},
+				Sections: []*mtypes.Section{section},
 			}
 			if err := normalizeCacheSectionOffsets(m); err != nil {
 				t.Fatal(err)
@@ -91,14 +86,11 @@ func TestNormalizeCacheSectionOffsetsRejectsInvalidLayout(t *testing.T) {
 		{"overflowing section offset", "__TEXT", 0x1100, 1, 0x100, math.MaxUint32},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &macho.File{FileTOC: macho.FileTOC{
-				Loads: []macho.Load{&macho.Segment{SegmentHeader: macho.SegmentHeader{
-					Name: "__TEXT", Addr: 0x1000, Memsz: 0x300, Filesz: 0x200, Offset: tt.segOff,
-				}}},
-				Sections: []*mtypes.Section{{SectionHeader: mtypes.SectionHeader{
-					Seg: tt.seg, Name: "__text", Addr: tt.addr, Size: tt.size, Offset: tt.offset,
-				}}},
-			}}
+			m := &macho.File{
+				Loads: []macho.Load{&macho.Segment{
+					Name: "__TEXT", Addr: 0x1000, Memsz: 0x300, Filesz: 0x200, Offset: tt.segOff}},
+				Sections: []*mtypes.Section{{
+					Seg: tt.seg, Name: "__text", Addr: tt.addr, Size: tt.size, Offset: tt.offset}}}
 			if err := normalizeCacheSectionOffsets(m); err == nil {
 				t.Fatal("expected invalid-layout error")
 			}
@@ -236,9 +228,9 @@ func TestExportMachoMixedSectionOffsets(t *testing.T) {
 }
 
 func TestExportMachoRejectsInvalidSectionsBeforeWriting(t *testing.T) {
-	m := &macho.File{FileTOC: macho.FileTOC{Sections: []*mtypes.Section{
-		{SectionHeader: mtypes.SectionHeader{Seg: "__TEXT", Name: "__text", Size: 1}},
-	}}}
+	m := &macho.File{Sections: []*mtypes.Section{
+		{Seg: "__TEXT", Name: "__text", Size: 1},
+	}}
 	path := filepath.Join(t.TempDir(), "invalid.dylib")
 	err := ExportMacho(m, path, nil, 0, nil)
 	if err == nil || !strings.Contains(err.Error(), "invalid cached sections: __TEXT.__text") {
