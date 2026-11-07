@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #define RAVEN_PROBABILITY_SCALE UINT32_C(16384)
 #define RAVEN_BLOCK_SIZE UINT32_C(524288)
@@ -653,11 +654,15 @@ static size_t raven_decode_frame(struct raven_model *model, uint8_t *flags, uint
             return written;
         }
         if (payload_size > size - cursor || written % RAVEN_BLOCK_SIZE || written >= capacity) {
+            fprintf(
+                stderr, "lzraven: (payload_size > size - cursor || ... || written >= capacity)\n"
+            );
             return 0;
         }
         raven_store16(flags + 2 * (written / RAVEN_BLOCK_SIZE), (uint16_t)(header & 4095));
         if (header & 1) {
             if (payload_size > capacity - written) {
+                fprintf(stderr,"lzraven: (payload_size > capacity - written)\n");
                 return 0;
             }
             memcpy(dst + written, src + cursor, payload_size);
@@ -665,12 +670,14 @@ static size_t raven_decode_frame(struct raven_model *model, uint8_t *flags, uint
         } else {
             decoded_size = raven_decode_block(model, dst, capacity, written, src + cursor, payload_size);
             if (!decoded_size) {
+                fprintf(stderr,"lzraven: (!decoded_size)\n");
                 return 0;
             }
         }
         written += decoded_size;
         cursor += payload_size;
     }
+    fprintf(stderr,"lzraven: reached end of buffer\n");
     return 0;
 }
 
@@ -705,6 +712,7 @@ static size_t raven_decode_scratch(void *destination, size_t capacity, const voi
     size_t result;
 
     if (!src || (!destination && capacity) || size < 8 || size > UINT32_MAX || raven_load32(src) != UINT32_C(0xecca002b) || (raven_load32(src + 4) & UINT32_C(0x03ffffff))) {
+        fprintf(stderr,"lzraven: raven_decode_scratch() errored\n");
         return 0;
     }
     if (capacity > UINT32_MAX) {
@@ -2029,6 +2037,7 @@ size_t lzraven_decode_buffer_with_scratch(void *destination, size_t capacity, co
 
     allocated = malloc(RAVEN_DECODE_SCRATCH_SIZE);
     if (!allocated) {
+        fprintf(stderr,"lzraven: out-of-memory\n");
         return 0;
     }
     result = raven_decode_scratch(destination, capacity, source, size, allocated);
