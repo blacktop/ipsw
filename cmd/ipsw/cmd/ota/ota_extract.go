@@ -476,7 +476,10 @@ func extractPatternPayloads(o patternPayloadSource, f otaExtractFlags, re *regex
 	}
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Searching for '%s' in OTA payload files", re.String()))
 	extracted := 0
-	if err := o.GetPayloadFilesWithCallback(f.pattern, f.payloadRange, output, func(string) { extracted++ }); err != nil {
+	if err := o.GetPayloadFilesWithCallback(f.pattern, f.payloadRange, output, func(dst string) {
+		extracted++
+		utils.Indent(log.Info, 3)("Extracted " + dst)
+	}); err != nil {
 		return true, err
 	}
 	if extracted == 0 {

@@ -546,7 +546,7 @@ func (r *Reader) getPayloadFile(file *File, pattern, output string, onFile func(
 		if err != nil {
 			return err
 		}
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(fi.Size())), fname))
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Extracting from '%s' -> %s\t%s", file.Base(), humanize.Bytes(uint64(fi.Size())), fname))
 		if onFile != nil {
 			onFile(fname)
 		}
