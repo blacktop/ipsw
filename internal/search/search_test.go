@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -452,5 +453,29 @@ func TestForEachMachoSkipsUnreadableAndMalformedFiles(t *testing.T) {
 	}
 	if !slices.Equal(seen, []string{"tool"}) {
 		t.Fatalf("visited %v, want only the valid Mach-O", seen)
+	}
+}
+
+func TestForEachMachoInMountMultiWalkFailureFailsEveryHandler(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteMacho(t, filepath.Join(root, "tool"), testutil.MachoArch{CPU: types.CPUArm64})
+	handlers := []NamedMachoScanHandler{
+		{Task: "machos", Handle: func(string, *macho.File) error { return nil }},
+		{Task: "entitlements", Handle: func(string, *macho.File) error { return nil }},
+		{Task: "idle"},
+	}
+
+	release := testutil.ExhaustFDs(t)
+	err := ForEachMachoInMountMulti(root, handlers)
+	release()
+
+	if !errors.Is(err, syscall.EMFILE) {
+		t.Fatalf("got %v, want the descriptor exhaustion error", err)
+	}
+	// The scan was cut short for every participating task, and only for them.
+	for task, want := range map[string]bool{"machos: walk:": true, "entitlements: walk:": true, "idle:": false} {
+		if got := strings.Contains(err.Error(), task); got != want {
+			t.Errorf("error names %q = %v, want %v:\n%v", task, got, want, err)
+		}
 	}
 }

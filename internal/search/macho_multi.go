@@ -83,11 +83,13 @@ func ForEachMachoInMountMulti(root string, handlers []NamedMachoScanHandler) err
 		return handleMachoInMount(root, path, dispatch)
 	})
 	if walkErr != nil {
-		// A walker-level error is fatal for the whole walk; attribute it
-		// to no specific task so the caller can decide whether to keep
-		// going on the next volume.
-		taskErrs["__walk__"] = fmt.Errorf("walk: %w", walkErr)
-		order = append(order, "__walk__")
+		// A walker-level error cut the walk short, so no handler saw the
+		// whole tree: fail every one that had not already failed.
+		for i := range handlers {
+			if !disabled[i] && handlers[i].Handle != nil {
+				recordErr(i, fmt.Errorf("walk: %w", walkErr))
+			}
+		}
 	}
 
 	if len(taskErrs) == 0 {
