@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/apex/log"
@@ -24,6 +25,13 @@ import (
 )
 
 var normalPadding = cli.Default.Padding
+
+// IsFDExhaustion reports whether err means the process or the system ran out
+// of file descriptors. It describes the process, not the path that failed, so
+// scans must stop on it instead of skipping the file.
+func IsFDExhaustion(err error) bool {
+	return errors.Is(err, syscall.EMFILE) || errors.Is(err, syscall.ENFILE)
+}
 
 // Retry will retry a function f a number of attempts with a sleep duration in between
 func Retry(attempts int, sleep time.Duration, f func() error) error {

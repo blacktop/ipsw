@@ -129,15 +129,13 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 
 			for _, file := range files {
-				output, err := fileEntitlements(file, conf)
-				if errors.Is(err, errNotMacho) {
-					continue
-				}
+				output, ok, err := scanFileEntitlements(file, conf)
 				if err != nil {
-					log.WithError(err).Warnf("failed to get entitlements for %s", file)
-					continue
+					return nil, err
 				}
-				entDB[strings.TrimPrefix(file, conf.Folder)] = output
+				if ok {
+					entDB[strings.TrimPrefix(file, conf.Folder)] = output
+				}
 			}
 		}
 
@@ -362,15 +360,13 @@ func scanEnts(ipswPath, dmgPath, dmgType string, conf *Config) (map[string]strin
 	entDB := make(map[string]string)
 
 	for _, file := range files {
-		output, err := fileEntitlements(file.Path, conf)
-		if errors.Is(err, errNotMacho) {
-			continue
-		}
+		output, ok, err := scanFileEntitlements(file.Path, conf)
 		if err != nil {
-			log.WithError(err).Warnf("failed to get entitlements for %s", file.Path)
-			continue
+			return nil, err
 		}
-		entDB[file.DBPath] = output
+		if ok {
+			entDB[file.DBPath] = output
+		}
 	}
 
 	return entDB, nil

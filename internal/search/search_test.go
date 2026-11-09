@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"syscall"
 	"testing"
 
 	"github.com/blacktop/go-macho"
@@ -404,5 +405,52 @@ func TestHandlePlistInMount(t *testing.T) {
 	}
 	if called {
 		t.Error("non-.plist file should be skipped")
+	}
+}
+
+func TestMachoScansStopOnFDExhaustion(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "tool")
+	testutil.WriteMacho(t, path, testutil.MachoArch{CPU: types.CPUArm64})
+	for name, scan := range map[string]func() error{
+		"walk": func() error {
+			return ForEachMachoSlices(root, func(string, []*macho.File) error { return nil })
+		},
+		"file": func() error {
+			return withMachoSlices(path, func([]*macho.File) error { return nil })
+		},
+	} {
+		release := testutil.ExhaustFDs(t)
+		err := scan()
+		release()
+		if !errors.Is(err, syscall.EMFILE) {
+			t.Errorf("%s: got %v, want the descriptor exhaustion error", name, err)
+		}
+	}
+}
+
+func TestForEachMachoSkipsUnreadableAndMalformedFiles(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read every file")
+	}
+	root := t.TempDir()
+	testutil.WriteMacho(t, filepath.Join(root, "tool"), testutil.MachoArch{CPU: types.CPUArm64})
+	malformed := binary.LittleEndian.AppendUint32(nil, types.Magic64.Int())
+	if err := os.WriteFile(filepath.Join(root, "malformed"), malformed, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "unreadable"), malformed, 0); err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(root, "empty"), "")
+	var seen []string
+	if err := ForEachMacho(root, func(path string, _ *macho.File) error {
+		seen = append(seen, filepath.Base(path))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(seen, []string{"tool"}) {
+		t.Fatalf("visited %v, want only the valid Mach-O", seen)
 	}
 }

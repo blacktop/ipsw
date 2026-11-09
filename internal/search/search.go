@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -326,12 +327,7 @@ func walkFilesInRootFrom(root, start string, strict bool, handle func(path strin
 				if strict {
 					return err
 				}
-				if os.IsPermission(err) {
-					log.Debugf("skipping path due to permission denied: %s", path)
-					return nil
-				}
-				log.Debugf("failed to walk root %s from %s: %v", root, dir, err)
-				return nil
+				return skipUnreadable(path, err)
 			}
 			if info.Mode()&os.ModeSymlink != 0 {
 				if strict {
@@ -452,9 +448,30 @@ func handleMachoInMount(mountPoint, machoPath string, handler func(string, []*ma
 	})
 }
 
-// withMachoSlices keeps every slice open until handler returns.
+// skipUnreadable decides what a lenient scan does when it cannot read path.
+// Running out of file descriptors stops the scan, because every later path
+// would fail the same way and be missing from the result. Any other failure
+// belongs to the path, which is skipped.
+func skipUnreadable(path string, err error) error {
+	if utils.IsFDExhaustion(err) {
+		return fmt.Errorf("failed to read %s: %w", path, err)
+	}
+	if errors.Is(err, fs.ErrPermission) {
+		log.Debugf("skipping path due to permission denied: %s", path)
+		return nil
+	}
+	log.Warnf("skipping unreadable path %s: %v", path, err)
+	return nil
+}
+
+// withMachoSlices keeps every slice open until handler returns. It skips files
+// that are not Mach-Os, including recognized but malformed ones.
 func withMachoSlices(machoPath string, handler func([]*macho.File) error) error {
-	if ok, _ := magic.IsMachO(machoPath); !ok {
+	ok, err := magic.IsMachO(machoPath)
+	if _, unreadable := errors.AsType[*fs.PathError](err); unreadable {
+		return skipUnreadable(machoPath, err)
+	}
+	if !ok {
 		return nil
 	}
 	fat, err := macho.OpenFat(machoPath)
@@ -467,14 +484,23 @@ func withMachoSlices(machoPath string, handler func([]*macho.File) error) error 
 		return handler(slices)
 	}
 	if !errors.Is(err, macho.ErrNotFat) {
-		return nil
+		return skipUnparsed(machoPath, err)
 	}
 	m, err := macho.Open(machoPath)
 	if err != nil {
-		return nil
+		return skipUnparsed(machoPath, err)
 	}
 	defer m.Close()
 	return handler([]*macho.File{m})
+}
+
+// skipUnparsed separates a file that could not be opened from one go-macho
+// opened and rejected as malformed.
+func skipUnparsed(machoPath string, err error) error {
+	if _, unopened := errors.AsType[*fs.PathError](err); unopened {
+		return skipUnreadable(machoPath, err)
+	}
+	return nil
 }
 
 // withMachoSlicesStrict distinguishes ordinary non-Mach-O files from unreadable

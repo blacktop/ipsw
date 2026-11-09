@@ -2,9 +2,11 @@ package ent
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/apex/log"
@@ -203,5 +205,22 @@ func TestFileEntitlementsSkipsNonMacho(t *testing.T) {
 	}
 	if _, err := fileEntitlements(path, &Config{}); err != errNotMacho {
 		t.Fatalf("got %v, want errNotMacho", err)
+	}
+}
+
+func TestEntitlementScanStopsOnFDExhaustion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tool")
+	testutil.WriteMacho(t, path, testutil.MachoArch{CPU: types.CPUArm64, Entitlements: "<ents/>"})
+
+	release := testutil.ExhaustFDs(t)
+	_, ok, err := scanFileEntitlements(path, &Config{})
+	release()
+	if ok || !errors.Is(err, syscall.EMFILE) {
+		t.Fatalf("got ok=%v err=%v, want the descriptor exhaustion error", ok, err)
+	}
+
+	output, ok, err := scanFileEntitlements(path, &Config{})
+	if err != nil || !ok || output != "<ents/>" {
+		t.Fatalf("got (%q, %v, %v) once descriptors are available", output, ok, err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 
 	"github.com/apex/log"
@@ -12,6 +13,7 @@ import (
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/types"
 	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 // errNotMacho marks files that are neither fat nor thin Mach-O and should be skipped silently.
@@ -36,6 +38,24 @@ func fileEntitlements(path string, conf *Config) (string, error) {
 	return renderEntitlements(path, cs, conf.LaunchConstraints), nil
 }
 
+// scanFileEntitlements is fileEntitlements for a database scan: ok is false for
+// files the scan skips. Running out of file descriptors aborts the scan, because
+// every later file would be skipped for the same reason.
+func scanFileEntitlements(path string, conf *Config) (output string, ok bool, err error) {
+	output, err = fileEntitlements(path, conf)
+	switch {
+	case err == nil:
+		return output, true, nil
+	case errors.Is(err, errNotMacho):
+		return "", false, nil
+	case utils.IsFDExhaustion(err):
+		return "", false, fmt.Errorf("failed to get entitlements for %s: %w", path, err)
+	default:
+		log.WithError(err).Warnf("failed to get entitlements for %s", path)
+		return "", false, nil
+	}
+}
+
 // openSlices returns every Mach-O slice in path (a single slice for thin files).
 func openSlices(path string) ([]*macho.File, func(), error) {
 	fat, err := macho.OpenFat(path)
@@ -45,6 +65,9 @@ func openSlices(path string) ([]*macho.File, func(), error) {
 			files = append(files, arch.File)
 		}
 		return files, func() { fat.Close() }, nil
+	}
+	if _, unopened := errors.AsType[*fs.PathError](err); unopened {
+		return nil, nil, err
 	}
 	if !errors.Is(err, macho.ErrNotFat) {
 		return nil, nil, errNotMacho
