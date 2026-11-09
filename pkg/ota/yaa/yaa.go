@@ -665,6 +665,24 @@ func (y *YAA) FileSize() uint64 {
 	return total
 }
 
+// readerAt returns r as an io.ReaderAt. Readers without ReadAt are adapted by
+// seeking, which is safe here because Parse repositions r after every nested read.
+func readerAt(r io.ReadSeeker) io.ReaderAt {
+	if ra, ok := r.(io.ReaderAt); ok {
+		return ra
+	}
+	return seekReaderAt{r}
+}
+
+type seekReaderAt struct{ rs io.ReadSeeker }
+
+func (s seekReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if _, err := s.rs.Seek(off, io.SeekStart); err != nil {
+		return 0, err
+	}
+	return io.ReadFull(s.rs, p)
+}
+
 func (y *YAA) Parse(r io.ReadSeeker) error {
 	if y.sr == nil {
 		y.sr = r
@@ -720,24 +738,37 @@ func (y *YAA) Parse(r io.ReadSeeker) error {
 					return fmt.Errorf("YAA.Parse: failed to seek to next entry: %w", err)
 				}
 			case YOP_EXTRACT, YOP_DST_FIXUP:
-				data := make([]byte, ent.Size)
-				if _, err := io.ReadFull(r, data); err != nil {
-					return fmt.Errorf("YAA.Parse: failed to read aa pbzx patch data: %w", err)
+				// The payload is a nested archive. Parse it in place so its entries
+				// read from r; a copy would stay referenced by every nested entry,
+				// keeping the whole payload in memory for the life of the archive.
+				end, err := r.Seek(0, io.SeekEnd)
+				if err != nil {
+					return fmt.Errorf("YAA.Parse: failed to find the end of the archive: %w", err)
 				}
-				if isPBZX, err := util.IsPBZXData(bytes.NewReader(data)); err != nil {
+				if ent.Size > uint64(end-ent.fileOffset) {
+					return fmt.Errorf("YAA.Parse: failed to read aa pbzx patch data: %w", io.ErrUnexpectedEOF)
+				}
+				payload := io.NewSectionReader(readerAt(r), ent.fileOffset, int64(ent.Size))
+				isPBZX, err := util.IsPBZXData(payload)
+				if err != nil {
 					return fmt.Errorf("YAA.Parse: failed to check if data is pbzx: %w", err)
-				} else if isPBZX {
+				}
+				if _, err := payload.Seek(0, io.SeekStart); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to rewind aa patch data: %w", err)
+				}
+				var nested io.ReadSeeker = payload
+				if isPBZX {
 					var pbuf bytes.Buffer
-					if err := pbzx.Extract(context.Background(), bytes.NewReader(data), &pbuf, runtime.NumCPU()); err != nil {
+					if err := pbzx.Extract(context.Background(), payload, &pbuf, runtime.NumCPU()); err != nil {
 						return fmt.Errorf("YAA.Parse: failed to extract aa pbzx patch data: %w", err)
 					}
-					if err := y.Parse(bytes.NewReader(pbuf.Bytes())); err != nil {
-						return fmt.Errorf("YAA.Parse: failed to parse aa patch: %w", err)
-					}
-				} else {
-					if err := y.Parse(bytes.NewReader(data)); err != nil {
-						return fmt.Errorf("YAA.Parse: failed to parse aa patch: %w", err)
-					}
+					nested = bytes.NewReader(pbuf.Bytes())
+				}
+				if err := y.Parse(nested); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to parse aa patch: %w", err)
+				}
+				if _, err := r.Seek(ent.fileOffset+int64(ent.Size), io.SeekStart); err != nil {
+					return fmt.Errorf("YAA.Parse: failed to seek to next entry: %w", err)
 				}
 			default:
 				log.Warnf("YAA.Parse: unsupported YOP operation: %s (let author know)", ent.Yop)
