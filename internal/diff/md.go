@@ -50,9 +50,6 @@ func (d *Diff) StatusNote() string {
 	return out.String()
 }
 
-// statusFileName is the machine-readable companion written beside README.md.
-const statusFileName = "status.json"
-
 // ReportStatus is the content of status.json. Complete is false when any
 // section failed; skipped sections do not make a report incomplete.
 type ReportStatus struct {
@@ -61,20 +58,17 @@ type ReportStatus struct {
 	SkippedSections []SkippedSection `json:"skipped_sections"`
 }
 
-func (d *Diff) status() ReportStatus {
-	return ReportStatus{
+// writeStatus writes status.json, the machine-readable companion to README.md.
+func (d *Diff) writeStatus(dir string) error {
+	dat, err := json.MarshalIndent(ReportStatus{
 		Complete:        len(d.failed) == 0,
 		FailedSections:  append([]string{}, d.failed...),
 		SkippedSections: append([]SkippedSection{}, d.skipped...),
-	}
-}
-
-func (d *Diff) writeStatus(dir string) error {
-	dat, err := json.MarshalIndent(d.status(), "", "  ")
+	}, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to encode report status: %w", err)
 	}
-	return os.WriteFile(filepath.Join(dir, statusFileName), append(dat, '\n'), 0o644)
+	return os.WriteFile(filepath.Join(dir, "status.json"), append(dat, '\n'), 0o644)
 }
 
 // Markdown saves the diff as Markdown files.

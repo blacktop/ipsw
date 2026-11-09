@@ -454,12 +454,6 @@ func TestRenderMachoDiffIntegration(t *testing.T) {
 // TestReportStatusInEveryRenderer pins that a stored report says what it is
 // missing in every output format, and that status.json carries the same facts.
 func TestReportStatusInEveryRenderer(t *testing.T) {
-	newDiff := func() *Diff {
-		d := newSameKernelDiff(t, testKernelVersion())
-		d.markFailed("entitlements", "files", "entitlements")
-		d.markSkipped("sandbox", "synthetic reason")
-		return d
-	}
 	readStatus := func(d *Diff) ReportStatus {
 		t.Helper()
 		if err := d.Markdown(); err != nil {
@@ -478,7 +472,9 @@ func TestReportStatusInEveryRenderer(t *testing.T) {
 	const failedNote = "**Incomplete report.** These sections failed and are missing or partial: `entitlements`, `files`"
 	const skippedNote = "Skipped `sandbox`: synthetic reason"
 
-	d := newDiff()
+	d := newSameKernelDiff(t, testKernelVersion())
+	d.markFailed("entitlements", "files", "entitlements")
+	d.markSkipped("sandbox", "synthetic reason")
 	status := readStatus(d)
 	if status.Complete || !slices.Equal(status.FailedSections, []string{"entitlements", "files"}) ||
 		!slices.Equal(status.SkippedSections, []SkippedSection{{Section: "sandbox", Reason: "synthetic reason"}}) {
@@ -491,18 +487,22 @@ func TestReportStatusInEveryRenderer(t *testing.T) {
 	if !strings.Contains(string(readme), failedNote) || !strings.Contains(string(readme), skippedNote) {
 		t.Fatalf("README missing the status note:\n%s", readme)
 	}
-	assertStatusNoteAboveInputs(t, "README", string(readme), d.Title)
-	text := newDiff().String()
+	body, ok := strings.CutPrefix(string(readme), "# "+d.Title+"\n")
+	if !ok {
+		t.Errorf("README line 1 is not the title:\n%s", readme)
+	}
+	assertStatusNoteAboveInputs(t, "README", body)
+	text := d.String()
 	if !strings.Contains(text, failedNote) || !strings.Contains(text, skippedNote) {
 		t.Errorf("Diff.String missing the status note:\n%s", text)
 	}
-	// The text output opens with a table of contents, so start at its title.
-	_, body, _ := strings.Cut(text, "\n# "+d.Title+"\n")
-	assertStatusNoteAboveInputs(t, "Diff.String", "# "+d.Title+"\n"+body, d.Title)
-	if got := mustRenderHTML(t, newDiff()); !strings.Contains(got, "Incomplete report.") || !strings.Contains(got, "synthetic reason") {
+	// The text output opens with a table of contents, so start after its title.
+	_, body, _ = strings.Cut(text, "\n# "+d.Title+"\n")
+	assertStatusNoteAboveInputs(t, "Diff.String", body)
+	if got := mustRenderHTML(t, d); !strings.Contains(got, "Incomplete report.") || !strings.Contains(got, "synthetic reason") {
 		t.Error("renderHTML missing the status note")
 	}
-	report, err := buildReport(newDiff())
+	report, err := buildReport(d)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -531,14 +531,11 @@ func TestReportStatusInEveryRenderer(t *testing.T) {
 	}
 }
 
-// assertStatusNoteAboveInputs pins the layout report consumers parse: the title
-// on line 1, the status note before Inputs, and an Inputs section holding
-// exactly its two bullets.
-func assertStatusNoteAboveInputs(t *testing.T, name, report, title string) {
+// assertStatusNoteAboveInputs pins the layout report consumers parse, given the
+// report after its title line: the status note before Inputs, and an Inputs
+// section holding exactly its two bullets.
+func assertStatusNoteAboveInputs(t *testing.T, name, report string) {
 	t.Helper()
-	if first, _, _ := strings.Cut(report, "\n"); first != "# "+title {
-		t.Errorf("%s line 1 = %q, want the title", name, first)
-	}
 	head, rest, ok := strings.Cut(report, "## Inputs\n")
 	if !ok || !strings.Contains(head, "Incomplete report.") || !strings.Contains(head, "Skipped `sandbox`") {
 		t.Fatalf("%s must carry the whole status note above Inputs:\n%s", name, report)
