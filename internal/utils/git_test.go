@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -54,4 +55,60 @@ func TestGitDiffPlainDeltaBypassesExecutable(t *testing.T) {
 			t.Fatalf("backend %q did not use plain diff: %q", backend, out)
 		}
 	}
+}
+
+func TestGitDiffClosesTempFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	openFDs := func() int {
+		entries, err := os.ReadDir("/dev/fd")
+		if err != nil {
+			t.Skipf("cannot count open descriptors: %v", err)
+		}
+		return len(entries)
+	}
+	// Without GC an unclosed os.File keeps its descriptor for the whole loop.
+	defer debug.SetGCPercent(debug.SetGCPercent(-1))
+
+	before := openFDs()
+	for range 20 {
+		if _, err := GitDiff("before\n", "after\n", &GitDiffConfig{Tool: "git"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if after := openFDs(); after != before {
+		t.Fatalf("open descriptors grew from %d to %d across 20 diffs", before, after)
+	}
+}
+
+func TestGitDiffToolExitStatus(t *testing.T) {
+	fakeGit := func(t *testing.T, script string) {
+		t.Helper()
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\n"+script+"\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", dir)
+	}
+	t.Run("exit 1 means the inputs differ", func(t *testing.T) {
+		fakeGit(t, `printf 'h1\nh2\nh3\nh4\n-before\n+after\n'; exit 1`)
+		out, err := GitDiff("before\n", "after\n", &GitDiffConfig{Tool: "git"})
+		if err != nil || out != "-before\n+after\n" {
+			t.Fatalf("GitDiff = %q, %v", out, err)
+		}
+	})
+	t.Run("other exit codes are failures", func(t *testing.T) {
+		fakeGit(t, `echo 'fatal: synthetic failure' >&2; exit 128`)
+		out, err := GitDiff("before\n", "after\n", &GitDiffConfig{Tool: "git"})
+		if err == nil || !strings.Contains(err.Error(), "fatal: synthetic failure") {
+			t.Fatalf("GitDiff = %q, %v; want the git failure", out, err)
+		}
+	})
+	t.Run("missing tool is a failure", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		if out, err := GitDiff("before\n", "after\n", &GitDiffConfig{Tool: "git"}); err == nil {
+			t.Fatalf("GitDiff = %q, nil; want an error", out)
+		}
+	})
 }

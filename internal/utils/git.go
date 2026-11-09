@@ -132,27 +132,22 @@ func createGoDiff(src, dst string, conf *GitDiffConfig) (string, error) {
 // differently than a fresh run on a host with a different git; the cache is
 // therefore host-bound by default. See machosJob.OptionsHash for details.
 func createGitDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
-	tmpSrc, err := os.CreateTemp("", "src")
+	tmpSrc, err := writeDiffInput("src", src)
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(tmpSrc.Name())
+	defer os.Remove(tmpSrc)
 
-	os.WriteFile(tmpSrc.Name(), []byte(src), 0644)
-
-	tmpDst, err := os.CreateTemp("", "dst")
+	tmpDst, err := writeDiffInput("dst", dst)
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(tmpDst.Name())
+	defer os.Remove(tmpDst)
 
-	os.WriteFile(tmpDst.Name(), []byte(dst), 0644)
-
-	cmd := exec.Command("git", "diff", "--no-color", "--no-index", tmpSrc.Name(), tmpDst.Name())
-
-	dat, _ := cmd.CombinedOutput()
-
-	out := string(dat)
+	out, err := runDiffTool(exec.Command("git", "diff", "--no-color", "--no-index", tmpSrc, tmpDst))
+	if err != nil {
+		return "", err
+	}
 	// strip the first 4 lines of the patch file
 	_, out, _ = strings.Cut(out, "\n")
 	_, out, _ = strings.Cut(out, "\n")
@@ -172,26 +167,54 @@ func createGitDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
 	return out, nil
 }
 
+// writeDiffInput writes content to a closed temp file for an external diff
+// tool and returns its path. The caller removes the file.
+func writeDiffInput(pattern, content string) (string, error) {
+	f, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return "", err
+	}
+	_, writeErr := f.WriteString(content)
+	if err := errors.Join(writeErr, f.Close()); err != nil {
+		os.Remove(f.Name())
+		return "", fmt.Errorf("failed to write diff input %s: %w", f.Name(), err)
+	}
+	return f.Name(), nil
+}
+
+// runDiffTool returns the stdout of an external diff command. Diff tools exit 1
+// when the inputs differ, so only other failures are errors.
+func runDiffTool(cmd *exec.Cmd) (string, error) {
+	out, err := cmd.Output()
+	if err == nil {
+		return string(out), nil
+	}
+	exitErr, ok := errors.AsType[*exec.ExitError](err)
+	if !ok {
+		return "", fmt.Errorf("failed to run %s: %w", cmd.Args[0], err)
+	}
+	if exitErr.ExitCode() == 1 {
+		return string(out), nil
+	}
+	return "", fmt.Errorf("%s failed: %w: %s", cmd.Args[0], err, strings.TrimSpace(string(exitErr.Stderr)))
+}
+
 func createDeltaDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
 	if !conf.Color {
 		return createGoDiff(src, dst, conf)
 	}
 
-	tmpSrc, err := os.CreateTemp("", "src")
+	tmpSrc, err := writeDiffInput("src", src)
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(tmpSrc.Name())
+	defer os.Remove(tmpSrc)
 
-	os.WriteFile(tmpSrc.Name(), []byte(src), 0644)
-
-	tmpDst, err := os.CreateTemp("", "dst")
+	tmpDst, err := writeDiffInput("dst", dst)
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(tmpDst.Name())
-
-	os.WriteFile(tmpDst.Name(), []byte(dst), 0644)
+	defer os.Remove(tmpDst)
 
 	width := 120
 	if term.IsTerminal(0) {
@@ -202,7 +225,7 @@ func createDeltaDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) 
 		width = twidth
 	}
 
-	cmd := exec.Command(
+	return runDiffTool(exec.Command(
 		"delta",
 		"--dark",
 		"--diff-so-fancy",
@@ -212,16 +235,9 @@ func createDeltaDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) 
 		"--syntax-theme",
 		"Nord",
 		"--width", strconv.Itoa(width),
-		tmpSrc.Name(),
-		tmpDst.Name(),
-	)
-
-	out, _ := cmd.CombinedOutput()
-	// if err != nil {
-	// 	return "", fmt.Errorf("delta failed %s: %v", out, err)
-	// }
-
-	return string(out), nil
+		tmpSrc,
+		tmpDst,
+	))
 }
 
 func ClangFormat(src, filename string, color bool) string {
