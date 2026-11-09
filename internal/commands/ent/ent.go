@@ -216,9 +216,6 @@ func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 	for _, f2 := range files { // DIFF ALL ENTITLEMENTS
 		e2 := db2[f2]
 		if e1, ok := db1[f2]; ok {
-			if e1 == e2 {
-				continue
-			}
 			var out string
 			if conf.Markdown {
 				out, err = utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Color: false, Tool: "git"})

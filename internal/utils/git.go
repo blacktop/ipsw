@@ -76,6 +76,9 @@ type GitDiffConfig struct {
 }
 
 func GitDiff(src, dst string, conf *GitDiffConfig) (string, error) {
+	if src == dst {
+		return "", nil
+	}
 	switch conf.Tool {
 	case "delta":
 		return createDeltaDiffPatch(src, dst, conf)

@@ -112,3 +112,14 @@ func TestGitDiffToolExitStatus(t *testing.T) {
 		}
 	})
 }
+
+func TestGitDiffIdenticalInputsNeverRunTheTool(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\necho 'fatal: must not run' >&2\nexit 128\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	if out, err := GitDiff("same\n", "same\n", &GitDiffConfig{Tool: "git"}); err != nil || out != "" {
+		t.Fatalf("GitDiff = %q, %v; want no diff without running git", out, err)
+	}
+}
