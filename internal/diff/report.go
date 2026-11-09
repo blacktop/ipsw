@@ -46,6 +46,14 @@ func buildReport(d *Diff) (map[string]any, error) {
 	addPtrIfNotNil(report, newFilesRenderer(d.Files))
 	addStringIfNotEmpty(report, newLaunchdRenderer(d.Launchd))
 
+	// Report status: present only when a section failed or was skipped.
+	if len(d.failed) > 0 {
+		report["failed_sections"] = d.failed
+	}
+	if len(d.skipped) > 0 {
+		report["skipped_sections"] = d.skipped
+	}
+
 	return report, nil
 }
 

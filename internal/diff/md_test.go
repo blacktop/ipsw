@@ -1,10 +1,12 @@
 package diff
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -446,5 +448,80 @@ func TestRenderMachoDiffIntegration(t *testing.T) {
 	}
 	if strings.Contains(got, "<details>") || strings.Contains(got, "```diff") {
 		t.Errorf("single-entry sections must be plain links/bullets, no <details>/inline diff, got:\n%s", got)
+	}
+}
+
+// TestReportStatusInEveryRenderer pins that a stored report says what it is
+// missing in every output format, and that status.json carries the same facts.
+func TestReportStatusInEveryRenderer(t *testing.T) {
+	newDiff := func() *Diff {
+		d := newSameKernelDiff(t, testKernelVersion())
+		d.markFailed("entitlements", "files", "entitlements")
+		d.markSkipped("sandbox", "synthetic reason")
+		return d
+	}
+	readStatus := func(d *Diff) ReportStatus {
+		t.Helper()
+		if err := d.Markdown(); err != nil {
+			t.Fatalf("Markdown: %v", err)
+		}
+		data, err := os.ReadFile(filepath.Join(d.conf.Output, "status.json"))
+		if err != nil {
+			t.Fatalf("read status.json: %v", err)
+		}
+		var status ReportStatus
+		if err := json.Unmarshal(data, &status); err != nil {
+			t.Fatalf("decode status.json: %v\n%s", err, data)
+		}
+		return status
+	}
+	const failedNote = "**Incomplete report.** These sections failed and are missing or partial: `entitlements`, `files`"
+	const skippedNote = "Skipped `sandbox`: synthetic reason"
+
+	d := newDiff()
+	status := readStatus(d)
+	if status.Complete || !slices.Equal(status.FailedSections, []string{"entitlements", "files"}) ||
+		!slices.Equal(status.SkippedSections, []SkippedSection{{Section: "sandbox", Reason: "synthetic reason"}}) {
+		t.Fatalf("status.json = %+v", status)
+	}
+	readme, err := os.ReadFile(filepath.Join(d.conf.Output, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(readme), failedNote) || !strings.Contains(string(readme), skippedNote) {
+		t.Fatalf("README missing the status note:\n%s", readme)
+	}
+	if got := newDiff().String(); !strings.Contains(got, failedNote) || !strings.Contains(got, skippedNote) {
+		t.Errorf("Diff.String missing the status note:\n%s", got)
+	}
+	if got := mustRenderHTML(t, newDiff()); !strings.Contains(got, "Incomplete report.") || !strings.Contains(got, "synthetic reason") {
+		t.Error("renderHTML missing the status note")
+	}
+	report, err := buildReport(newDiff())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failed, _ := report["failed_sections"].([]string); !slices.Equal(failed, []string{"entitlements", "files"}) {
+		t.Errorf("JSON failed_sections = %v", report["failed_sections"])
+	}
+	if _, ok := report["skipped_sections"]; !ok {
+		t.Error("JSON report missing skipped_sections")
+	}
+
+	// A complete report must say so, and must not carry the warning.
+	complete := newSameKernelDiff(t, testKernelVersion())
+	raw := readStatus(complete)
+	if !raw.Complete || raw.FailedSections == nil || len(raw.FailedSections) != 0 || raw.SkippedSections == nil {
+		t.Fatalf("complete status.json = %+v, want complete with empty arrays", raw)
+	}
+	if got := complete.String(); strings.Contains(got, "Incomplete report") || strings.Contains(got, "Skipped") {
+		t.Errorf("complete report renders a status note:\n%s", got)
+	}
+	completeReport, err := buildReport(complete)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := completeReport["failed_sections"]; ok {
+		t.Error("complete JSON report carries failed_sections")
 	}
 }

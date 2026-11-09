@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"maps"
@@ -30,6 +31,52 @@ func (d *Diff) SameKernelNote() string {
 	return sameKernelNote
 }
 
+// StatusNote returns the Markdown block that marks a report as incomplete and
+// lists skipped sections, else "". Like [Diff.SameKernelNote], it is the single
+// source every renderer reads, so a stored report says what it is missing in
+// every output format. Exported for template access.
+func (d *Diff) StatusNote() string {
+	var out strings.Builder
+	if len(d.failed) > 0 {
+		fmt.Fprintf(&out, "> ⚠️ **Incomplete report.** These sections failed and are missing or partial: `%s`\n",
+			strings.Join(d.failed, "`, `"))
+	}
+	for _, skip := range d.skipped {
+		if out.Len() > 0 {
+			out.WriteString(">\n")
+		}
+		fmt.Fprintf(&out, "> ℹ️ Skipped `%s`: %s\n", skip.Section, skip.Reason)
+	}
+	return out.String()
+}
+
+// statusFileName is the machine-readable companion written beside README.md.
+const statusFileName = "status.json"
+
+// ReportStatus is the content of status.json. Complete is false when any
+// section failed; skipped sections do not make a report incomplete.
+type ReportStatus struct {
+	Complete        bool             `json:"complete"`
+	FailedSections  []string         `json:"failed_sections"`
+	SkippedSections []SkippedSection `json:"skipped_sections"`
+}
+
+func (d *Diff) status() ReportStatus {
+	return ReportStatus{
+		Complete:        len(d.failed) == 0,
+		FailedSections:  append([]string{}, d.failed...),
+		SkippedSections: append([]SkippedSection{}, d.skipped...),
+	}
+}
+
+func (d *Diff) writeStatus(dir string) error {
+	dat, err := json.MarshalIndent(d.status(), "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode report status: %w", err)
+	}
+	return os.WriteFile(filepath.Join(dir, statusFileName), append(dat, '\n'), 0o644)
+}
+
 // Markdown saves the diff as Markdown files.
 func (d *Diff) Markdown() error {
 	d.conf.Output = filepath.Join(d.conf.Output, d.TitleToFilename())
@@ -52,6 +99,9 @@ func (d *Diff) Markdown() error {
 			filepath.Base(d.New.IPSWPath),
 		),
 	)
+	if note := d.StatusNote(); note != "" {
+		out.WriteString(note + "\n")
+	}
 
 	// SECTION: Kernel — heading, optional version table, optional state note,
 	// mirroring the HTML template's shape. The note carries the section when the
@@ -195,6 +245,9 @@ func (d *Diff) Markdown() error {
 
 	// Write README.md
 	if err := os.MkdirAll(d.conf.Output, 0o750); err != nil {
+		return err
+	}
+	if err := d.writeStatus(d.conf.Output); err != nil {
 		return err
 	}
 	fname := filepath.Join(d.conf.Output, "README.md")

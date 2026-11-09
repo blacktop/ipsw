@@ -168,6 +168,16 @@ func outputDiff(d *diff.Diff, hasOutput, markdownOut, jsonOut, htmlOut bool) err
 var diffCmd = &cobra.Command{
 	Use:   "diff <IPSW|OTA|DIR> <IPSW|OTA|DIR>",
 	Short: "Diff IPSWs, OTAs, or patched OTA DMG directories",
+	Long: heredoc.Doc(`
+		Diff IPSWs, OTAs, or patched OTA DMG directories
+
+		When a section fails, the other sections are still reported and the command
+		exits nonzero after writing the report. The report names the failed sections
+		and any sections skipped because they do not apply to the inputs.
+
+		With --markdown and --output, status.json beside README.md records the same:
+		{"complete": false, "failed_sections": ["..."], "skipped_sections": [{"section": "...", "reason": "..."}]}
+		A nonzero exit with "complete": true means only cleanup failed.`),
 	Example: heredoc.Doc(`
 		# Diff two IPSWs
 		❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown

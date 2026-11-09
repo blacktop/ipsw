@@ -71,6 +71,8 @@ const diffMarkdownTemplate = `
 
 - {{ .Old.IPSWPath | base }}
 - {{ .New.IPSWPath | base }}
+{{ with .StatusNote }}
+{{ . }}{{ end }}
 
 ## Kernel
 {{ if .Old.Kernel.Version }}
@@ -532,6 +534,9 @@ type diffHTMLPageData struct {
 	// kernelcache changed), so a Kernel section with no KEXT diff is never left
 	// unexplained. Sourced from Diff.SameKernelNote like every other renderer.
 	SameKernelNote template.HTML
+	// StatusNote is [Diff.StatusNote] rendered to HTML (empty for a complete
+	// report with nothing skipped).
+	StatusNote template.HTML
 
 	// TOC-only converted views: every in-scope task (mount-based or
 	// top-level) keeps its sidebar TOC entry while the section bodies
@@ -1089,6 +1094,9 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
             <li><code>{{ .OldInput }}</code></li>
             <li><code>{{ .NewInput }}</code></li>
           </ul>
+          {{- with .StatusNote }}
+          {{ . }}
+          {{- end }}
 
           <h2 id="kernel">Kernel</h2>
           {{- if .HasKernelVersion }}
@@ -1665,6 +1673,7 @@ func (d *Diff) renderHTML() (string, error) {
 	}
 
 	data.SameKernelNote = renderMarkdownFragment(d.SameKernelNote())
+	data.StatusNote = renderMarkdownFragment(d.StatusNote())
 	if d.Old.Kernel.Version != nil {
 		data.HasKernelVersion = true
 		data.OldKernelDarwin = d.Old.Kernel.Version.KernelVersion.Darwin
