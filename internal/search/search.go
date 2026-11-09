@@ -467,16 +467,23 @@ func skipUnreadable(path string, err error) error {
 // withMachoSlices keeps every slice open until handler returns. It skips files
 // that are not Mach-Os, including recognized but malformed ones.
 func withMachoSlices(machoPath string, handler func([]*macho.File) error) error {
-	ok, err := magic.IsMachO(machoPath)
-	if _, unreadable := errors.AsType[*fs.PathError](err); unreadable {
+	f, err := os.Open(machoPath)
+	if err != nil {
 		return skipUnreadable(machoPath, err)
 	}
-	if !ok {
+	defer f.Close()
+	var header [4]byte
+	if _, err := io.ReadFull(f, header[:]); err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil // A file shorter than the magic is not a Mach-O.
+		}
+		return skipUnreadable(machoPath, err)
+	}
+	if ok, _ := magic.IsMachOData(header[:]); !ok {
 		return nil
 	}
-	fat, err := macho.OpenFat(machoPath)
+	fat, err := macho.NewFatFile(f)
 	if err == nil {
-		defer fat.Close()
 		var slices []*macho.File
 		for _, arch := range fat.Arches {
 			slices = append(slices, arch.File)
@@ -484,23 +491,13 @@ func withMachoSlices(machoPath string, handler func([]*macho.File) error) error 
 		return handler(slices)
 	}
 	if !errors.Is(err, macho.ErrNotFat) {
-		return skipUnparsed(machoPath, err)
+		return nil
 	}
-	m, err := macho.Open(machoPath)
+	m, err := macho.NewFile(f)
 	if err != nil {
-		return skipUnparsed(machoPath, err)
+		return nil
 	}
-	defer m.Close()
 	return handler([]*macho.File{m})
-}
-
-// skipUnparsed separates a file that could not be opened from one go-macho
-// opened and rejected as malformed.
-func skipUnparsed(machoPath string, err error) error {
-	if _, unopened := errors.AsType[*fs.PathError](err); unopened {
-		return skipUnreadable(machoPath, err)
-	}
-	return nil
 }
 
 // withMachoSlicesStrict distinguishes ordinary non-Mach-O files from unreadable
