@@ -236,7 +236,8 @@ func walkFolderFiles(root string, fn func(relPath, absPath string) error) error 
 // diffMachosInMounts diffs Mach-Os per volume between the old and new mount
 // sets. Each volume's contents are diffed independently, producing a per-
 // volume map matching the IPSW machosJob output shape so renderers and JSON
-// consumers see the same structure across input modes.
+// consumers see the same structure across input modes. Keys are mount-relative
+// with a leading slash, the same as IPSW mode.
 func diffMachosInMounts(oldMounts, newMounts map[string]mount, conf *mcmd.DiffConfig) (map[string]*mcmd.MachoDiff, error) {
 	out := make(map[string]*mcmd.MachoDiff)
 
@@ -244,9 +245,8 @@ func diffMachosInMounts(oldMounts, newMounts map[string]mount, conf *mcmd.DiffCo
 	for _, name := range names {
 		prev := make(map[string]*mcmd.DiffInfo)
 		if mnt, ok := oldMounts[name]; ok {
-			if err := search.ForEachMacho(mnt.MountPath, func(path string, m *macho.File) error {
-				key := filepath.ToSlash(relativeToRoot(mnt.MountPath, path))
-				prev[key] = mcmd.GenerateDiffInfo(m, conf)
+			if err := search.ForEachMachoInMount(mnt.MountPath, func(path string, m *macho.File) error {
+				prev[path] = mcmd.GenerateDiffInfo(m, conf)
 				return nil
 			}); err != nil {
 				return nil, fmt.Errorf("failed to parse machos in old %s mount: %w", name, err)
@@ -255,9 +255,8 @@ func diffMachosInMounts(oldMounts, newMounts map[string]mount, conf *mcmd.DiffCo
 
 		next := make(map[string]*mcmd.DiffInfo)
 		if mnt, ok := newMounts[name]; ok {
-			if err := search.ForEachMacho(mnt.MountPath, func(path string, m *macho.File) error {
-				key := filepath.ToSlash(relativeToRoot(mnt.MountPath, path))
-				next[key] = mcmd.GenerateDiffInfo(m, conf)
+			if err := search.ForEachMachoInMount(mnt.MountPath, func(path string, m *macho.File) error {
+				next[path] = mcmd.GenerateDiffInfo(m, conf)
 				return nil
 			}); err != nil {
 				return nil, fmt.Errorf("failed to parse machos in new %s mount: %w", name, err)
@@ -336,8 +335,8 @@ func collectFilesInMounts(mounts map[string]mount) (map[string][]string, error) 
 	out := make(map[string][]string)
 	for _, name := range sortedMountNames(mounts) {
 		mnt := mounts[name]
-		if err := walkFolderFiles(mnt.MountPath, func(relPath, _ string) error {
-			out[name] = append(out[name], filepath.ToSlash(relPath))
+		if err := search.ForEachFileInMount(mnt.MountPath, name, "", func(_, path string) error {
+			out[name] = append(out[name], path)
 			return nil
 		}); err != nil {
 			return nil, fmt.Errorf("failed to walk %s mount: %w", name, err)
