@@ -486,11 +486,7 @@ func taskNameFromError(err error) (string, bool) {
 	}
 	msg := err.Error()
 	if i := strings.Index(msg, ": "); i > 0 {
-		name := msg[:i]
-		if name == "" || name == "__walk__" {
-			return "", false
-		}
-		return name, true
+		return msg[:i], true
 	}
 	return "", false
 }

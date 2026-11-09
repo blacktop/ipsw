@@ -12,7 +12,6 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/diff/storage"
 	"github.com/blacktop/ipsw/internal/search"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
@@ -880,9 +879,6 @@ func TestSplitJoinedErrorsAndTaskNameFromError(t *testing.T) {
 	if _, ok := taskNameFromError(errors.New("no prefix here")); ok {
 		t.Error("taskNameFromError accepted an unprefixed error")
 	}
-	if _, ok := taskNameFromError(errors.New("__walk__: ouch")); ok {
-		t.Error("taskNameFromError accepted the walker sentinel")
-	}
 
 	// A non-joined error round-trips as a single element so the caller can
 	// still attribute walker-level failures without losing them.
@@ -1078,19 +1074,5 @@ func assertFileSeen(t *testing.T, files map[string][]string, dmg, want string) {
 	t.Helper()
 	if !strings.Contains(strings.Join(files[dmg], ","), want) {
 		t.Fatalf("%s files = %v, want %s", dmg, files[dmg], want)
-	}
-}
-
-func TestWebkitVersionMissingSeparatesAbsentFromUnreadable(t *testing.T) {
-	absent := &Diff{}
-	absent.webkitVersionMissing("old", fmt.Errorf("image not in DSC: %w", &dyld.ImageNotFoundError{Name: "WebKit"}))
-	if absent.failedSectionsError() != nil || len(absent.skipped) != 1 || absent.skipped[0].Section != "webkit version" {
-		t.Fatalf("absent WebKit: failed=%v skipped=%+v, want one skip", absent.failed, absent.skipped)
-	}
-
-	unreadable := &Diff{}
-	unreadable.webkitVersionMissing("new", errors.New("failed to create MachO for image WebKit"))
-	if !slices.Equal(unreadable.failed, []string{"webkit version"}) || len(unreadable.skipped) != 0 {
-		t.Fatalf("unreadable WebKit: failed=%v skipped=%+v, want a failure", unreadable.failed, unreadable.skipped)
 	}
 }

@@ -442,11 +442,14 @@ func (e *CompletedError) Unwrap() error { return e.Err }
 // markFailed records sections the report is missing or only partly covers.
 // Diff keeps going so the other sections are still reported, then fails.
 func (d *Diff) markFailed(sections ...string) {
-	for _, section := range sections {
-		if !slices.Contains(d.failed, section) {
-			d.failed = append(d.failed, section)
-		}
-	}
+	d.failed = utils.UniqueConcat(d.failed, sections)
+}
+
+// fail logs a section failure and records it. The diff carries on so the other
+// sections are still reported.
+func (d *Diff) fail(section, msg string, err error) {
+	log.WithError(err).Error(msg)
+	d.markFailed(section)
 }
 
 // SkippedSection is a section left out of the report because it does not apply
@@ -457,10 +460,7 @@ type SkippedSection struct {
 }
 
 func (d *Diff) markSkipped(section, reason string) {
-	skip := SkippedSection{Section: section, Reason: reason}
-	if !slices.Contains(d.skipped, skip) {
-		d.skipped = append(d.skipped, skip)
-	}
+	d.skipped = utils.UniqueAppend(d.skipped, SkippedSection{Section: section, Reason: reason})
 }
 
 // skippedError is returned by a task whose section does not apply to the
@@ -615,20 +615,17 @@ func (d *Diff) Diff() (err error) {
 		if otaMode || !d.dscVolumeUnchanged() {
 			log.Info("Diffing DYLD_SHARED_CACHES")
 			if err := d.parseDSC(); err != nil {
-				log.WithError(err).Error("failed to parse DSCs")
-				d.markFailed("dsc")
+				d.fail("dsc", "failed to parse DSCs", err)
 			}
 		}
 		log.Info("Diffing MachOs")
 		if err := d.parseMachos(); err != nil {
-			log.WithError(err).Error("failed to parse MachOs")
-			d.markFailed("machos")
+			d.fail("machos", "failed to parse MachOs", err)
 		}
 		if d.conf.LaunchD && otaMode {
 			log.Info("Diffing launchd PLIST")
 			if err := d.parseLaunchdPlists(); err != nil {
-				log.WithError(err).Error("failed to parse launchd plists")
-				d.markFailed("launchd")
+				d.fail("launchd", "failed to parse launchd plists", err)
 			}
 		}
 	}
@@ -654,8 +651,7 @@ func (d *Diff) Diff() (err error) {
 	if d.conf.Features && (directoryMode || otaMode) {
 		log.Info("Diffing Feature Flags")
 		if err := d.parseFeatureFlags(); err != nil {
-			log.WithError(err).Error("failed to parse feature flags")
-			d.markFailed("features")
+			d.fail("features", "failed to parse feature flags", err)
 		}
 	}
 
@@ -663,8 +659,7 @@ func (d *Diff) Diff() (err error) {
 	if d.conf.Localizations && (directoryMode || otaMode) {
 		log.Info("Diffing Localizations")
 		if err := d.parseLocalizations(); err != nil {
-			log.WithError(err).Error("failed to parse localizations")
-			d.markFailed("localizations")
+			d.fail("localizations", "failed to parse localizations", err)
 		}
 	}
 
@@ -673,8 +668,7 @@ func (d *Diff) Diff() (err error) {
 		log.Info("Diffing ENTITLEMENTS")
 		d.Ents, err = d.parseEntitlements()
 		if err != nil {
-			log.WithError(err).Error("failed to parse entitlements")
-			d.markFailed("entitlements")
+			d.fail("entitlements", "failed to parse entitlements", err)
 		}
 	}
 
@@ -707,8 +701,7 @@ func (d *Diff) runIPSWVolumeJobsForMode(directoryMode, otaMode bool) error {
 		if d.conf.Files {
 			log.Info("Diffing Files")
 			if err := d.parseFiles(); err != nil {
-				log.WithError(err).Error("failed to parse files")
-				d.markFailed("files")
+				d.fail("files", "failed to parse files", err)
 			}
 		}
 		return nil
@@ -982,6 +975,7 @@ func (d *Diff) parseKernelcache() error {
 	}
 
 	var smap map[string]signature.SymbolMap
+	var symbolicateErr error
 	if d.conf.Signatures != "" {
 		smap = make(map[string]signature.SymbolMap)
 		log.Info("Parsing Kernel Signatures")
@@ -993,15 +987,13 @@ func (d *Diff) parseKernelcache() error {
 		smap[m1.UUID().String()] = signature.NewSymbolMap()
 		log.WithField("kernelcache", d.Old.Kernel.Path).Info("Symbolicating...")
 		if err := smap[m1.UUID().String()].Symbolicate(d.Old.Kernel.Path, sigs, true); err != nil {
-			log.Errorf("failed to symbolicate kernelcache: %v", err)
-			d.markFailed("kernelcache symbolication")
+			symbolicateErr = errors.Join(symbolicateErr, fmt.Errorf("failed to symbolicate 'Old' kernelcache: %w", err))
 		}
 
 		smap[m2.UUID().String()] = signature.NewSymbolMap()
 		log.WithField("kernelcache", d.New.Kernel.Path).Info("Symbolicating...")
 		if err := smap[m2.UUID().String()].Symbolicate(d.New.Kernel.Path, sigs, true); err != nil {
-			log.Errorf("failed to symbolicate kernelcache: %v", err)
-			d.markFailed("kernelcache symbolication")
+			symbolicateErr = errors.Join(symbolicateErr, fmt.Errorf("failed to symbolicate 'New' kernelcache: %w", err))
 		}
 	}
 
@@ -1010,6 +1002,11 @@ func (d *Diff) parseKernelcache() error {
 	d.Kexts, err = kcmd.Diff(m1, m2, conf)
 	if err != nil {
 		return err
+	}
+	if symbolicateErr != nil {
+		// The KEXT diff above is still reported, without the missing symbols.
+		// Returning the error fails the section and keeps it out of the cache.
+		return symbolicateErr
 	}
 
 	// // diff kexts
@@ -1073,22 +1070,24 @@ func (d *Diff) diffDSCBetweenRoots(oldRoot, newRoot string) error {
 
 	/* DIFF WEBKIT */
 
+	// A cache that does not ship WebKit has no version to report. A WebKit image
+	// that cannot be read fails the section, after the dylib diff is built.
+	var webkitErr error
 	d.Old.Webkit, err = dcmd.GetWebkitVersion(dscOLD)
-	if err != nil {
-		d.webkitVersionMissing("old", err)
+	if err != nil && !errors.Is(err, dyld.ErrImageNotFound) {
+		webkitErr = errors.Join(webkitErr, fmt.Errorf("failed to get WebKit version from 'old' DSC: %w", err))
 	}
 
 	d.New.Webkit, err = dcmd.GetWebkitVersion(dscNEW)
-	if err != nil {
-		d.webkitVersionMissing("new", err)
+	if err != nil && !errors.Is(err, dyld.ErrImageNotFound) {
+		webkitErr = errors.Join(webkitErr, fmt.Errorf("failed to get WebKit version from 'new' DSC: %w", err))
 	}
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, d.dscDiffConfig())
 	if err != nil {
 		return err
 	}
-
-	return nil
+	return webkitErr
 }
 
 // openDSCFromMount finds main dyld_shared_cache files under mountRoot (filtered
@@ -1141,17 +1140,6 @@ func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side strin
 		return nil, fmt.Errorf("failed to open DSC: %v", err)
 	}
 	return dsc, nil
-}
-
-// webkitVersionMissing records why a WebKit version is absent. A cache that
-// does not ship WebKit is a skip; a WebKit image that cannot be read is a failure.
-func (d *Diff) webkitVersionMissing(side string, err error) {
-	if errors.Is(err, dyld.ErrImageNotFound) {
-		d.markSkipped("webkit version", fmt.Sprintf("WebKit is not in the %s dyld shared cache", side))
-		return
-	}
-	log.WithError(err).Errorf("failed to get WebKit version from '%s' DSC", side)
-	d.markFailed("webkit version")
 }
 
 // preferGenericDSC picks dyld_shared_cache_arm64e (then arm64) over ISA
