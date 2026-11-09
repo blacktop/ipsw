@@ -17,28 +17,28 @@ ipsw fw aea <AEA> [flags]
 ### Options
 
 ```
-      --auth-data string   AEA auth data file
-  -e, --encrypt            AEA encrypt file
-  -f, --fcs-key            Get fcs-key JSON
-  -h, --help               help for aea
-      --id                 Print AEA file ID
-  -i, --info               Print info
-      --insecure           Allow insecure connections
-  -k, --key                Get archive decryption key
-  -b, --key-val string     Base64 encoded symmetric encryption key
-  -o, --output string      Folder to extract files to
-  -p, --pem string         AEA private_key.pem file
-      --pem-db string      AEA pem DB JSON file
-      --proxy string       HTTP/HTTPS proxy
+      --auth-data string        AEA auth data file
+  -e, --encrypt[=true|false]    AEA encrypt file
+  -f, --fcs-key[=true|false]    Get fcs-key JSON
+  -h, --help[=true|false]       help for aea
+      --id[=true|false]         Print AEA file ID
+  -i, --info[=true|false]       Print info
+      --insecure[=true|false]   Allow insecure connections
+  -k, --key[=true|false]        Get archive decryption key
+  -b, --key-val string          Base64 encoded symmetric encryption key
+  -o, --output string           Folder to extract files to
+  -p, --pem string              AEA private_key.pem file
+      --pem-db string           AEA pem DB JSON file
+      --proxy string            HTTP/HTTPS proxy
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

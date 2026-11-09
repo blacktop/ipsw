@@ -17,16 +17,16 @@ ipsw disk [flags]
 ### Options
 
 ```
-  -h, --help   help for disk
+  -h, --help[=true|false]   help for disk
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

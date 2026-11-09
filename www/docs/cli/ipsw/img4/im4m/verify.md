@@ -28,17 +28,17 @@ ipsw img4 im4m verify <IM4M> [flags]
 
 ```
   -b, --build-manifest string   Build manifest file for verification
-  -h, --help                    help for verify
-  -s, --strict                  Strict mode: fail if any BuildManifest components are missing from IM4M
+  -h, --help[=true|false]       help for verify
+  -s, --strict[=true|false]     Strict mode: fail if any BuildManifest components are missing from IM4M
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

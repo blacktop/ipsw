@@ -17,24 +17,24 @@ ipsw img3 extract [flags]
 ### Options
 
 ```
-  -h, --help                   help for extract
+  -h, --help[=true|false]      help for extract
       --iv string              IV for decryption (hex string)
   -k, --iv-key string          IV+Key for direct decryption (concatenated hex string)
       --key string             Key for decryption (hex string)
-      --lookup                 Auto-lookup IV/key on theapplewiki.com
+      --lookup[=true|false]    Auto-lookup IV/key on theapplewiki.com
       --lookup-build string    Build number for key lookup (e.g., 20H71)
       --lookup-device string   Device identifier for key lookup (e.g., iPhone14,2)
   -o, --output string          Output file for extracted data
-  -r, --raw                    Extract raw data (no decryption)
+  -r, --raw[=true|false]       Extract raw data (no decryption)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -33,19 +33,19 @@ ipsw img4 im4m extract <IM4M> [flags]
 ### Options
 
 ```
-  -h, --help            help for extract
-  -n, --no-nonce        Extract no-nonce Image4 manifest (if available)
-  -o, --output string   Output file path
-  -u, --update          Extract update Image4 manifest (if available)
+  -h, --help[=true|false]       help for extract
+  -n, --no-nonce[=true|false]   Extract no-nonce Image4 manifest (if available)
+  -o, --output string           Output file path
+  -u, --update[=true|false]     Extract update Image4 manifest (if available)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

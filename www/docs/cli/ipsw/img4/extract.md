@@ -33,21 +33,21 @@ ipsw img4 extract <IMG4> [flags]
 ### Options
 
 ```
-  -h, --help            help for extract
-  -m, --im4m            Extract IM4M manifest to path
-  -p, --im4p            Extract IM4P payload to path
-  -r, --im4r            Extract IM4R restore info to path
-  -o, --output string   Output folder
-      --raw             Extract raw IM4P data without decompression
+  -h, --help[=true|false]   help for extract
+  -m, --im4m[=true|false]   Extract IM4M manifest to path
+  -p, --im4p[=true|false]   Extract IM4P payload to path
+  -r, --im4r[=true|false]   Extract IM4R restore info to path
+  -o, --output string       Output folder
+      --raw[=true|false]    Extract raw IM4P data without decompression
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

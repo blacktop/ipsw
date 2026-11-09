@@ -36,32 +36,32 @@ ipsw kernel cpp <kernelcache> [flags]
 ### Options
 
 ```
-  -a, --arch string             Which architecture to use for fat/universal MachO
-      --blockprofile string     Write block profile to file
-  -c, --class string            Only emit the specified class name
-      --cpuprofile string       Write CPU profile to file
-  -e, --entry stringArray       Only scan the specified bundle/entry (repeatable)
-      --flightrecorder string   Write flight recorder trace to file
-  -h, --help                    help for cpp
-  -i, --inheritance             Show inheritance hierarchy
-  -j, --json                    Output classes as JSON
-  -l, --limit int               Limit number of classes to display (0 = all)
-      --memprofile string       Write heap profile to file
-      --methods                 List per-slot vtable methods with PAC metadata
-      --mutexprofile string     Write mutex profile to file
-  -o, --output string           Write output to file
-      --pprof string            Serve net/http/pprof on address (e.g. localhost:6060)
-      --timings                 Print timing breakdown
-      --trace string            Write runtime trace to file
+  -a, --arch string                Which architecture to use for fat/universal MachO
+      --blockprofile string        Write block profile to file
+  -c, --class string               Only emit the specified class name
+      --cpuprofile string          Write CPU profile to file
+  -e, --entry stringArray          Only scan the specified bundle/entry (repeatable)
+      --flightrecorder string      Write flight recorder trace to file
+  -h, --help[=true|false]          help for cpp
+  -i, --inheritance[=true|false]   Show inheritance hierarchy
+  -j, --json[=true|false]          Output classes as JSON
+  -l, --limit int                  Limit number of classes to display (0 = all)
+      --memprofile string          Write heap profile to file
+      --methods[=true|false]       List per-slot vtable methods with PAC metadata
+      --mutexprofile string        Write mutex profile to file
+  -o, --output string              Write output to file
+      --pprof string               Serve net/http/pprof on address (e.g. localhost:6060)
+      --timings[=true|false]       Print timing breakdown
+      --trace string               Write runtime trace to file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

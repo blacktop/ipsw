@@ -57,42 +57,42 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
 ### Options
 
 ```
-      --device string           Device to select kernel/DMGs/caches for (product type or DMG board, e.g. Mac18,5)
-      --dmg string              Extract DMG file (app, sys, fs, exc, rdisk, rosetta)
-      --driverkit               Extract DriverKit dyld_shared_cache
-      --dtree                   Extract DeviceTree
-  -d, --dyld                    Extract dyld_shared_cache
-  -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
-  -x, --exclave                 Extract Exclave Bundle
-      --fcs-key                 Extract AEA1 keys for SystemOS DMGs (legacy filesystem fallback)
-  -f, --files                   Extract File System files
-      --flat                    Do NOT preserve directory structure when extracting
-  -h, --help                    help for extract
-      --iboot                   Extract iBoot
-      --ident string            Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
-      --insecure                do not verify ssl certs
-  -j, --json                    Output extracted paths as JSON
-      --json-format string      JSON format: legacy (per component) or artifacts (one versioned report; requires --json) (default "legacy")
-      --kbag                    Extract Im4p Keybags
-  -k, --kernel                  Extract kernelcache
-  -l, --lookup                  Lookup decryption keys on theapplewiki.com
-  -o, --output string           Folder to extract files to
-  -p, --pattern string          Extract files that match regex
-      --pem-db string           AEA pem DB JSON file
-      --proxy string            HTTP/HTTPS proxy
-  -r, --remote                  Extract from URL
-      --sep                     Extract sep-firmware
-      --sptm                    Extract SPTM and TXM Firmwares
-      --sys-ver                 Extract SystemVersion
+      --device string            Device to select kernel/DMGs/caches for (product type or DMG board, e.g. Mac18,5)
+      --dmg string               Extract DMG file (app, sys, fs, exc, rdisk, rosetta)
+      --driverkit[=true|false]   Extract DriverKit dyld_shared_cache
+      --dtree[=true|false]       Extract DeviceTree
+  -d, --dyld[=true|false]        Extract dyld_shared_cache
+  -a, --dyld-arch stringArray    dyld_shared_cache architecture to extract
+  -x, --exclave[=true|false]     Extract Exclave Bundle
+      --fcs-key[=true|false]     Extract AEA1 keys for SystemOS DMGs (legacy filesystem fallback)
+  -f, --files[=true|false]       Extract File System files
+      --flat[=true|false]        Do NOT preserve directory structure when extracting
+  -h, --help[=true|false]        help for extract
+      --iboot[=true|false]       Extract iBoot
+      --ident string             Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
+      --insecure[=true|false]    do not verify ssl certs
+  -j, --json[=true|false]        Output extracted paths as JSON
+      --json-format string       JSON format: legacy (per component) or artifacts (one versioned report; requires --json) (default "legacy")
+      --kbag[=true|false]        Extract Im4p Keybags
+  -k, --kernel[=true|false]      Extract kernelcache
+  -l, --lookup[=true|false]      Lookup decryption keys on theapplewiki.com
+  -o, --output string            Folder to extract files to
+  -p, --pattern string           Extract files that match regex
+      --pem-db string            AEA pem DB JSON file
+      --proxy string             HTTP/HTTPS proxy
+  -r, --remote[=true|false]      Extract from URL
+      --sep[=true|false]         Extract sep-firmware
+      --sptm[=true|false]        Extract SPTM and TXM Firmwares
+      --sys-ver[=true|false]     Extract SystemVersion
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

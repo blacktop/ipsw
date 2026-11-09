@@ -32,23 +32,23 @@ ipsw kernel symbolicate <KERNELCACHE|SYMBOLS_JSON> [flags]
 ### Options
 
 ```
-  -a, --arch string         Which architecture to use for fat/universal MachO
-  -f, --flat                Output results in flat file '.syms' format
-  -h, --help                help for symbolicate
-  -j, --json                Output results in JSON format
-  -l, --lookup uint         Lookup the nearest symbol for an address (input may be a kernelcache or a symbols JSON map)
-  -o, --output string       Folder to write files to
-  -q, --quiet               Do NOT display logging
-  -s, --signatures string   Path to signatures folder
+  -a, --arch string          Which architecture to use for fat/universal MachO
+  -f, --flat[=true|false]    Output results in flat file '.syms' format
+  -h, --help[=true|false]    help for symbolicate
+  -j, --json[=true|false]    Output results in JSON format
+  -l, --lookup uint          Lookup the nearest symbol for an address (input may be a kernelcache or a symbols JSON map)
+  -o, --output string        Folder to write files to
+  -q, --quiet[=true|false]   Do NOT display logging
+  -s, --signatures string    Path to signatures folder
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -25,17 +25,17 @@ ipsw img4 im4r create [flags]
 
 ```
   -n, --boot-nonce string   Boot nonce to set (8-byte hex string)
-  -h, --help                help for create
+  -h, --help[=true|false]   help for create
   -o, --output string       Output IM4R file path
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

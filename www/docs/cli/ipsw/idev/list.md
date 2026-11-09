@@ -17,19 +17,19 @@ ipsw idev list [flags]
 ### Options
 
 ```
-  -h, --help   help for list
-  -i, --ipsw   Display devices as ipsw spec names
-  -j, --json   Display devices as JSON
+  -h, --help[=true|false]   help for list
+  -i, --ipsw[=true|false]   Display devices as ipsw spec names
+  -j, --json[=true|false]   Display devices as JSON
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -u, --udid string     Device UniqueDeviceID to connect to
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -u, --udid string             Device UniqueDeviceID to connect to
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

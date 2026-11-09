@@ -71,52 +71,52 @@ ipsw download ota [options] [flags]
 ### Options
 
 ```
-      --beta                     Download Beta OTAs
-      --black-list stringArray   iOS device black list
-  -b, --build string             iOS BuildID (i.e. 16F203)
-  -y, --confirm                  do not prompt user for confirmation
-      --delta                    Download Delta OTAs
-  -d, --device string            iOS Device (i.e. iPhone11,2)
-      --driver-kit               Extract DriverKit dyld_shared_cache(s) from remote OTA zip
-      --dyld                     Extract dyld_shared_cache(s) from remote OTA zip
-  -a, --dyld-arch stringArray    dyld_shared_cache architecture(s) to remote extract
-      --fcs-keys                 Get AEA decryption keys as JSON database from OTA metadata
-  -f, --flat                     Do NOT preserve directory structure when downloading with --pattern
-  -h, --help                     help for ota
-      --info                     Show all the latest OTAs available
-      --insecure                 do not verify ssl certs
-  -j, --json                     Dump a versioned OTA envelope as JSON (never includes decryption keys)
-  -k, --kernel                   Extract kernelcache from remote OTA zip
-      --latest                   Download latest OTAs
-  -m, --model string             iOS Model (i.e. D321AP)
-  -o, --output string            Folder to download files to
-      --pattern string           Download remote files that match regex
-      --platform string          Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)
-      --proxy string             HTTP/HTTPS proxy
-      --rc                       Download confirmed RC OTAs (queried from the beta seed audiences)
-  -_, --remove-commas            replace commas in IPSW filename with underscores
-      --restart-all              always restart resumable IPSWs
-      --rsr                      Download Rapid Security Response OTAs
-      --show-latest-build        Show latest iOS build
-      --show-latest-version      Show latest iOS version
-      --sim                      Download Simulator OTAs
-      --skip-all                 continue past files locked by another download process
-  -u, --urls                     Dump URLs only
-  -v, --version string           iOS Version (i.e. 12.3.1)
-      --white-list stringArray   iOS device white list
+      --beta[=true|false]                  Download Beta OTAs
+      --black-list stringArray             iOS device black list
+  -b, --build string                       iOS BuildID (i.e. 16F203)
+  -y, --confirm[=true|false]               do not prompt user for confirmation
+      --delta[=true|false]                 Download Delta OTAs
+  -d, --device string                      iOS Device (i.e. iPhone11,2)
+      --driver-kit[=true|false]            Extract DriverKit dyld_shared_cache(s) from remote OTA zip
+      --dyld[=true|false]                  Extract dyld_shared_cache(s) from remote OTA zip
+  -a, --dyld-arch stringArray              dyld_shared_cache architecture(s) to remote extract
+      --fcs-keys[=true|false]              Get AEA decryption keys as JSON database from OTA metadata
+  -f, --flat[=true|false]                  Do NOT preserve directory structure when downloading with --pattern
+  -h, --help[=true|false]                  help for ota
+      --info[=true|false]                  Show all the latest OTAs available
+      --insecure[=true|false]              do not verify ssl certs
+  -j, --json[=true|false]                  Dump a versioned OTA envelope as JSON (never includes decryption keys)
+  -k, --kernel[=true|false]                Extract kernelcache from remote OTA zip
+      --latest[=true|false]                Download latest OTAs
+  -m, --model string                       iOS Model (i.e. D321AP)
+  -o, --output string                      Folder to download files to
+      --pattern string                     Download remote files that match regex
+      --platform string                    Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)
+      --proxy string                       HTTP/HTTPS proxy
+      --rc[=true|false]                    Download confirmed RC OTAs (queried from the beta seed audiences)
+  -_, --remove-commas[=true|false]         replace commas in IPSW filename with underscores
+      --restart-all[=true|false]           always restart resumable IPSWs
+      --rsr[=true|false]                   Download Rapid Security Response OTAs
+      --show-latest-build[=true|false]     Show latest iOS build
+      --show-latest-version[=true|false]   Show latest iOS version
+      --sim[=true|false]                   Download Simulator OTAs
+      --skip-all[=true|false]              continue past files locked by another download process
+  -u, --urls[=true|false]                  Dump URLs only
+  -v, --version string                     iOS Version (i.e. 12.3.1)
+      --white-list stringArray             iOS device white list
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
-      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --no-color                disable colorize output
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
-  -V, --verbose                 verbose output
+      --color[=true|false]                   colorize output
+      --config string                        config file (default is $HOME/.config/ipsw/config.yaml)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --no-color[=true|false]                disable colorize output
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
+  -V, --verbose[=true|false]                 verbose output
 ```
 
 ### SEE ALSO

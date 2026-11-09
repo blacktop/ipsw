@@ -17,21 +17,21 @@ ipsw kernel extract <KERNELCACHE> <KEXT> [flags]
 ### Options
 
 ```
-  -a, --all             Extract all KEXTs
-  -e, --arch string     Which architecture to use for fat/universal MachO
-      --force           Overwrite existing extracted KEXT(s)
-  -h, --help            help for extract
-      --imports         Resolve imported symbol names from kernelcache
-  -o, --output string   Directory to extract KEXTs to
+  -a, --all[=true|false]       Extract all KEXTs
+  -e, --arch string            Which architecture to use for fat/universal MachO
+      --force[=true|false]     Overwrite existing extracted KEXT(s)
+  -h, --help[=true|false]      help for extract
+      --imports[=true|false]   Resolve imported symbol names from kernelcache
+  -o, --output string          Directory to extract KEXTs to
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

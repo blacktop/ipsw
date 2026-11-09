@@ -17,19 +17,19 @@ ipsw idev noti [flags]
 ### Options
 
 ```
-  -a, --all                   observe all notifications
-  -h, --help                  help for noti
+  -a, --all[=true|false]      observe all notifications
+  -h, --help[=true|false]     help for noti
   -n, --notification string   notification to observe
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -u, --udid string     Device UniqueDeviceID to connect to
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -u, --udid string             Device UniqueDeviceID to connect to
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

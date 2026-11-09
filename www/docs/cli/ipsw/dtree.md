@@ -17,25 +17,25 @@ ipsw dtree <IPSW/OTA/DeviceTree> [flags]
 ### Options
 
 ```
-  -y, --confirm          Skip confirmation prompt for OTA downloads
-  -f, --filter string    Filter DeviceTree to parse (if multiple i.e. macOS)
-  -h, --help             help for dtree
-      --insecure         do not verify ssl certs
-  -j, --json             Output to stdout as JSON
-      --key-db string    Path to AEA keys JSON database (auto-lookup by filename)
-      --key-val string   Base64 encoded AEA symmetric encryption key
-      --proxy string     HTTP/HTTPS proxy
-  -r, --remote           Extract from URL
-  -s, --summary          Output summary only
+  -y, --confirm[=true|false]    Skip confirmation prompt for OTA downloads
+  -f, --filter string           Filter DeviceTree to parse (if multiple i.e. macOS)
+  -h, --help[=true|false]       help for dtree
+      --insecure[=true|false]   do not verify ssl certs
+  -j, --json[=true|false]       Output to stdout as JSON
+      --key-db string           Path to AEA keys JSON database (auto-lookup by filename)
+      --key-val string          Base64 encoded AEA symmetric encryption key
+      --proxy string            HTTP/HTTPS proxy
+  -r, --remote[=true|false]     Extract from URL
+  -s, --summary[=true|false]    Output summary only
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -17,19 +17,19 @@ ipsw dyld softlinks <DSC> [flags]
 ### Options
 
 ```
-      --filter string   Regex filter for softlink symbol/helper names
-  -O, --format string   Output format: tsv, jsonl (default "tsv")
-  -h, --help            help for softlinks
-      --image string    Image path/name in the DSC
+      --filter string       Regex filter for softlink symbol/helper names
+  -O, --format string       Output format: tsv, jsonl (default "tsv")
+  -h, --help[=true|false]   help for softlinks
+      --image string        Image path/name in the DSC
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -26,18 +26,18 @@ ipsw device-list [flags]
 ### Options
 
 ```
-  -h, --help    help for device-list
-  -j, --json    Output as JSON
-  -p, --plain   Output as non-interactive table
+  -h, --help[=true|false]    help for device-list
+  -j, --json[=true|false]    Output as JSON
+  -p, --plain[=true|false]   Output as non-interactive table
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

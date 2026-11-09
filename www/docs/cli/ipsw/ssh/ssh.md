@@ -17,22 +17,22 @@ ipsw ssh [flags]
 ### Options
 
 ```
-  -h, --help              help for ssh
-  -t, --host string       ssh host (default "localhost")
-  -n, --insecure          ignore known_hosts
-  -i, --key string        ssh key (e.g. ~/.ssh/id_rsa)
-  -s, --password string   ssh password (default "alpine")
-  -p, --port string       ssh port (default "2222")
-  -u, --user string       ssh user (default "root")
+  -h, --help[=true|false]       help for ssh
+  -t, --host string             ssh host (default "localhost")
+  -n, --insecure[=true|false]   ignore known_hosts
+  -i, --key string              ssh key (e.g. ~/.ssh/id_rsa)
+  -s, --password string         ssh password (default "alpine")
+  -p, --port string             ssh port (default "2222")
+  -u, --user string             ssh user (default "root")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

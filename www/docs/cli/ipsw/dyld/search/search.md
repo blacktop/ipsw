@@ -17,10 +17,10 @@ ipsw dyld search <DSC> [flags]
 ### Options
 
 ```
-  -h, --help                  help for search
+  -h, --help[=true|false]     help for search
   -i, --import string         Search for specific import regex
   -l, --load-command string   Search for specific load command regex
-      --mte                   Search for dylibs with MTE (Memory Tagging Extension) instructions
+      --mte[=true|false]      Search for dylibs with MTE (Memory Tagging Extension) instructions
   -x, --section string        Search for specific section regex
   -u, --uuid string           Search for dylib by UUID
 ```
@@ -28,10 +28,10 @@ ipsw dyld search <DSC> [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

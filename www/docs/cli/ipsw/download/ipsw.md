@@ -34,50 +34,50 @@ ipsw download ipsw [flags]
 ### Options
 
 ```
-      --black-list stringArray   iOS device black list
-  -b, --build string             iOS BuildID (i.e. 16F203)
-  -y, --confirm                  do not prompt user for confirmation
-      --decrypt                  Attempt to decrypt the partial files if keys are available
-  -d, --device string            iOS Device (i.e. iPhone11,2)
-      --dyld                     Extract dyld_shared_cache(s) from remote IPSW
-  -a, --dyld-arch stringArray    dyld_shared_cache architecture(s) to remote extract
-      --extract-device string    Product type or board for partial extraction (does not filter the download feed)
-      --fcs-keys                 Download AEA1 DMG fcs-key pem files
-      --fcs-keys-json            Download AEA1 DMG fcs-keys as JSON
-  -f, --flat                     Do NOT preserve directory structure when downloading with --pattern
-  -h, --help                     help for ipsw
-      --ibridge                  Download iBridge IPSWs
-      --ignore-sha1              skip checksum verification
-      --insecure                 do not verify ssl certs
-      --kernel                   Extract kernelcache from remote IPSW
-      --latest                   Download latest IPSWs
-      --macos                    Download macOS IPSWs
-  -m, --model string             iOS Model (i.e. D321AP)
-  -o, --output string            Folder to download files to
-      --pattern string           Download remote files that match regex
-      --proxy string             HTTP/HTTPS proxy
-  -_, --remove-commas            replace commas in IPSW filename with underscores
-      --restart-all              always restart resumable IPSWs
-      --show-latest-build        Show latest iOS build
-      --show-latest-version      Show latest iOS version
-      --skip-all                 continue past files locked by another download process
-  -u, --urls                     Dump URLs only
-      --usb                      Download IPSWs for USB attached iDevices
-  -v, --version string           iOS Version (i.e. 12.3.1)
-      --white-list stringArray   iOS device white list
+      --black-list stringArray             iOS device black list
+  -b, --build string                       iOS BuildID (i.e. 16F203)
+  -y, --confirm[=true|false]               do not prompt user for confirmation
+      --decrypt[=true|false]               Attempt to decrypt the partial files if keys are available
+  -d, --device string                      iOS Device (i.e. iPhone11,2)
+      --dyld[=true|false]                  Extract dyld_shared_cache(s) from remote IPSW
+  -a, --dyld-arch stringArray              dyld_shared_cache architecture(s) to remote extract
+      --extract-device string              Product type or board for partial extraction (does not filter the download feed)
+      --fcs-keys[=true|false]              Download AEA1 DMG fcs-key pem files
+      --fcs-keys-json[=true|false]         Download AEA1 DMG fcs-keys as JSON
+  -f, --flat[=true|false]                  Do NOT preserve directory structure when downloading with --pattern
+  -h, --help[=true|false]                  help for ipsw
+      --ibridge[=true|false]               Download iBridge IPSWs
+      --ignore-sha1[=true|false]           skip checksum verification
+      --insecure[=true|false]              do not verify ssl certs
+      --kernel[=true|false]                Extract kernelcache from remote IPSW
+      --latest[=true|false]                Download latest IPSWs
+      --macos[=true|false]                 Download macOS IPSWs
+  -m, --model string                       iOS Model (i.e. D321AP)
+  -o, --output string                      Folder to download files to
+      --pattern string                     Download remote files that match regex
+      --proxy string                       HTTP/HTTPS proxy
+  -_, --remove-commas[=true|false]         replace commas in IPSW filename with underscores
+      --restart-all[=true|false]           always restart resumable IPSWs
+      --show-latest-build[=true|false]     Show latest iOS build
+      --show-latest-version[=true|false]   Show latest iOS version
+      --skip-all[=true|false]              continue past files locked by another download process
+  -u, --urls[=true|false]                  Dump URLs only
+      --usb[=true|false]                   Download IPSWs for USB attached iDevices
+  -v, --version string                     iOS Version (i.e. 12.3.1)
+      --white-list stringArray             iOS device white list
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
-      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --no-color                disable colorize output
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
-  -V, --verbose                 verbose output
+      --color[=true|false]                   colorize output
+      --config string                        config file (default is $HOME/.config/ipsw/config.yaml)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --no-color[=true|false]                disable colorize output
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
+  -V, --verbose[=true|false]                 verbose output
 ```
 
 ### SEE ALSO

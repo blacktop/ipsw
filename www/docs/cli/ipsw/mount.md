@@ -53,23 +53,23 @@ $ ipsw mount fs iPhone.ipsw --detach
 ### Options
 
 ```
-  -d, --detach               Mount without blocking (leave mounted in background)
-      --device string        Device product type or board to mount (e.g. Mac18,5 or j873gap)
-  -h, --help                 help for mount
-      --ident string         Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
-  -k, --key string           DMG key
-      --lookup               Lookup DMG keys on theapplewiki.com
-  -m, --mount-point string   Mount point (default: unique dir under /tmp; explicit paths must not be shared concurrently)
-      --pem-db string        AEA pem DB JSON file
+  -d, --detach[=true|false]   Mount without blocking (leave mounted in background)
+      --device string         Device product type or board to mount (e.g. Mac18,5 or j873gap)
+  -h, --help[=true|false]     help for mount
+      --ident string          Identity Variant to select specific RestoreRamDisk (e.g. 'Erase', 'Upgrade', 'Recovery')
+  -k, --key string            DMG key
+      --lookup[=true|false]   Lookup DMG keys on theapplewiki.com
+  -m, --mount-point string    Mount point (default: unique dir under /tmp; explicit paths must not be shared concurrently)
+      --pem-db string         AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

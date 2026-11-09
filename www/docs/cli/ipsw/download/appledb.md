@@ -54,52 +54,52 @@ ipsw download appledb [flags]
 ### Options
 
 ```
-  -a, --api                   Use Github API
-      --api-token string      Github API Token
-      --beta                  Download beta IPSWs
-  -b, --build string          iOS BuildID (i.e. 16F203)
-  -y, --confirm               do not prompt user for confirmation
-      --deltas                Download all OTA deltas
-  -d, --device string         iOS Device (i.e. iPhone11,2)
-      --dyld                  Extract dyld_shared_cache(s) from remote OTA
-      --fcs-keys              Download AEA1 DMG fcs-key pem files
-      --fcs-keys-json         Download AEA1 DMG fcs-keys as JSON
-  -f, --flat                  Do NOT preserve directory structure when downloading with --pattern
-  -h, --help                  help for appledb
-      --ignore-sha1           skip checksum verification
-      --insecure              do not verify ssl certs
-  -j, --json                  Dump a versioned release envelope as JSON
-      --kernel                Extract kernelcache from remote IPSW
-      --latest                Download latest IPSWs
-      --no-update             Do NOT git clone/pull local AppleDB (query existing checkout)
-      --os stringArray        Operating system to download (audioOS, bridgeOS, iOS, iPadOS, iPodOS, macOS, tvOS, watchOS, visionOS)
-  -o, --output string         Folder to download files to
-      --pattern string        Download remote files that match regex
-  -p, --prereq-build string   OTA prerequisite build
-      --proxy string          HTTP/HTTPS proxy
-      --rc                    Download RC (release candidate) IPSWs
-      --release               Download release IPSWs
-  -_, --remove-commas         replace commas in IPSW filename with underscores
-      --restart-all           always restart resumable IPSWs
-      --show-latest           Show latest version/build
-      --skip-all              continue past files locked by another download process
-      --type string           FW type to download (ipsw, ota, rsr) (default "ipsw")
-  -u, --urls                  Dump URLs only
-      --usb                   Download IPSWs for USB attached iDevices
-  -v, --version string        iOS Version (i.e. 12.3.1)
+  -a, --api[=true|false]             Use Github API
+      --api-token string             Github API Token
+      --beta[=true|false]            Download beta IPSWs
+  -b, --build string                 iOS BuildID (i.e. 16F203)
+  -y, --confirm[=true|false]         do not prompt user for confirmation
+      --deltas[=true|false]          Download all OTA deltas
+  -d, --device string                iOS Device (i.e. iPhone11,2)
+      --dyld[=true|false]            Extract dyld_shared_cache(s) from remote OTA
+      --fcs-keys[=true|false]        Download AEA1 DMG fcs-key pem files
+      --fcs-keys-json[=true|false]   Download AEA1 DMG fcs-keys as JSON
+  -f, --flat[=true|false]            Do NOT preserve directory structure when downloading with --pattern
+  -h, --help[=true|false]            help for appledb
+      --ignore-sha1[=true|false]     skip checksum verification
+      --insecure[=true|false]        do not verify ssl certs
+  -j, --json[=true|false]            Dump a versioned release envelope as JSON
+      --kernel[=true|false]          Extract kernelcache from remote IPSW
+      --latest[=true|false]          Download latest IPSWs
+      --no-update[=true|false]       Do NOT git clone/pull local AppleDB (query existing checkout)
+      --os stringArray               Operating system to download (audioOS, bridgeOS, iOS, iPadOS, iPodOS, macOS, tvOS, watchOS, visionOS)
+  -o, --output string                Folder to download files to
+      --pattern string               Download remote files that match regex
+  -p, --prereq-build string          OTA prerequisite build
+      --proxy string                 HTTP/HTTPS proxy
+      --rc[=true|false]              Download RC (release candidate) IPSWs
+      --release[=true|false]         Download release IPSWs
+  -_, --remove-commas[=true|false]   replace commas in IPSW filename with underscores
+      --restart-all[=true|false]     always restart resumable IPSWs
+      --show-latest[=true|false]     Show latest version/build
+      --skip-all[=true|false]        continue past files locked by another download process
+      --type string                  FW type to download (ipsw, ota, rsr) (default "ipsw")
+  -u, --urls[=true|false]            Dump URLs only
+      --usb[=true|false]             Download IPSWs for USB attached iDevices
+  -v, --version string               iOS Version (i.e. 12.3.1)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
-      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --no-color                disable colorize output
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
-  -V, --verbose                 verbose output
+      --color[=true|false]                   colorize output
+      --config string                        config file (default is $HOME/.config/ipsw/config.yaml)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --no-color[=true|false]                disable colorize output
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
+  -V, --verbose[=true|false]                 verbose output
 ```
 
 ### SEE ALSO

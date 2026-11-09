@@ -17,21 +17,21 @@ ipsw dyld imports <DSC> [DYLIB] [flags]
 ### Options
 
 ```
-      --device string   Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)
-      --filter string   Regex filter for printed import/importer rows
-  -h, --help            help for imports
-      --image string    List imported bind symbols for this image instead of reverse importers
-  -i, --ipsw string     Path to IPSW to scan for MachO files that import dylib
-      --pem-db string   AEA pem DB JSON file
+      --device string       Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)
+      --filter string       Regex filter for printed import/importer rows
+  -h, --help[=true|false]   help for imports
+      --image string        List imported bind symbols for this image instead of reverse importers
+  -i, --ipsw string         Path to IPSW to scan for MachO files that import dylib
+      --pem-db string       AEA pem DB JSON file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

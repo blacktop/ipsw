@@ -59,38 +59,38 @@ $ ipsw car Assets.car --raw --output original
 ### Options
 
 ```
-      --appearance string          Match the exact numeric appearance key
-      --apply-orientation          Apply EXIF rotation or mirroring to PNG exports
-      --astc-decoder string        Path to astcenc for ASTC decoding
-      --block-profile string       Write block profile to file
-      --cpu-profile string         Write CPU profile to file
-      --dry-run                    Preview export destinations without decoding or extracting assets
-      --gamut string               Match the exact numeric display-gamut key
-      --goroutine-profile string   Write goroutine profile to file
-  -h, --help                       help for car
-      --idiom string               Match the exact idiom key (0=universal, 1=phone, 2=pad, 3=desktop)
-  -j, --json                       Output the selected inventory as JSON
-      --localization string        Match the exact numeric localization key
-      --manifest string            Write an export manifest to a new file, or '-' for stdout
-      --mem-profile string         Write memory profile to file
-      --mem-profile-rate int       Memory profiling rate (0 to disable)
-      --metadata-only              Inspect catalog metadata without decoding pixels
-      --mutex-profile string       Write mutex profile to file
-      --name stringArray           Match a logical or rendition name glob (repeatable)
-  -o, --output string              Output folder to extract renditions
-      --raw                        Export complete encoded CSI renditions instead of converted assets
-      --render                     Render HEIF, PDF, and SVG payloads as PNG
-      --scale string               Match the exact scale key (1, 2, 3)
-      --trace string               Write execution trace to file
+      --appearance string                Match the exact numeric appearance key
+      --apply-orientation[=true|false]   Apply EXIF rotation or mirroring to PNG exports
+      --astc-decoder string              Path to astcenc for ASTC decoding
+      --block-profile string             Write block profile to file
+      --cpu-profile string               Write CPU profile to file
+      --dry-run[=true|false]             Preview export destinations without decoding or extracting assets
+      --gamut string                     Match the exact numeric display-gamut key
+      --goroutine-profile string         Write goroutine profile to file
+  -h, --help[=true|false]                help for car
+      --idiom string                     Match the exact idiom key (0=universal, 1=phone, 2=pad, 3=desktop)
+  -j, --json[=true|false]                Output the selected inventory as JSON
+      --localization string              Match the exact numeric localization key
+      --manifest string                  Write an export manifest to a new file, or '-' for stdout
+      --mem-profile string               Write memory profile to file
+      --mem-profile-rate int             Memory profiling rate (0 to disable)
+      --metadata-only[=true|false]       Inspect catalog metadata without decoding pixels
+      --mutex-profile string             Write mutex profile to file
+      --name stringArray                 Match a logical or rendition name glob (repeatable)
+  -o, --output string                    Output folder to extract renditions
+      --raw[=true|false]                 Export complete encoded CSI renditions instead of converted assets
+      --render[=true|false]              Render HEIF, PDF, and SVG payloads as PNG
+      --scale string                     Match the exact scale key (1, 2, 3)
+      --trace string                     Write execution trace to file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -17,25 +17,25 @@ ipsw macho dump <macho> <address> [flags]
 ### Options
 
 ```
-  -v, --addr             Output as addresses/uint64s
-  -a, --arch string      Which architecture to use for fat/universal MachO
-  -b, --bytes            Output as bytes
-  -c, --count uint       The number of total items to display
-  -e, --entry string     Dump from fileset entry (requires --section)
-  -h, --help             help for dump
-  -o, --output string    Output to a file
-  -x, --section string   Dump a specific segment/section (i.e. __TEXT.__text)
-  -g, --segment string   Dump a specific segment (i.e. __TEXT)
-  -s, --size uint        Size of data in bytes
+  -v, --addr[=true|false]    Output as addresses/uint64s
+  -a, --arch string          Which architecture to use for fat/universal MachO
+  -b, --bytes[=true|false]   Output as bytes
+  -c, --count uint           The number of total items to display
+  -e, --entry string         Dump from fileset entry (requires --section)
+  -h, --help[=true|false]    help for dump
+  -o, --output string        Output to a file
+  -x, --section string       Dump a specific segment/section (i.e. __TEXT.__text)
+  -g, --segment string       Dump a specific segment (i.e. __TEXT)
+  -s, --size uint            Size of data in bytes
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

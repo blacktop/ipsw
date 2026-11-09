@@ -17,20 +17,20 @@ ipsw appstore [flags]
 ### Options
 
 ```
-  -h, --help         help for appstore
-  -i, --iss string   Issuer ID
-  -j, --jwt string   JWT api key
-  -k, --kid string   Key ID
-  -p, --p8 string    Path to App Store Connect API Key (.p8)
+  -h, --help[=true|false]   help for appstore
+  -i, --iss string          Issuer ID
+  -j, --jwt string          JWT api key
+  -k, --kid string          Key ID
+  -p, --p8 string           Path to App Store Connect API Key (.p8)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

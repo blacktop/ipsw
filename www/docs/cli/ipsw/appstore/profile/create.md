@@ -17,26 +17,26 @@ ipsw appstore profile create <NAME> [flags]
 ### Options
 
 ```
-  -b, --bundle-id string   Board ID
-  -c, --certs strings      Certificate IDs
-  -d, --devices strings    Device IDs
-  -h, --help               help for create
-      --offline            Enable profile with 'Offline Support' (7 day validity)
-  -o, --output string      Folder to download profile to
-  -t, --type string        Profile type (default "IOS_APP_DEVELOPMENT")
+  -b, --bundle-id string       Board ID
+  -c, --certs strings          Certificate IDs
+  -d, --devices strings        Device IDs
+  -h, --help[=true|false]      help for create
+      --offline[=true|false]   Enable profile with 'Offline Support' (7 day validity)
+  -o, --output string          Folder to download profile to
+  -t, --type string            Profile type (default "IOS_APP_DEVELOPMENT")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-  -i, --iss string      Issuer ID
-  -j, --jwt string      JWT api key
-  -k, --kid string      Key ID
-      --no-color        disable colorize output
-  -p, --p8 string       Path to App Store Connect API Key (.p8)
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+  -i, --iss string              Issuer ID
+  -j, --jwt string              JWT api key
+  -k, --kid string              Key ID
+      --no-color[=true|false]   disable colorize output
+  -p, --p8 string               Path to App Store Connect API Key (.p8)
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -17,17 +17,17 @@ ipsw kernel mach [flags]
 ### Options
 
 ```
-  -a, --arch string   Which architecture to use for fat/universal MachO
-  -h, --help          help for mach
+  -a, --arch string         Which architecture to use for fat/universal MachO
+  -h, --help[=true|false]   help for mach
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

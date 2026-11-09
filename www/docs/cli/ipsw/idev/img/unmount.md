@@ -17,7 +17,7 @@ ipsw idev img unmount [flags]
 ### Options
 
 ```
-  -h, --help                 help for unmount
+  -h, --help[=true|false]    help for unmount
   -t, --image-type string    Image type to unmount (i.e. 'Developer')
   -m, --mount-point string   Path to mount point (i.e. '/Developer')
 ```
@@ -25,11 +25,11 @@ ipsw idev img unmount [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -u, --udid string     Device UniqueDeviceID to connect to
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -u, --udid string             Device UniqueDeviceID to connect to
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

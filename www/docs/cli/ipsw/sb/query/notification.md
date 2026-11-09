@@ -17,22 +17,22 @@ ipsw sb query notification <TARGET> [KERNELCACHE] [flags]
 ### Options
 
 ```
-  -h, --help   help for notification
+  -h, --help[=true|false]   help for notification
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
+      --color[=true|false]      colorize output
       --config string           config file (default is $HOME/.config/ipsw/config.yaml)
       --darwin-version string   Darwin version when using --operations without a kernelcache
       --graph string            Use a previously exported graph file instead of building from live sandbox inputs
   -i, --input string            Input sandbox profile binary file
-      --no-color                disable colorize output
+      --no-color[=true|false]   disable colorize output
   -o, --operations string       Input operations list file (one operation per line)
   -O, --output string           Output format: pretty, table, or json (default "pretty")
-      --profile                 Build graph from a compiled sandbox profile instead of the builtin collection
-  -V, --verbose                 verbose output
+      --profile[=true|false]    Build graph from a compiled sandbox profile instead of the builtin collection
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

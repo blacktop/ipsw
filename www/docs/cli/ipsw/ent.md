@@ -58,13 +58,13 @@ ipsw ent [IPSW] [flags]
 
 ```
       --device string             Device product type or board for IPSW selection (e.g. Mac18,5 or j873gap)
-      --dry-run                   Show what would be replaced without making changes
+      --dry-run[=true|false]      Show what would be replaced without making changes
   -f, --file string               Search for file path pattern
-      --file-only                 Only output file paths
+      --file-only[=true|false]    Only output file paths
       --format string             Output format for --fs: text, tsv, jsonl (default "text")
-      --fs                        Search IPSW filesystem Mach-Os directly instead of a database
+      --fs[=true|false]           Search IPSW filesystem Mach-Os directly instead of a database
       --has strings               Require entitlement key(s); comma-separated values are supported
-  -h, --help                      help for ent
+  -h, --help[=true|false]         help for ent
       --input stringArray         Folders of MachOs to analyze
       --ipsw stringArray          IPSWs to process
   -k, --key string                Search for entitlement key pattern
@@ -77,10 +77,10 @@ ipsw ent [IPSW] [flags]
       --pg-port string            PostgreSQL port (default "5432")
       --pg-sslmode string         PostgreSQL SSL mode (disable, require, verify-ca, verify-full) (default "require")
       --pg-user string            PostgreSQL user
-      --replace                   Replace older builds of the same iOS version with newer builds
+      --replace[=true|false]      Replace older builds of the same iOS version with newer builds
       --replace-strategy string   Replacement strategy: auto, prompt, force (default "auto")
       --sqlite string             Path to SQLite database
-      --stats                     Show database statistics
+      --stats[=true|false]        Show database statistics
   -v, --value string              Search for entitlement value pattern
       --version string            Filter by iOS version
       --without strings           Exclude entitlement key(s); comma-separated values are supported
@@ -89,10 +89,10 @@ ipsw ent [IPSW] [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

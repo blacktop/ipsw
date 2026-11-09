@@ -36,15 +36,15 @@ ipsw ota extract <OTA> [FILENAME] [flags]
 ### Options
 
 ```
-  -y, --confirm                 Skip prompt and search payloadv2 files (requires --pattern or --dyld)
+  -y, --confirm[=true|false]    Skip prompt and search payloadv2 files (requires --pattern or --dyld)
   -c, --cryptex string          Extract cryptex as DMG (requires full OTA)
-  -x, --decomp                  Decompress pbzx files
-  -d, --dyld                    Extract dyld_shared_cache files
+  -x, --decomp[=true|false]     Decompress pbzx files
+  -d, --dyld[=true|false]       Extract dyld_shared_cache files
   -a, --dyld-arch stringArray   dyld_shared_cache architecture(s) to extract (requires --dyld)
-  -f, --flat                    Do NOT preserve directory structure when extracting
-  -h, --help                    help for extract
-  -j, --json                    Output a single JSON dyld_shared_cache extraction report to stdout (requires --dyld)
-  -k, --kernel                  Extract kernelcache
+  -f, --flat[=true|false]       Do NOT preserve directory structure when extracting
+  -h, --help[=true|false]       help for extract
+  -j, --json[=true|false]       Output a single JSON dyld_shared_cache extraction report to stdout (requires --dyld)
+  -k, --kernel[=true|false]     Extract kernelcache
   -o, --output string           Output folder
   -p, --pattern string          Regex pattern to match files
   -r, --range string            Regex pattern to limit payloadv2 files searched (requires --pattern or --dyld)
@@ -53,13 +53,13 @@ ipsw ota extract <OTA> [FILENAME] [flags]
 ### Options inherited from parent commands
 
 ```
-      --color            colorize output
-      --config string    config file (default is $HOME/.config/ipsw/config.yaml)
-      --insecure         Allow insecure connections when fetching AEA keys
-      --key-db string    Path to AEA keys JSON database (auto-lookup by filename)
-      --key-val string   Base64 encoded AEA symmetric encryption key
-      --no-color         disable colorize output
-  -V, --verbose          verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --insecure[=true|false]   Allow insecure connections when fetching AEA keys
+      --key-db string           Path to AEA keys JSON database (auto-lookup by filename)
+      --key-val string          Base64 encoded AEA symmetric encryption key
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

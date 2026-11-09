@@ -30,17 +30,17 @@ ipsw sb opts <KERNELCACHE> [flags]
 ### Options
 
 ```
-  -d, --diff   Diff two kernel's sandbox operations
-  -h, --help   help for opts
+  -d, --diff[=true|false]   Diff two kernel's sandbox operations
+  -h, --help[=true|false]   help for opts
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

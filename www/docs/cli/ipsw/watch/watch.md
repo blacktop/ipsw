@@ -43,33 +43,33 @@ ipsw watch <ORG/REPO> [flags]
       --cache string                    Cache file to store seen commits/tags
   -c, --command string                  Command to run on new commit
   -d, --days int                        Days back to search for commits (default 1)
-      --discord                         Announce to Discord
+      --discord[=true|false]            Announce to Discord
       --discord-icon string             Discord Post Icon URL
       --discord-id string               Discord Webhook ID
       --discord-token string            Discord Webhook Token
   -f, --file string                     Commit file path to watch
       --func string                     Function name to watch (for local repos)
-  -h, --help                            help for watch
-      --json                            Output downloadable tar.gz URLs as JSON
-      --mastodon                        Annouce to Mastodon
+  -h, --help[=true|false]               help for watch
+      --json[=true|false]               Output downloadable tar.gz URLs as JSON
+      --mastodon[=true|false]           Annouce to Mastodon
       --mastodon-access-token string    Mastodon Access Token
       --mastodon-client-id string       Mastodon Client ID
       --mastodon-client-secret string   Mastodon Client Secret
       --mastodon-server string          Mastodon Server URL (default "https://mastodon.social")
   -p, --pattern string                  Commit message pattern to match
-      --post                            Create social media post for NEW tags
+      --post[=true|false]               Create social media post for NEW tags
       --ssh-key string                  SSH private key for git operations
-  -g, --tags                            Watch for new tags
+  -g, --tags[=true|false]               Watch for new tags
   -t, --timeout duration                Timeout for watch attempts (default: 0s = no timeout/run once)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

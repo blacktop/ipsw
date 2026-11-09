@@ -28,24 +28,24 @@ ipsw kernel dwarf <dSYM> [dSYM] [flags]
 ### Options
 
 ```
-      --all           Dump all types
-  -d, --diff          Diff two structs
-      --enums         Dump all enums
-  -h, --help          help for dwarf
-  -m, --md            Markdown diff output
-  -n, --name string   Name to lookup
-      --no-off        Do NOT display struct field offsets in output
-      --structs       Dump all structs
-  -t, --type string   Type to lookup
+      --all[=true|false]       Dump all types
+  -d, --diff[=true|false]      Diff two structs
+      --enums[=true|false]     Dump all enums
+  -h, --help[=true|false]      help for dwarf
+  -m, --md[=true|false]        Markdown diff output
+  -n, --name string            Name to lookup
+      --no-off[=true|false]    Do NOT display struct field offsets in output
+      --structs[=true|false]   Dump all structs
+  -t, --type string            Type to lookup
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

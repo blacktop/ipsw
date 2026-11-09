@@ -17,20 +17,20 @@ ipsw dyld slide <DSC> [flags]
 ### Options
 
 ```
-  -a, --auth            Print only slide info for mappings with auth flags
-  -c, --cache string    path to addr to sym cache file
-  -h, --help            help for slide
-      --json            Output as JSONL
-  -o, --output string   folder to save JSONL output
+  -a, --auth[=true|false]   Print only slide info for mappings with auth flags
+  -c, --cache string        path to addr to sym cache file
+  -h, --help[=true|false]   help for slide
+      --json[=true|false]   Output as JSONL
+  -o, --output string       folder to save JSONL output
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

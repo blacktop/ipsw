@@ -43,7 +43,7 @@ ipsw sb list [KERNELCACHE] [flags]
 ```
       --darwin-version string   Darwin version (required when operations list is provided without kernelcache)
   -f, --format string           Output format: auto, names, table, or json (default "auto")
-  -h, --help                    help for list
+  -h, --help[=true|false]       help for list
   -i, --input string            Input sandbox profile binary file
   -o, --operations string       Input operations list file (one operation per line)
       --type string             Sandbox source type: collection, protobox, profile, or all (default "collection")
@@ -52,10 +52,10 @@ ipsw sb list [KERNELCACHE] [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

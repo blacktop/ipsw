@@ -46,26 +46,26 @@ ipsw img4 im4p extract <IM4P> [flags]
 ### Options
 
 ```
-  -e, --extra                  Extract extra data
-  -h, --help                   help for extract
+  -e, --extra[=true|false]     Extract extra data
+  -h, --help[=true|false]      help for extract
   -i, --iv string              AES iv for decryption
       --iv-key string          AES iv+key for decryption
-  -b, --kbag                   Extract keybags as JSON
+  -b, --kbag[=true|false]      Extract keybags as JSON
   -k, --key string             AES key for decryption
-      --lookup                 Auto-lookup IV/key on theapplewiki.com
+      --lookup[=true|false]    Auto-lookup IV/key on theapplewiki.com
       --lookup-build string    Build number for key lookup (e.g., 20H71)
       --lookup-device string   Device identifier for key lookup (e.g., iPhone14,2)
   -o, --output string          Output file path
-  -r, --raw                    Extract raw data (compressed/encrypted)
+  -r, --raw[=true|false]       Extract raw data (compressed/encrypted)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -50,7 +50,7 @@ ipsw img4 create [flags]
   -g, --boot-nonce string   Boot nonce to set in Img4 restore info
   -c, --compress string     IM4P compression to use (none, lzss, lzfse, lzfse_iboot) (default "none")
   -e, --extra string        Extra IM4P payload data to set
-  -h, --help                help for create
+  -h, --help[=true|false]   help for create
   -m, --im4m string         Input Img4 manifest file
   -p, --im4p string         Input Img4 payload file
   -r, --im4r string         Input Img4 restore info file
@@ -63,10 +63,10 @@ ipsw img4 create [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

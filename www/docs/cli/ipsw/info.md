@@ -17,22 +17,22 @@ ipsw info <IPSW> [flags]
 ### Options
 
 ```
-  -h, --help           help for info
-      --insecure       do not verify ssl certs
-  -j, --json           Output as JSON
-  -l, --list           List files in IPSW/OTA
-  -k, --lookup         Lookup DMG keys on theapplewiki.com
-      --proxy string   HTTP/HTTPS proxy
-  -r, --remote         Extract from URL
+  -h, --help[=true|false]       help for info
+      --insecure[=true|false]   do not verify ssl certs
+  -j, --json[=true|false]       Output as JSON
+  -l, --list[=true|false]       List files in IPSW/OTA
+  -k, --lookup[=true|false]     Lookup DMG keys on theapplewiki.com
+      --proxy string            HTTP/HTTPS proxy
+  -r, --remote[=true|false]     Extract from URL
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

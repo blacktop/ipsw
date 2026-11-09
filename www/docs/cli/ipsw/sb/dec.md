@@ -46,24 +46,24 @@ ipsw sb dec [KERNELCACHE] [PROFILE] [flags]
 ### Options
 
 ```
-      --darwin-version string   Darwin version (required when operations list is provided without kernelcache)
-  -f, --format string           Output format: sbpl, sbasm, or json (default "sbpl")
-      --full-graph              Disable normalized-output node limit (may be slow)
-  -h, --help                    help for dec
-      --inline                  Inline parent-profile chain into a single SBPL document (SBPL only; requires PROFILE)
-  -i, --input string            Input sandbox profile binary file
-  -o, --operations string       Input operations list file (one operation per line)
-  -O, --output string           Output path for plain compileable SBPL
-      --type string             Sandbox source type: collection, protobox, or profile (default "collection")
+      --darwin-version string     Darwin version (required when operations list is provided without kernelcache)
+  -f, --format string             Output format: sbpl, sbasm, or json (default "sbpl")
+      --full-graph[=true|false]   Disable normalized-output node limit (may be slow)
+  -h, --help[=true|false]         help for dec
+      --inline[=true|false]       Inline parent-profile chain into a single SBPL document (SBPL only; requires PROFILE)
+  -i, --input string              Input sandbox profile binary file
+  -o, --operations string         Input operations list file (one operation per line)
+  -O, --output string             Output path for plain compileable SBPL
+      --type string               Sandbox source type: collection, protobox, or profile (default "collection")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

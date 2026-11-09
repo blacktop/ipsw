@@ -17,23 +17,23 @@ ipsw idev img ddi [flags]
 ### Options
 
 ```
-  -b, --backup          Backup DDI
-  -c, --clean           Clean DDI
-  -h, --help            help for ddi
-  -i, --info            Show DDI info
-  -o, --output string   Output directory
-  -s, --source string   Update DDI from source directory
-  -x, --xcode           Update DDI from Xcode
+  -b, --backup[=true|false]   Backup DDI
+  -c, --clean[=true|false]    Clean DDI
+  -h, --help[=true|false]     help for ddi
+  -i, --info[=true|false]     Show DDI info
+  -o, --output string         Output directory
+  -s, --source string         Update DDI from source directory
+  -x, --xcode[=true|false]    Update DDI from Xcode
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -u, --udid string     Device UniqueDeviceID to connect to
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -u, --udid string             Device UniqueDeviceID to connect to
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

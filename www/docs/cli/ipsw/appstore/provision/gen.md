@@ -24,28 +24,28 @@ ipsw appstore provision gen <BUNDLE_ID> [flags]
 ### Options
 
 ```
-  -c, --country string    Country code for certificate subject (e.g., US, GB) (default "US")
-      --csr               Create a NEW Certificate Signing Request
-  -e, --email string      Email address to use for the certificate
-  -h, --help              help for gen
-      --install           Install the certificate and profile
-      --keep-key          Keep private key files on disk after Keychain import
-  -o, --output string     Folder to save files to
-      --platform string   Target platform (ios, macos, tvos, catalyst) (default "ios")
-  -t, --type string       Type of profile to manage (development, adhoc, distribution) (default "development")
+  -c, --country string          Country code for certificate subject (e.g., US, GB) (default "US")
+      --csr[=true|false]        Create a NEW Certificate Signing Request
+  -e, --email string            Email address to use for the certificate
+  -h, --help[=true|false]       help for gen
+      --install[=true|false]    Install the certificate and profile
+      --keep-key[=true|false]   Keep private key files on disk after Keychain import
+  -o, --output string           Folder to save files to
+      --platform string         Target platform (ios, macos, tvos, catalyst) (default "ios")
+  -t, --type string             Type of profile to manage (development, adhoc, distribution) (default "development")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-  -i, --iss string      Issuer ID
-  -j, --jwt string      JWT api key
-  -k, --kid string      Key ID
-      --no-color        disable colorize output
-  -p, --p8 string       Path to App Store Connect API Key (.p8)
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+  -i, --iss string              Issuer ID
+  -j, --jwt string              JWT api key
+  -k, --kid string              Key ID
+      --no-color[=true|false]   disable colorize output
+  -p, --p8 string               Path to App Store Connect API Key (.p8)
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

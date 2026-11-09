@@ -40,28 +40,28 @@ ipsw download git [flags]
 ### Options
 
 ```
-  -a, --api string       GitHub token (falls back to GITHUB_TOKEN, then GITHUB_API_TOKEN)
-  -h, --help             help for git
-      --insecure         do not verify ssl certs
-      --json             Output downloadable tar.gz URLs as JSON
-      --latest           Get ONLY latest tag
-  -o, --output string    Folder to download files to
-  -p, --product string   macOS product to download (i.e. dyld)
-      --proxy string     HTTP/HTTPS proxy
-      --webkit           Get WebKit tags
+  -a, --api string              GitHub token (falls back to GITHUB_TOKEN, then GITHUB_API_TOKEN)
+  -h, --help[=true|false]       help for git
+      --insecure[=true|false]   do not verify ssl certs
+      --json[=true|false]       Output downloadable tar.gz URLs as JSON
+      --latest[=true|false]     Get ONLY latest tag
+  -o, --output string           Folder to download files to
+  -p, --product string          macOS product to download (i.e. dyld)
+      --proxy string            HTTP/HTTPS proxy
+      --webkit[=true|false]     Get WebKit tags
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
-      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --no-color                disable colorize output
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
-  -V, --verbose                 verbose output
+      --color[=true|false]                   colorize output
+      --config string                        config file (default is $HOME/.config/ipsw/config.yaml)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --no-color[=true|false]                disable colorize output
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
+  -V, --verbose[=true|false]                 verbose output
 ```
 
 ### SEE ALSO

@@ -28,30 +28,30 @@ ipsw swift-dump [<DSC> <DYLIB>|<MACHO>] [flags]
 ### Options
 
 ```
-      --all             Dump ALL dylbs from DSC
-      --arch string     Which architecture to use for fat/universal MachO
-  -a, --ass string      Dump associated type (regex)
-      --demangle        Demangle symbol names
-      --deps            Dump imported private frameworks as well
-      --diff string     Structurally diff Swift against another DSC/MachO (same DYLIB)
-  -e, --ext string      Dump extension (regex)
-      --extra           Dump all other Swift sections/info
-      --headers         Create separate header files for each Swift type/protocol/extension
-  -h, --help            help for swift-dump
-  -i, --interface       🚧 Dump Swift Interface
-  -o, --output string   🚧 Folder to write interface to
-  -p, --proto string    Dump protocol (regex)
-      --theme string    Color theme (nord, github, etc) (default "nord")
-  -y, --type string     Dump type (regex)
+      --all[=true|false]         Dump ALL dylbs from DSC
+      --arch string              Which architecture to use for fat/universal MachO
+  -a, --ass string               Dump associated type (regex)
+      --demangle[=true|false]    Demangle symbol names
+      --deps[=true|false]        Dump imported private frameworks as well
+      --diff string              Structurally diff Swift against another DSC/MachO (same DYLIB)
+  -e, --ext string               Dump extension (regex)
+      --extra[=true|false]       Dump all other Swift sections/info
+      --headers[=true|false]     Create separate header files for each Swift type/protocol/extension
+  -h, --help[=true|false]        help for swift-dump
+  -i, --interface[=true|false]   🚧 Dump Swift Interface
+  -o, --output string            🚧 Folder to write interface to
+  -p, --proto string             Dump protocol (regex)
+      --theme string             Color theme (nord, github, etc) (default "nord")
+  -y, --type string              Dump type (regex)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

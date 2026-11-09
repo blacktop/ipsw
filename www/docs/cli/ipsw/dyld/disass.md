@@ -42,26 +42,26 @@ ipsw dyld disass <DSC> [flags]
 ```
       --cache string                 Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint                   Number of instructions to disassemble
-  -D, --dec                          Decompile assembly
+  -D, --dec[=true|false]             Decompile assembly
       --dec-api-key-env string       Environment variable holding the OpenAI-compatible API key (defaults to OPENAI_API_KEY)
       --dec-base-url string          OpenAI-compatible API base URL (defaults to OPENAI_BASE_URL)
       --dec-lang string              Language to decompile to (C, ObjC or Swift)
       --dec-llm string               LLM provider to use for decompilation
       --dec-model string             LLM model to use for decompilation
-      --dec-nocache                  Do not use decompilation cache
+      --dec-nocache[=true|false]     Do not use decompilation cache
       --dec-retries int              Number of retries for LLM decompilation
       --dec-retry-backoff duration   Backoff time between retries (e.g. '30s', '2m') (default 30s)
       --dec-temp float               LLM temperature for decompilation (default 0.2)
       --dec-theme string             Decompilation color theme (nord, github, etc) (default "nord")
       --dec-top-p float              LLM top_p for decompilation (default 0.1)
-  -d, --demangle                     Demangle symbol names
-      --dylibs                       Analyze all dylibs loaded by the image as well (could improve accuracy)
-      --force                        Continue to disassemble even if there are analysis errors
-  -h, --help                         help for disass
+  -d, --demangle[=true|false]        Demangle symbol names
+      --dylibs[=true|false]          Analyze all dylibs loaded by the image as well (could improve accuracy)
+      --force[=true|false]           Continue to disassemble even if there are analysis errors
+  -h, --help[=true|false]            help for disass
   -i, --image strings                Dylib(s) to disassemble
       --input string                 Input function JSON file
-  -j, --json                         Output as JSON
-  -q, --quiet                        Do NOT markup analysis (Faster)
+  -j, --json[=true|false]            Output as JSON
+  -q, --quiet[=true|false]           Do NOT markup analysis (Faster)
   -s, --symbol string                Function to disassemble
       --symbol-image string          Dylib to search for symbol (speeds up symbol lookup)
   -a, --vaddr uint                   Virtual address to start disassembling
@@ -70,10 +70,10 @@ ipsw dyld disass <DSC> [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

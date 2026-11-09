@@ -17,18 +17,18 @@ ipsw comp <FILE> [flags]
 ### Options
 
 ```
-  -a, --algo string     Use a specific algorithm for compression
-  -h, --help            help for comp
-  -o, --output string   Output file path (for stdout use '-')
+  -a, --algo string         Use a specific algorithm for compression
+  -h, --help[=true|false]   help for comp
+  -o, --output string       Output file path (for stdout use '-')
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

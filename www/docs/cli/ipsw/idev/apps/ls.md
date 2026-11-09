@@ -17,21 +17,21 @@ ipsw idev apps ls [flags]
 ### Options
 
 ```
-  -h, --help     help for ls
-  -n, --hidden   List hidden apps
-  -j, --json     Display apps as JSON
-  -s, --system   List system apps
-  -r, --user     List user apps
+  -h, --help[=true|false]     help for ls
+  -n, --hidden[=true|false]   List hidden apps
+  -j, --json[=true|false]     Display apps as JSON
+  -s, --system[=true|false]   List system apps
+  -r, --user[=true|false]     List user apps
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -u, --udid string     Device UniqueDeviceID to connect to
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -u, --udid string             Device UniqueDeviceID to connect to
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

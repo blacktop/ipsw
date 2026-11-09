@@ -31,25 +31,25 @@ ipsw watch pcc [flags]
 ### Options
 
 ```
-  -h, --help                help for pcc
-      --insecure            Do not verify TLS certificates
-  -t, --interval duration   Polling interval (0 runs once) (default 5m0s)
-      --notify-initial      Notify for existing vphone600 releases when creating state
-      --proxy string        HTTP/HTTPS proxy
-      --state string        Path to durable PCC watcher state
+  -h, --help[=true|false]             help for pcc
+      --insecure[=true|false]         Do not verify TLS certificates
+  -t, --interval duration             Polling interval (0 runs once) (default 5m0s)
+      --notify-initial[=true|false]   Notify for existing vphone600 releases when creating state
+      --proxy string                  HTTP/HTTPS proxy
+      --state string                  Path to durable PCC watcher state
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                  colorize output
-      --config string          config file (default is $HOME/.config/ipsw/config.yaml)
-      --discord                Announce to Discord
-      --discord-icon string    Discord Post Icon URL
-      --discord-id string      Discord Webhook ID
-      --discord-token string   Discord Webhook Token
-      --no-color               disable colorize output
-  -V, --verbose                verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --discord[=true|false]    Announce to Discord
+      --discord-icon string     Discord Post Icon URL
+      --discord-id string       Discord Webhook ID
+      --discord-token string    Discord Webhook Token
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

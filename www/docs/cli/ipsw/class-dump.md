@@ -32,31 +32,31 @@ ipsw class-dump [<DSC> <DYLIB>|<MACHO>] [flags]
 ### Options
 
 ```
-      --all             Dump ALL dylbs from DSC
-      --arch string     Which architecture to use for fat/universal MachO
-  -a, --cat string      Dump category (regex)
-  -c, --class string    Dump class (regex)
-      --demangle        Demangle symbol names (same as verbose)
-      --deps            Dump imported private frameworks as well
-      --diff string     Structurally diff ObjC against another DSC/MachO (same DYLIB)
-      --headers         Dump ObjC headers
-  -h, --help            help for class-dump
-  -o, --output string   Folder to write headers to
-  -p, --proto string    Dump protocol (regex)
-      --re              RE verbosity (with addresses)
-      --refs            Dump ObjC references too
-  -s, --spm             🚧 Generate a Swift Package for the dylib
-      --theme string    Color theme (nord, github, etc) (default "nord")
-  -x, --xcfw            🚧 Generate a XCFramework for the dylib
+      --all[=true|false]        Dump ALL dylbs from DSC
+      --arch string             Which architecture to use for fat/universal MachO
+  -a, --cat string              Dump category (regex)
+  -c, --class string            Dump class (regex)
+      --demangle[=true|false]   Demangle symbol names (same as verbose)
+      --deps[=true|false]       Dump imported private frameworks as well
+      --diff string             Structurally diff ObjC against another DSC/MachO (same DYLIB)
+      --headers[=true|false]    Dump ObjC headers
+  -h, --help[=true|false]       help for class-dump
+  -o, --output string           Folder to write headers to
+  -p, --proto string            Dump protocol (regex)
+      --re[=true|false]         RE verbosity (with addresses)
+      --refs[=true|false]       Dump ObjC references too
+  -s, --spm[=true|false]        🚧 Generate a Swift Package for the dylib
+      --theme string            Color theme (nord, github, etc) (default "nord")
+  -x, --xcfw[=true|false]       🚧 Generate a XCFramework for the dylib
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

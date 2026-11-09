@@ -24,23 +24,23 @@ ipsw dyld webkit <DSC> [DSC] [flags]
 ### Options
 
 ```
-  -a, --api string     Github API Token
-  -d, --diff           Diff two dyld_shared_cache files
-  -g, --git            Lookup git tag on github.com
-  -h, --help           help for webkit
-      --insecure       do not verify ssl certs
-  -j, --json           Output as JSON
-      --proxy string   HTTP/HTTPS proxy
-  -r, --rev            Lookup svn rev on trac.webkit.org
+  -a, --api string              Github API Token
+  -d, --diff[=true|false]       Diff two dyld_shared_cache files
+  -g, --git[=true|false]        Lookup git tag on github.com
+  -h, --help[=true|false]       help for webkit
+      --insecure[=true|false]   do not verify ssl certs
+  -j, --json[=true|false]       Output as JSON
+      --proxy string            HTTP/HTTPS proxy
+  -r, --rev[=true|false]        Lookup svn rev on trac.webkit.org
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

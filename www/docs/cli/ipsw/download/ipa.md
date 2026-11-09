@@ -34,13 +34,13 @@ ipsw download ipa [flags]
 ### Options
 
 ```
-  -h, --help                    help for ipa
-      --insecure                do not verify ssl certs
+  -h, --help[=true|false]       help for ipa
+      --insecure[=true|false]   do not verify ssl certs
   -o, --output string           Folder to download files to
       --password string         Password for authentication
       --proxy string            HTTP/HTTPS proxy
-      --search                  Search for app to download
-      --sms                     Prefer SMS Two-factor authentication
+      --search[=true|false]     Search for app to download
+      --sms[=true|false]        Prefer SMS Two-factor authentication
   -s, --store-front string      The country code for the App Store to download from (default "US")
       --username string         Username for authentication
   -k, --vault-password string   Password to unlock credential vault (only for file vaults)
@@ -49,14 +49,14 @@ ipsw download ipa [flags]
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
-      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --no-color                disable colorize output
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
-  -V, --verbose                 verbose output
+      --color[=true|false]                   colorize output
+      --config string                        config file (default is $HOME/.config/ipsw/config.yaml)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --no-color[=true|false]                disable colorize output
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
+  -V, --verbose[=true|false]                 verbose output
 ```
 
 ### SEE ALSO

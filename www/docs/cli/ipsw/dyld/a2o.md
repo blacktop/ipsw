@@ -17,19 +17,19 @@ ipsw dyld a2o <DSC> <ADDR> [flags]
 ### Options
 
 ```
-  -d, --dec         Return address in decimal
-  -h, --help        help for a2o
-  -x, --hex         Return address in hexadecimal
-      --image-rel   Return offset relative to the containing image __TEXT load address
+  -d, --dec[=true|false]         Return address in decimal
+  -h, --help[=true|false]        help for a2o
+  -x, --hex[=true|false]         Return address in hexadecimal
+      --image-rel[=true|false]   Return offset relative to the containing image __TEXT load address
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

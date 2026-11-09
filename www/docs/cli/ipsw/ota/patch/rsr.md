@@ -20,7 +20,7 @@ ipsw ota patch rsr <OTA> | --cryptex <PATCH> [flags]
   -c, --cryptex string          Patch a local cryptex RIDIFF file directly (no OTA argument)
       --device string           Device product type or board for manifest DMG selection
   -a, --dyld-arch stringArray   Limit OTA system cryptex patching to these dyld_shared_cache architectures
-  -h, --help                    help for rsr
+  -h, --help[=true|false]       help for rsr
   -i, --input string            Input folder containing base DMGs to patch against
   -o, --output string           Output folder for patched DMGs
 ```
@@ -28,13 +28,13 @@ ipsw ota patch rsr <OTA> | --cryptex <PATCH> [flags]
 ### Options inherited from parent commands
 
 ```
-      --color            colorize output
-      --config string    config file (default is $HOME/.config/ipsw/config.yaml)
-      --insecure         Allow insecure connections when fetching AEA keys
-      --key-db string    Path to AEA keys JSON database (auto-lookup by filename)
-      --key-val string   Base64 encoded AEA symmetric encryption key
-      --no-color         disable colorize output
-  -V, --verbose          verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --insecure[=true|false]   Allow insecure connections when fetching AEA keys
+      --key-db string           Path to AEA keys JSON database (auto-lookup by filename)
+      --key-val string          Base64 encoded AEA symmetric encryption key
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

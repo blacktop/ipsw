@@ -17,22 +17,22 @@ ipsw dyld search objc <DSC> [flags]
 ### Options
 
 ```
-  -g, --category string   Search for specific ObjC category regex
-  -c, --class string      Search for specific ObjC class regex
-  -h, --help              help for objc
-  -i, --image strings     Images to search (default: all)
-      --ivar string       Search for specific ObjC instance variable regex
-  -p, --protocol string   Search for specific ObjC protocol regex
-  -s, --sel string        Search for specific ObjC selector regex
+  -g, --category string     Search for specific ObjC category regex
+  -c, --class string        Search for specific ObjC class regex
+  -h, --help[=true|false]   help for objc
+  -i, --image strings       Images to search (default: all)
+      --ivar string         Search for specific ObjC instance variable regex
+  -p, --protocol string     Search for specific ObjC protocol regex
+  -s, --sel string          Search for specific ObjC selector regex
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

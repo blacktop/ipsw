@@ -17,21 +17,21 @@ ipsw dyld a2s <DSC> <ADDR> [flags]
 ### Options
 
 ```
-      --cache string   Path to .a2s addr to sym cache file (speeds up analysis)
-  -d, --demangle       Demangle symbol names
-  -h, --help           help for a2s
-  -i, --image          Show the containing image, segment, and section
-  -m, --mapping        Show the dyld shared-cache mapping
-  -s, --slide uint     dyld_shared_cache slide to apply
+      --cache string            Path to .a2s addr to sym cache file (speeds up analysis)
+  -d, --demangle[=true|false]   Demangle symbol names
+  -h, --help[=true|false]       help for a2s
+  -i, --image[=true|false]      Show the containing image, segment, and section
+  -m, --mapping[=true|false]    Show the dyld shared-cache mapping
+  -s, --slide uint              dyld_shared_cache slide to apply
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

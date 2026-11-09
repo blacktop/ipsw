@@ -21,19 +21,19 @@ ipsw kernel syscall [KERNELCACHE] [flags]
 ### Options
 
 ```
-  -a, --arch string     Which architecture to use for fat/universal MachO
-  -g, --gen             Generate syscall table data gzip file
-  -h, --help            help for syscall
-  -o, --output string   Output gzip file
+  -a, --arch string         Which architecture to use for fat/universal MachO
+  -g, --gen[=true|false]    Generate syscall table data gzip file
+  -h, --help[=true|false]   help for syscall
+  -o, --output string       Output gzip file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

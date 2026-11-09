@@ -56,34 +56,34 @@ ipsw download pcc [INDEX] [flags]
 ### Options
 
 ```
-      --app string        Filter by cloudOS application name (e.g. TIE, 'TIE Proxy')
-      --build string      Filter by cloudOS build version prefix (e.g. 5E, 5E290)
-  -h, --help              help for pcc
-  -i, --info              Show PCC Release info
-      --insecure          do not verify ssl certs
-      --latest            Show only the newest PCC release after filtering
-      --os-build string   Filter by OS ProductBuildVersion prefix (e.g. 23E5207q); resolved via partial-zip, cached
-  -o, --output string     Output directory to save files to
-      --proxy string      HTTP/HTTPS proxy
-      --restart-all       always restart resumable IPSWs
-      --skip-all          continue past files locked by another download process
-      --train string      Filter by cloudOS build train substring (e.g. LuckE)
-  -u, --urls              Show compact release summaries and asset URLs without saving assets
-      --version string    Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached
-      --vphone            Filter to OS IPSWs containing vphone600 firmware; resolved via partial-zip, cached
+      --app string                 Filter by cloudOS application name (e.g. TIE, 'TIE Proxy')
+      --build string               Filter by cloudOS build version prefix (e.g. 5E, 5E290)
+  -h, --help[=true|false]          help for pcc
+  -i, --info[=true|false]          Show PCC Release info
+      --insecure[=true|false]      do not verify ssl certs
+      --latest[=true|false]        Show only the newest PCC release after filtering
+      --os-build string            Filter by OS ProductBuildVersion prefix (e.g. 23E5207q); resolved via partial-zip, cached
+  -o, --output string              Output directory to save files to
+      --proxy string               HTTP/HTTPS proxy
+      --restart-all[=true|false]   always restart resumable IPSWs
+      --skip-all[=true|false]      continue past files locked by another download process
+      --train string               Filter by cloudOS build train substring (e.g. LuckE)
+  -u, --urls[=true|false]          Show compact release summaries and asset URLs without saving assets
+      --version string             Filter by OS ProductVersion prefix (e.g. 26.3); resolved via partial-zip, cached
+      --vphone[=true|false]        Filter to OS IPSWs containing vphone600 firmware; resolved via partial-zip, cached
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
-      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --no-color                disable colorize output
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
-  -V, --verbose                 verbose output
+      --color[=true|false]                   colorize output
+      --config string                        config file (default is $HOME/.config/ipsw/config.yaml)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --no-color[=true|false]                disable colorize output
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
+  -V, --verbose[=true|false]                 verbose output
 ```
 
 ### SEE ALSO

@@ -17,21 +17,21 @@ ipsw dyld symaddr <DSC> [flags]
 ### Options
 
 ```
-  -a, --all             Find all symbol matches
-  -b, --binds           Also search LC_DYLD_INFO binds
-  -h, --help            help for symaddr
-  -i, --image string    dylib image to search
-      --in string       Path to JSON file containing list of symbols to lookup
-  -o, --output string   Path to output JSON file
+  -a, --all[=true|false]     Find all symbol matches
+  -b, --binds[=true|false]   Also search LC_DYLD_INFO binds
+  -h, --help[=true|false]    help for symaddr
+  -i, --image string         dylib image to search
+      --in string            Path to JSON file containing list of symbols to lookup
+  -o, --output string        Path to output JSON file
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

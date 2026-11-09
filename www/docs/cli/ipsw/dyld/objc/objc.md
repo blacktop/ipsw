@@ -17,20 +17,20 @@ ipsw dyld objc <DSC> [flags]
 ### Options
 
 ```
-  -c, --class       Print the classes
-  -h, --help        help for objc
-  -i, --imp-cache   Print the imp-caches
-  -p, --proto       Print the protocols
-  -s, --sel         Print the selectors
+  -c, --class[=true|false]       Print the classes
+  -h, --help[=true|false]        help for objc
+  -i, --imp-cache[=true|false]   Print the imp-caches
+  -p, --proto[=true|false]       Print the protocols
+  -s, --sel[=true|false]         Print the selectors
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

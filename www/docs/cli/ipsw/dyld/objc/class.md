@@ -21,17 +21,17 @@ ipsw dyld objc class <DSC> [flags]
 ### Options
 
 ```
-  -h, --help           help for class
-  -i, --image string   List class references from this dylib image
+  -h, --help[=true|false]   help for class
+  -i, --image string        List class references from this dylib image
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

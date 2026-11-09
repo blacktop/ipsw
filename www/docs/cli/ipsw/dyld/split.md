@@ -25,21 +25,21 @@ ipsw dyld split <DSC> [flags]
 ### Options
 
 ```
-  -b, --build string     Cache build
-  -c, --cache            Build Xcode device support cache
-  -h, --help             help for split
-  -o, --output string    Directory to extract the dylibs (default: CWD)
-  -v, --version string   Cache version
-  -x, --xcode string     Path to Xcode.app
+  -b, --build string         Cache build
+  -c, --cache[=true|false]   Build Xcode device support cache
+  -h, --help[=true|false]    help for split
+  -o, --output string        Directory to extract the dylibs (default: CWD)
+  -v, --version string       Cache version
+  -x, --xcode string         Path to Xcode.app
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

@@ -84,33 +84,33 @@ ipsw symbolicate <CRASHLOG> [IPSW|DSC] [flags]
 ### Options
 
 ```
-  -a, --all                 Show all threads in crashlog
-  -t, --api-token string    Symbol Server API bearer token
-  -d, --demangle            Demangle symbol names
-      --dsc-slide string    Rebase dyld_shared_cache frames onto this base for static analysis (hex, e.g. 0x180000000)
-  -x, --extra string        Path to folder with extra files for symbolication
-      --force               Force using the supplied IPSW even if it doesn't match the crashlog (e.g. for vPhone)
-  -h, --help                help for symbolicate
-      --hex                 Display function offsets in hexadecimal
-      --ida                 Generate IDAPython script to mark panic frames in IDA Pro
-      --kc-slide string     Apply custom KASLR slide to kernelcache frames for live debugging (hex, e.g. 0x14f74000)
-      --peek                Show disassembly instructions around each panicked frame
-      --peek-count int      Number of instructions to show with --peek (centered on frame, respects function boundaries) (default 5)
-      --pem-db string       AEA pem DB JSON file
-  -p, --proc string         Filter crashlog by process name
-  -r, --running             Show all running (TH_RUN) threads in crashlog
-  -s, --server string       Symbol Server DB URL
-      --signatures string   Path to signatures folder
-  -u, --unslide             Unslide user-space addresses for static analysis (kernel frames are always unslid)
+  -a, --all[=true|false]        Show all threads in crashlog
+  -t, --api-token string        Symbol Server API bearer token
+  -d, --demangle[=true|false]   Demangle symbol names
+      --dsc-slide string        Rebase dyld_shared_cache frames onto this base for static analysis (hex, e.g. 0x180000000)
+  -x, --extra string            Path to folder with extra files for symbolication
+      --force[=true|false]      Force using the supplied IPSW even if it doesn't match the crashlog (e.g. for vPhone)
+  -h, --help[=true|false]       help for symbolicate
+      --hex[=true|false]        Display function offsets in hexadecimal
+      --ida[=true|false]        Generate IDAPython script to mark panic frames in IDA Pro
+      --kc-slide string         Apply custom KASLR slide to kernelcache frames for live debugging (hex, e.g. 0x14f74000)
+      --peek[=true|false]       Show disassembly instructions around each panicked frame
+      --peek-count int          Number of instructions to show with --peek (centered on frame, respects function boundaries) (default 5)
+      --pem-db string           AEA pem DB JSON file
+  -p, --proc string             Filter crashlog by process name
+  -r, --running[=true|false]    Show all running (TH_RUN) threads in crashlog
+  -s, --server string           Symbol Server DB URL
+      --signatures string       Path to signatures folder
+  -u, --unslide[=true|false]    Unslide user-space addresses for static analysis (kernel frames are always unslid)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

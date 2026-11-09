@@ -17,18 +17,18 @@ ipsw dyld tbd <DSC> <DYLIB> [flags]
 ### Options
 
 ```
-  -g, --generic         Generate for ALL targets
-  -h, --help            help for tbd
-  -o, --output string   Directory to extract the dylibs (default: CWD)
+  -g, --generic[=true|false]   Generate for ALL targets
+  -h, --help[=true|false]      help for tbd
+  -o, --output string          Directory to extract the dylibs (default: CWD)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

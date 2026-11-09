@@ -17,20 +17,20 @@ ipsw idev crash pull [flags]
 ### Options
 
 ```
-  -a, --all             Pull all crashlogs
-  -h, --help            help for pull
-  -o, --output string   Folder to save crashlogs
-  -r, --rm              Remove crashlogs after pulling
+  -a, --all[=true|false]    Pull all crashlogs
+  -h, --help[=true|false]   help for pull
+  -o, --output string       Folder to save crashlogs
+  -r, --rm[=true|false]     Remove crashlogs after pulling
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -u, --udid string     Device UniqueDeviceID to connect to
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -u, --udid string             Device UniqueDeviceID to connect to
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

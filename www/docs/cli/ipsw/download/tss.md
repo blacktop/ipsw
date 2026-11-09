@@ -37,32 +37,32 @@ ipsw download tss [flags]
 ### Options
 
 ```
-      --beta             Check for beta iOS versions
-  -b, --build string     iOS BuildID (i.e. 16F203)
-  -d, --device string    iOS Device (i.e. iPhone11,2)
-      --ecid uint        Device ECID
-  -h, --help             help for tss
-      --insecure         do not verify ssl certs
-  -l, --latest           Check latest iOS version
-      --no-update        Use an existing AppleDB checkout without updating it (signing still requires network access)
-  -o, --output string    Output path for SHSH blobs
-      --proxy string     HTTP/HTTPS proxy
-  -s, --signed           Check signing status (exit 0 if signed, exit 1 if unsigned or the check fails)
-  -u, --usb              Download blobs for USB connected device
-  -v, --version string   iOS Version (i.e. 12.3.1)
+      --beta[=true|false]        Check for beta iOS versions
+  -b, --build string             iOS BuildID (i.e. 16F203)
+  -d, --device string            iOS Device (i.e. iPhone11,2)
+      --ecid uint                Device ECID
+  -h, --help[=true|false]        help for tss
+      --insecure[=true|false]    do not verify ssl certs
+  -l, --latest[=true|false]      Check latest iOS version
+      --no-update[=true|false]   Use an existing AppleDB checkout without updating it (signing still requires network access)
+  -o, --output string            Output path for SHSH blobs
+      --proxy string             HTTP/HTTPS proxy
+  -s, --signed[=true|false]      Check signing status (exit 0 if signed, exit 1 if unsigned or the check fails)
+  -u, --usb[=true|false]         Download blobs for USB connected device
+  -v, --version string           iOS Version (i.e. 12.3.1)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color                   colorize output
-      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --no-color                disable colorize output
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
-  -V, --verbose                 verbose output
+      --color[=true|false]                   colorize output
+      --config string                        config file (default is $HOME/.config/ipsw/config.yaml)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --no-color[=true|false]                disable colorize output
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
+  -V, --verbose[=true|false]                 verbose output
 ```
 
 ### SEE ALSO

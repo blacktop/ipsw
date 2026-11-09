@@ -32,23 +32,23 @@ ipsw dyld info <DSC> [DSC] [flags]
 ### Options
 
 ```
-  -c, --closures   Dump program launch closures
-      --delta      Compare two DSCs' image versions (requires --dylibs)
-      --diff       Diff two DSCs' images (requires --dylibs)
-  -d, --dlopen     Dump all dylibs and bundles with dlopen closures
-  -l, --dylibs     List dylibs and their versions
-  -h, --help       help for info
-  -j, --json       Output as JSON
-  -s, --sig        Print code signature
+  -c, --closures[=true|false]   Dump program launch closures
+      --delta[=true|false]      Compare two DSCs' image versions (requires --dylibs)
+      --diff[=true|false]       Diff two DSCs' images (requires --dylibs)
+  -d, --dlopen[=true|false]     Dump all dylibs and bundles with dlopen closures
+  -l, --dylibs[=true|false]     List dylibs and their versions
+  -h, --help[=true|false]       help for info
+  -j, --json[=true|false]       Output as JSON
+  -s, --sig[=true|false]        Print code signature
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

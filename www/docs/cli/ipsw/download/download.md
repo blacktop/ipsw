@@ -36,20 +36,20 @@ ipsw download [flags]
 ### Options
 
 ```
-      --enable-node-selection   spread streams across CDN addresses by measured throughput
-  -h, --help                    help for download
-      --min-part-size int       minimum scheduler range size in MiB (0 uses the URL profile)
-      --min-parts int           connections opened immediately and never retired (0 uses the URL profile)
-      --parts int               maximum parallel connections per download (0 uses the URL profile)
+      --enable-node-selection[=true|false]   spread streams across CDN addresses by measured throughput
+  -h, --help[=true|false]                    help for download
+      --min-part-size int                    minimum scheduler range size in MiB (0 uses the URL profile)
+      --min-parts int                        connections opened immediately and never retired (0 uses the URL profile)
+      --parts int                            maximum parallel connections per download (0 uses the URL profile)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

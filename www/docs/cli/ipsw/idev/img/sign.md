@@ -23,9 +23,9 @@ ipsw idev img sign [flags]
   -d, --ddi-dmg string                     DDI.dmg to mount
   -f, --ddi-folder string                  DDI folder (i.e. /Library/Developer/DeveloperDiskImages/iOS_DDI)
   -e, --ecid uint                          Device ApECID
-  -h, --help                               help for sign
+  -h, --help[=true|false]                  help for sign
   -i, --input ipsw idev img nonce --json   JSON file from ipsw idev img nonce --json command
-      --insecure                           do not verify ssl certs
+      --insecure[=true|false]              do not verify ssl certs
   -m, --manifest string                    BuildManifest.plist to use
   -n, --nonce string                       Device ApNonce
   -o, --output string                      Folder to write signature to
@@ -36,11 +36,11 @@ ipsw idev img sign [flags]
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -u, --udid string     Device UniqueDeviceID to connect to
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -u, --udid string             Device UniqueDeviceID to connect to
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO

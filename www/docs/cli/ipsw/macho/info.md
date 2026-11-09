@@ -21,39 +21,39 @@ ipsw macho info <macho|app|ipa> [flags]
 ### Options
 
 ```
-  -z, --all-fileset-entries     Parse all fileset entries
-  -a, --arch string             Which architecture to use for fat/universal MachO
-  -b, --bit-code                Dump the LLVM bitcode
-      --demangle                Demangle symbol names
-      --dump-cert               Dump the certificate
-  -e, --ent                     Print entitlements
-      --ent-der                 Print DER entitlements
-  -x, --extract-fileset-entry   Extract the fileset entry
-  -t, --fileset-entry string    Which fileset entry to analyze
-  -u, --fixups                  Print fixup chains
-  -d, --header                  Print the mach header
-  -h, --help                    help for info
-  -j, --json                    Print the TOC as JSON
-  -l, --loads                   Print the load commands
-  -o, --objc                    Print ObjC info
-      --objc-refs               Print ObjC references
-      --output string           Directory to extract files to
-  -s, --sig                     Print code signature
-  -g, --split-seg               Print split seg info
-  -f, --starts                  Print function starts
-  -c, --strings                 Print cstrings
-  -w, --swift                   Print Swift info
-      --swift-all               Print all other Swift sections info
-  -n, --symbols                 Print symbols
+  -z, --all-fileset-entries[=true|false]     Parse all fileset entries
+  -a, --arch string                          Which architecture to use for fat/universal MachO
+  -b, --bit-code[=true|false]                Dump the LLVM bitcode
+      --demangle[=true|false]                Demangle symbol names
+      --dump-cert[=true|false]               Dump the certificate
+  -e, --ent[=true|false]                     Print entitlements
+      --ent-der[=true|false]                 Print DER entitlements
+  -x, --extract-fileset-entry[=true|false]   Extract the fileset entry
+  -t, --fileset-entry string                 Which fileset entry to analyze
+  -u, --fixups[=true|false]                  Print fixup chains
+  -d, --header[=true|false]                  Print the mach header
+  -h, --help[=true|false]                    help for info
+  -j, --json[=true|false]                    Print the TOC as JSON
+  -l, --loads[=true|false]                   Print the load commands
+  -o, --objc[=true|false]                    Print ObjC info
+      --objc-refs[=true|false]               Print ObjC references
+      --output string                        Directory to extract files to
+  -s, --sig[=true|false]                     Print code signature
+  -g, --split-seg[=true|false]               Print split seg info
+  -f, --starts[=true|false]                  Print function starts
+  -c, --strings[=true|false]                 Print cstrings
+  -w, --swift[=true|false]                   Print Swift info
+      --swift-all[=true|false]               Print all other Swift sections info
+  -n, --symbols[=true|false]                 Print symbols
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --color           colorize output
-      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
-      --no-color        disable colorize output
-  -V, --verbose         verbose output
+      --color[=true|false]      colorize output
+      --config string           config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color[=true|false]   disable colorize output
+  -V, --verbose[=true|false]    verbose output
 ```
 
 ### SEE ALSO
