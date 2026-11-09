@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/diff/storage"
 	"github.com/blacktop/ipsw/internal/search"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
 )
@@ -1074,5 +1075,37 @@ func assertFileSeen(t *testing.T, files map[string][]string, dmg, want string) {
 	t.Helper()
 	if !strings.Contains(strings.Join(files[dmg], ","), want) {
 		t.Fatalf("%s files = %v, want %s", dmg, files[dmg], want)
+	}
+}
+
+func TestParseIBootSkipsOnlyEncryptedPayloads(t *testing.T) {
+	ipswWithIBoot := func(name string, keybags []img4.Keybag) string {
+		t.Helper()
+		payload, err := img4.CreatePayload(&img4.CreatePayloadConfig{
+			Type: "ibot", Version: "synthetic", Data: []byte("synthetic bytes, not an iBoot image"), Keybags: keybags,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		im4p, err := payload.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(t.TempDir(), name)
+		writeMinimalIPSWZip(t, path, "Firmware/all_flash/iBoot.d22.RELEASE.im4p", string(im4p))
+		return path
+	}
+	encrypted := ipswWithIBoot("encrypted.ipsw", []img4.Keybag{{Type: img4.PRODUCTION, IV: make([]byte, 16), Key: make([]byte, 32)}})
+	unreadable := ipswWithIBoot("unreadable.ipsw", nil)
+
+	d := &Diff{Old: Context{IPSWPath: unreadable}, New: Context{IPSWPath: encrypted}}
+	if _, ok := errors.AsType[*skippedError](d.parseIBoot()); ok {
+		t.Fatal("an unencrypted iBoot that does not parse must fail the section, not skip it")
+	}
+
+	d = &Diff{Old: Context{IPSWPath: encrypted}, New: Context{IPSWPath: unreadable}}
+	skipped, ok := errors.AsType[*skippedError](d.parseIBoot())
+	if !ok || !strings.Contains(skipped.reason, "'Old' iBoot is encrypted") {
+		t.Fatalf("parseIBoot() = %v, want a skip naming the encrypted 'Old' iBoot", d.parseIBoot())
 	}
 }

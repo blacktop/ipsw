@@ -1336,6 +1336,19 @@ func (d *Diff) parseFirmwares() (err error) {
 	return
 }
 
+// errEncryptedIBoot marks an iBoot image whose im4p payload carries keybags. It
+// cannot be read without the device's keys.
+var errEncryptedIBoot = errors.New("iBoot is encrypted")
+
+// iBootInputError turns an encrypted iBoot into a skipped section. Any other
+// failure to read an iBoot is a failed section.
+func iBootInputError(side, input string, err error) error {
+	if errors.Is(err, errEncryptedIBoot) {
+		return &skippedError{reason: fmt.Sprintf("the '%s' iBoot is encrypted", side)}
+	}
+	return fmt.Errorf("failed to get iBoot from '%s' %s: %w", side, input, err)
+}
+
 func (d *Diff) parseIBoot() (err error) {
 	d.IBoot = &IBootDiff{
 		New:     make(map[string][]string),
@@ -1345,11 +1358,11 @@ func (d *Diff) parseIBoot() (err error) {
 	if d.Old.InputMode == inputModeOTA {
 		oldIBoot, err = parseOTAIBoot(&d.Old)
 		if err != nil {
-			return fmt.Errorf("failed to get iBoot from 'Old' OTA: %v", err)
+			return iBootInputError("Old", "OTA", err)
 		}
 		newIBoot, err = parseOTAIBoot(&d.New)
 		if err != nil {
-			return fmt.Errorf("failed to get iBoot from 'New' OTA: %v", err)
+			return iBootInputError("New", "OTA", err)
 		}
 	} else {
 		tmpDIR, err := os.MkdirTemp("", "ipsw_extract_iboot")
@@ -1369,15 +1382,18 @@ func (d *Diff) parseIBoot() (err error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to open im4p: %v", err)
 			}
+			if im4p.Encrypted {
+				return nil, errEncryptedIBoot
+			}
 			return iboot.Parse(im4p.Data)
 		}
 		oldIBoot, err = getIboot(d.Old.IPSWPath)
 		if err != nil {
-			return fmt.Errorf("failed to get iBoot from 'Old' IPSW: %v", err)
+			return iBootInputError("Old", "IPSW", err)
 		}
 		newIBoot, err = getIboot(d.New.IPSWPath)
 		if err != nil {
-			return fmt.Errorf("failed to get iBoot from 'New' IPSW: %v", err)
+			return iBootInputError("New", "IPSW", err)
 		}
 	}
 	d.IBoot.Versions = []string{oldIBoot.Version, newIBoot.Version}

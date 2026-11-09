@@ -790,6 +790,9 @@ func parseOTAIBoot(ctx *Context) (*iboot.IBoot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse iBoot im4p %s: %w", candidates[0], err)
 	}
+	if im4p.Encrypted {
+		return nil, errEncryptedIBoot
+	}
 	payload, err := im4p.GetData()
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode iBoot im4p %s: %w", candidates[0], err)
