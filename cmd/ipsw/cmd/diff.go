@@ -230,7 +230,7 @@ var diffCmd = &cobra.Command{
 		})
 		diffErr := d.Diff()
 		if diffErr != nil {
-			if _, completed := errors.AsType[*diff.CleanupError](diffErr); !completed {
+			if _, completed := errors.AsType[*diff.CompletedError](diffErr); !completed {
 				return diffErr
 			}
 		}

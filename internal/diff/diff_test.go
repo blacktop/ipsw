@@ -338,8 +338,10 @@ func TestVolumeJobOrchestratorDropsTaskWhenSetupFails(t *testing.T) {
 
 	failing := newSetupFailingJob()
 	ok := newRecordingFilesJob()
-	if err := runVolumeJobsAcrossSessions(oldInfo, newInfo, oldSession, newSession, nil, []Task{failing, ok}, storage.NewMemoryStore()); err != nil {
-		t.Fatalf("runVolumeJobsAcrossSessions() error = %v", err)
+	err := runVolumeJobsAcrossSessions(oldInfo, newInfo, oldSession, newSession, nil, []Task{failing, ok}, storage.NewMemoryStore())
+	failed, isFailedTasks := errors.AsType[*failedTasksError](err)
+	if !isFailedTasks || !slices.Equal(failed.tasks, []string{failing.Name()}) {
+		t.Fatalf("runVolumeJobsAcrossSessions() error = %v, want only %s reported as failed", err, failing.Name())
 	}
 
 	if failing.processed {

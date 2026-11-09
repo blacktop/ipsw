@@ -189,6 +189,7 @@ type Diff struct {
 	newSession    *mountcmd.Session // IPSW mode only: mounts each OS volume once
 	sameKernel    bool              // IPSW mode only: BuildManifest digests match
 	sameVolumes   map[string]bool   // IPSW mode only: dmg type -> BuildManifest digests match
+	failed        []string          // sections whose result is missing or partial
 	// store is the cache backend used by orchestrators; nil means each
 	// orchestrator allocates its own ephemeral MemoryStore. The CLI sets
 	// this via SetStore so a single SQLiteStore spans every task in a run.
@@ -429,19 +430,37 @@ func setManifestContext(ctx *Context, tmpDir string) error {
 	return nil
 }
 
-// CleanupError means the diff finished but teardown failed. Callers can still
-// publish the report before returning the error to the user.
-type CleanupError struct{ Err error }
+// CompletedError means the diff ran to the end but a section or teardown
+// failed. Callers can still publish the report, which may be missing the failed
+// sections, before returning the error to the user.
+type CompletedError struct{ Err error }
 
-func (e *CleanupError) Error() string { return e.Err.Error() }
-func (e *CleanupError) Unwrap() error { return e.Err }
+func (e *CompletedError) Error() string { return e.Err.Error() }
+func (e *CompletedError) Unwrap() error { return e.Err }
+
+// markFailed records sections the report is missing or only partly covers.
+// Diff keeps going so the other sections are still reported, then fails.
+func (d *Diff) markFailed(sections ...string) {
+	for _, section := range sections {
+		if !slices.Contains(d.failed, section) {
+			d.failed = append(d.failed, section)
+		}
+	}
+}
+
+func (d *Diff) failedSectionsError() error {
+	if len(d.failed) == 0 {
+		return nil
+	}
+	return fmt.Errorf("diff report is incomplete; failed sections: %s", strings.Join(d.failed, ", "))
+}
 
 // Diff diffs the diff
 func (d *Diff) Diff() (err error) {
 	completed := false
 	defer func() {
 		if completed && err != nil {
-			err = &CleanupError{Err: err}
+			err = &CompletedError{Err: err}
 		}
 	}()
 
@@ -576,16 +595,19 @@ func (d *Diff) Diff() (err error) {
 			log.Info("Diffing DYLD_SHARED_CACHES")
 			if err := d.parseDSC(); err != nil {
 				log.WithError(err).Error("failed to parse DSCs")
+				d.markFailed("dsc")
 			}
 		}
 		log.Info("Diffing MachOs")
 		if err := d.parseMachos(); err != nil {
 			log.WithError(err).Error("failed to parse MachOs")
+			d.markFailed("machos")
 		}
 		if d.conf.LaunchD && otaMode {
 			log.Info("Diffing launchd PLIST")
 			if err := d.parseLaunchdPlists(); err != nil {
 				log.WithError(err).Error("failed to parse launchd plists")
+				d.markFailed("launchd")
 			}
 		}
 	}
@@ -612,6 +634,7 @@ func (d *Diff) Diff() (err error) {
 		log.Info("Diffing Feature Flags")
 		if err := d.parseFeatureFlags(); err != nil {
 			log.WithError(err).Error("failed to parse feature flags")
+			d.markFailed("features")
 		}
 	}
 
@@ -620,6 +643,7 @@ func (d *Diff) Diff() (err error) {
 		log.Info("Diffing Localizations")
 		if err := d.parseLocalizations(); err != nil {
 			log.WithError(err).Error("failed to parse localizations")
+			d.markFailed("localizations")
 		}
 	}
 
@@ -629,6 +653,7 @@ func (d *Diff) Diff() (err error) {
 		d.Ents, err = d.parseEntitlements()
 		if err != nil {
 			log.WithError(err).Error("failed to parse entitlements")
+			d.markFailed("entitlements")
 		}
 	}
 
@@ -637,7 +662,7 @@ func (d *Diff) Diff() (err error) {
 	}
 
 	completed = true
-	return nil
+	return d.failedSectionsError()
 }
 
 func (d *Diff) runSandboxDiff() error {
@@ -662,6 +687,7 @@ func (d *Diff) runIPSWVolumeJobsForMode(directoryMode, otaMode bool) error {
 			log.Info("Diffing Files")
 			if err := d.parseFiles(); err != nil {
 				log.WithError(err).Error("failed to parse files")
+				d.markFailed("files")
 			}
 		}
 		return nil
@@ -947,12 +973,14 @@ func (d *Diff) parseKernelcache() error {
 		log.WithField("kernelcache", d.Old.Kernel.Path).Info("Symbolicating...")
 		if err := smap[m1.UUID().String()].Symbolicate(d.Old.Kernel.Path, sigs, true); err != nil {
 			log.Errorf("failed to symbolicate kernelcache: %v", err)
+			d.markFailed("kernelcache symbolication")
 		}
 
 		smap[m2.UUID().String()] = signature.NewSymbolMap()
 		log.WithField("kernelcache", d.New.Kernel.Path).Info("Symbolicating...")
 		if err := smap[m2.UUID().String()].Symbolicate(d.New.Kernel.Path, sigs, true); err != nil {
 			log.Errorf("failed to symbolicate kernelcache: %v", err)
+			d.markFailed("kernelcache symbolication")
 		}
 	}
 
@@ -1027,11 +1055,13 @@ func (d *Diff) diffDSCBetweenRoots(oldRoot, newRoot string) error {
 	d.Old.Webkit, err = dcmd.GetWebkitVersion(dscOLD)
 	if err != nil {
 		log.WithError(err).Error("failed to get WebKit version from 'old' DSC")
+		d.markFailed("webkit version")
 	}
 
 	d.New.Webkit, err = dcmd.GetWebkitVersion(dscNEW)
 	if err != nil {
 		log.WithError(err).Error("failed to get WebKit version from 'new' DSC")
+		d.markFailed("webkit version")
 	}
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, d.dscDiffConfig())

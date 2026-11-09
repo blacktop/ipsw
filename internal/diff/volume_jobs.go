@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/apex/log"
@@ -27,7 +29,7 @@ func (d *Diff) runIPSWVolumePhases(jobs []Task) error {
 	if cleanup != nil {
 		defer cleanup()
 	}
-	return runVolumeJobsAcrossSessions(
+	err := runVolumeJobsAcrossSessions(
 		d.Old.Info,
 		d.New.Info,
 		d.oldSession,
@@ -36,6 +38,17 @@ func (d *Diff) runIPSWVolumePhases(jobs []Task) error {
 		jobs,
 		store,
 	)
+	if failed, ok := errors.AsType[*failedTasksError](err); ok {
+		d.markFailed(failed.tasks...)
+	}
+	return err
+}
+
+// failedTasksError names the tasks that did not produce a complete result.
+type failedTasksError struct{ tasks []string }
+
+func (e *failedTasksError) Error() string {
+	return "failed tasks: " + strings.Join(e.tasks, ", ")
 }
 
 // acquireStore returns the cache backend the orchestrator should use, plus
@@ -72,7 +85,8 @@ func (d *Diff) acquireStore() (storage.Store, func()) {
 //
 // After the loop, Finalize is called on every job (whether it processed any
 // volume or not). Errors are logged per-stage and execution continues so a
-// failure in one job does not poison the others.
+// failure in one job does not poison the others. Once every job has run, the
+// tasks that failed any stage are returned as a [failedTasksError].
 func runVolumeJobsAcrossSessions(
 	oldInfo, newInfo *info.Info,
 	oldSession, newSession ipswVolumeFileSession,
@@ -88,7 +102,8 @@ func runVolumeJobsAcrossSessions(
 	// volume and is not finalized. Running a half-initialized task produces
 	// garbage (e.g. machosJob with an empty cacheDir writes its per-binary
 	// cache into a relative path in the CWD; filesJob emits partial output).
-	jobs = setupTasks(jobs, store)
+	failed := make(map[string]bool)
+	jobs = setupTasks(jobs, store, failed)
 
 	// Cache lifecycle: resolve each CacheableTask's scope, hydrate the ones
 	// whose exact (task, version, options, inputs) tuple is already complete
@@ -116,6 +131,7 @@ func runVolumeJobsAcrossSessions(
 
 		errs, errored := processVolumePair(typ, oldPresent, newPresent, oldSession, newSession, active)
 		lc.markErrored(errored)
+		maps.Copy(failed, errored)
 		if errs != nil {
 			log.WithError(errs).Errorf("failed to process %s volume", volumeLabel(typ))
 		}
@@ -130,6 +146,7 @@ func runVolumeJobsAcrossSessions(
 	for _, job := range jobs {
 		if err := finalizeTask(job); err != nil {
 			lc.markErrored(map[string]bool{job.Name(): true})
+			failed[job.Name()] = true
 			log.WithError(err).Errorf("failed to finalize %s job", job.Name())
 		}
 	}
@@ -139,19 +156,23 @@ func runVolumeJobsAcrossSessions(
 	// in the store, so persistAndComplete skips them; tasks with any recorded
 	// error are skipped so a stale result is never served.
 	lc.persistAndComplete(store)
-	return nil
+	if len(failed) == 0 {
+		return nil
+	}
+	return &failedTasksError{tasks: slices.Sorted(maps.Keys(failed))}
 }
 
 // setupTasks runs each task's setup hook and returns only the tasks that
-// initialized successfully. A task whose Setup errors is logged and dropped
-// from the run so it never processes a volume or finalizes with partial state.
-// Tasks with no setup hook pass through unchanged.
-func setupTasks(jobs []Task, store storage.Store) []Task {
+// initialized successfully. A task whose Setup errors is logged, recorded in
+// failed, and dropped from the run so it never processes a volume or finalizes
+// with partial state. Tasks with no setup hook pass through unchanged.
+func setupTasks(jobs []Task, store storage.Store, failed map[string]bool) []Task {
 	out := make([]Task, 0, len(jobs))
 	for _, job := range jobs {
 		if s, ok := job.(TaskSetup); ok {
 			if err := s.Setup(store); err != nil {
 				log.WithError(err).Errorf("disabling %s job: setup failed", job.Name())
+				failed[job.Name()] = true
 				continue
 			}
 		}
@@ -538,6 +559,7 @@ func (d *Diff) runTopLevelTasks(ctx context.Context, tasks []TopLevelTask) error
 		}
 		if err := t.Parse(ctx, d); err != nil {
 			lc.markErrored(map[string]bool{t.Name(): true})
+			d.markFailed(t.Name())
 			log.WithError(err).Errorf("failed to parse %s", t.Name())
 			parseErrs = append(parseErrs, fmt.Errorf("failed to parse %s: %w", t.Name(), err))
 		}

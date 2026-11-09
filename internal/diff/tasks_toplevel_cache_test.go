@@ -3,6 +3,7 @@ package diff
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/blacktop/ipsw/internal/diff/storage"
@@ -52,6 +53,9 @@ func TestTopLevelTaskParseFailureIsReturnedAfterSiblingsComplete(t *testing.T) {
 	err := d.runTopLevelTasks(context.Background(), []TopLevelTask{failing, successful})
 	if !errors.Is(err, parseErr) {
 		t.Fatalf("runTopLevelTasks error = %v, want wrapped parse error", err)
+	}
+	if failedErr := d.failedSectionsError(); failedErr == nil || !strings.HasSuffix(failedErr.Error(), "failed sections: sandbox") {
+		t.Fatalf("failed sections error = %v, want only sandbox", failedErr)
 	}
 	if successful.parsed != 1 || successful.persisted != 1 {
 		t.Fatalf("successful sibling calls = (parsed %d, persisted %d), want (1, 1)", successful.parsed, successful.persisted)
