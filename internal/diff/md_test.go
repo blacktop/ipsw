@@ -491,9 +491,14 @@ func TestReportStatusInEveryRenderer(t *testing.T) {
 	if !strings.Contains(string(readme), failedNote) || !strings.Contains(string(readme), skippedNote) {
 		t.Fatalf("README missing the status note:\n%s", readme)
 	}
-	if got := newDiff().String(); !strings.Contains(got, failedNote) || !strings.Contains(got, skippedNote) {
-		t.Errorf("Diff.String missing the status note:\n%s", got)
+	assertStatusNoteAboveInputs(t, "README", string(readme), d.Title)
+	text := newDiff().String()
+	if !strings.Contains(text, failedNote) || !strings.Contains(text, skippedNote) {
+		t.Errorf("Diff.String missing the status note:\n%s", text)
 	}
+	// The text output opens with a table of contents, so start at its title.
+	_, body, _ := strings.Cut(text, "\n# "+d.Title+"\n")
+	assertStatusNoteAboveInputs(t, "Diff.String", "# "+d.Title+"\n"+body, d.Title)
 	if got := mustRenderHTML(t, newDiff()); !strings.Contains(got, "Incomplete report.") || !strings.Contains(got, "synthetic reason") {
 		t.Error("renderHTML missing the status note")
 	}
@@ -523,5 +528,29 @@ func TestReportStatusInEveryRenderer(t *testing.T) {
 	}
 	if _, ok := completeReport["failed_sections"]; ok {
 		t.Error("complete JSON report carries failed_sections")
+	}
+}
+
+// assertStatusNoteAboveInputs pins the layout report consumers parse: the title
+// on line 1, the status note before Inputs, and an Inputs section holding
+// exactly its two bullets.
+func assertStatusNoteAboveInputs(t *testing.T, name, report, title string) {
+	t.Helper()
+	if first, _, _ := strings.Cut(report, "\n"); first != "# "+title {
+		t.Errorf("%s line 1 = %q, want the title", name, first)
+	}
+	head, rest, ok := strings.Cut(report, "## Inputs\n")
+	if !ok || !strings.Contains(head, "Incomplete report.") || !strings.Contains(head, "Skipped `sandbox`") {
+		t.Fatalf("%s must carry the whole status note above Inputs:\n%s", name, report)
+	}
+	inputs, _, _ := strings.Cut(rest, "\n## ")
+	var lines []string
+	for line := range strings.SplitSeq(inputs, "\n") {
+		if strings.TrimSpace(line) != "" {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) != 2 || !strings.HasPrefix(lines[0], "- ") || !strings.HasPrefix(lines[1], "- ") {
+		t.Errorf("%s Inputs section = %q, want exactly two bullets", name, lines)
 	}
 }

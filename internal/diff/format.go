@@ -66,13 +66,12 @@ const diffMarkdownTemplate = `
 
 
 # {{ .Title }}
-
+{{ with .StatusNote }}
+{{ . }}{{ end }}
 ## Inputs
 
 - {{ .Old.IPSWPath | base }}
 - {{ .New.IPSWPath | base }}
-{{ with .StatusNote }}
-{{ . }}{{ end }}
 
 ## Kernel
 {{ if .Old.Kernel.Version }}
@@ -1088,15 +1087,14 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
       </aside>
       <main class="report-main panel">
         <article class="rc">
-
+{{ with .StatusNote }}
+          {{ . }}
+{{ end }}
           <h2 id="inputs">Inputs</h2>
           <ul>
             <li><code>{{ .OldInput }}</code></li>
             <li><code>{{ .NewInput }}</code></li>
           </ul>
-          {{- with .StatusNote }}
-          {{ . }}
-          {{- end }}
 
           <h2 id="kernel">Kernel</h2>
           {{- if .HasKernelVersion }}

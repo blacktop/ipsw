@@ -87,21 +87,23 @@ func (d *Diff) Markdown() error {
 	var out strings.Builder
 	/* TOC */
 
+	// The title stays on line 1 and the status note sits above Inputs, because
+	// report consumers require the Inputs section to hold exactly two bullets.
+	out.WriteString(fmt.Sprintf("# %s\n\n", d.Title))
+	if note := d.StatusNote(); note != "" {
+		out.WriteString(note + "\n")
+	}
+
 	// SECTION: Inputs
 	out.WriteString(
 		fmt.Sprintf(
-			"# %s\n\n"+
-				"## Inputs\n\n"+
+			"## Inputs\n\n"+
 				"- `%s`\n"+
 				"- `%s`\n\n",
-			d.Title,
 			filepath.Base(d.Old.IPSWPath),
 			filepath.Base(d.New.IPSWPath),
 		),
 	)
-	if note := d.StatusNote(); note != "" {
-		out.WriteString(note + "\n")
-	}
 
 	// SECTION: Kernel — heading, optional version table, optional state note,
 	// mirroring the HTML template's shape. The note carries the section when the
