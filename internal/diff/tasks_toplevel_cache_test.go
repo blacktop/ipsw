@@ -3,6 +3,7 @@ package diff
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -180,5 +181,36 @@ func TestTopLevelCacheLifecycleTwoHitsNoParse(t *testing.T) {
 	}
 	if task.persisted != 1 {
 		t.Fatalf("after two warm reruns persisted = %d, want 1 (hits must not re-persist)", task.persisted)
+	}
+}
+
+func TestTopLevelTaskSkipIsReportedNotFailedOrCached(t *testing.T) {
+	oldInfo := testIPSWInfo(map[string]testManifestEntry{
+		"KernelCache": {path: "kernelcache.release.v53", digest: []byte{0x01}},
+	})
+	newInfo := testIPSWInfo(map[string]testManifestEntry{
+		"KernelCache": {path: "kernelcache.release.v53", digest: []byte{0x02}},
+	})
+	store := storage.NewMemoryStore()
+	skipping := &fakeTopLevelTask{name: "sandbox", version: 1, optsHash: "skip", inputHash: "input",
+		parseErr: &skippedError{reason: "synthetic unsupported input"}}
+
+	d := &Diff{Old: Context{Info: oldInfo}, New: Context{Info: newInfo}}
+	d.SetStore(store)
+	for run := range 2 {
+		if err := d.runTopLevelTasks(context.Background(), []TopLevelTask{skipping}); err != nil {
+			t.Fatalf("run %d: runTopLevelTasks error = %v, want a skip to succeed", run, err)
+		}
+	}
+	if d.failedSectionsError() != nil {
+		t.Fatalf("a skipped task failed the diff: %v", d.failedSectionsError())
+	}
+	want := []SkippedSection{{Section: "sandbox", Reason: "synthetic unsupported input"}}
+	if !slices.Equal(d.skipped, want) {
+		t.Fatalf("skipped = %+v, want %+v", d.skipped, want)
+	}
+	// A cached skip would drop the note on the next run, so it must re-parse.
+	if skipping.parsed != 2 || skipping.persisted != 0 {
+		t.Fatalf("skipped task calls = (parsed %d, persisted %d), want (2, 0)", skipping.parsed, skipping.persisted)
 	}
 }

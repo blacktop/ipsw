@@ -913,7 +913,7 @@ func GetStringsRegex(f *dyld.File, pattern string) ([]String, error) {
 func GetWebkitVersion(f *dyld.File) (string, error) {
 	image, err := f.Image("/System/Library/Frameworks/WebKit.framework/WebKit")
 	if err != nil {
-		return "", fmt.Errorf("image not in DSC: %v", err)
+		return "", fmt.Errorf("image not in DSC: %w", err)
 	}
 
 	m, err := image.GetPartialMacho()

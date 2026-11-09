@@ -558,7 +558,13 @@ func (d *Diff) runTopLevelTasks(ctx context.Context, tasks []TopLevelTask) error
 			continue
 		}
 		if err := t.Parse(ctx, d); err != nil {
+			// A skip is never cached, so every run reports it again.
 			lc.markErrored(map[string]bool{t.Name(): true})
+			if skipped, ok := errors.AsType[*skippedError](err); ok {
+				log.Warnf("Skipping %s: %s", t.Name(), skipped.reason)
+				d.markSkipped(t.Name(), skipped.reason)
+				continue
+			}
 			d.markFailed(t.Name())
 			log.WithError(err).Errorf("failed to parse %s", t.Name())
 			parseErrs = append(parseErrs, fmt.Errorf("failed to parse %s: %w", t.Name(), err))

@@ -31,16 +31,25 @@ func (d *Diff) parseSandboxProfiles() (string, error) {
 	}
 	oldDocs, err := collectSandboxProfileDocuments(&d.Old)
 	if err != nil {
-		return "", fmt.Errorf("old sandbox profiles: %w", err)
+		return "", sandboxDocumentsError("old", err)
 	}
 	newDocs, err := collectSandboxProfileDocuments(&d.New)
 	if err != nil {
-		return "", fmt.Errorf("new sandbox profiles: %w", err)
+		return "", sandboxDocumentsError("new", err)
 	}
 	if len(oldDocs) == 0 && len(newDocs) == 0 {
 		return "", nil
 	}
 	return renderSandboxProfileDiffMarkdown(oldDocs, newDocs)
+}
+
+// sandboxDocumentsError turns a kernel the sandbox parser does not support
+// into a skipped section. Any other failure is a failed section.
+func sandboxDocumentsError(side string, err error) error {
+	if errors.Is(err, sandbox.ErrUnsupportedKernel) {
+		return &skippedError{reason: fmt.Sprintf("the %s kernelcache's Darwin version is not supported by the sandbox profile diff", side)}
+	}
+	return fmt.Errorf("%s sandbox profiles: %w", side, err)
 }
 
 func collectSandboxProfileDocuments(ctx *Context) (sandboxProfileDocuments, error) {

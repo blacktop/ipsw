@@ -190,6 +190,7 @@ type Diff struct {
 	sameKernel    bool              // IPSW mode only: BuildManifest digests match
 	sameVolumes   map[string]bool   // IPSW mode only: dmg type -> BuildManifest digests match
 	failed        []string          // sections whose result is missing or partial
+	skipped       []SkippedSection  // sections that do not apply to these inputs
 	// store is the cache backend used by orchestrators; nil means each
 	// orchestrator allocates its own ephemeral MemoryStore. The CLI sets
 	// this via SetStore so a single SQLiteStore spans every task in a run.
@@ -447,6 +448,26 @@ func (d *Diff) markFailed(sections ...string) {
 		}
 	}
 }
+
+// SkippedSection is a section left out of the report because it does not apply
+// to the inputs. A skip is noted in the report and does not fail the diff.
+type SkippedSection struct {
+	Section string `json:"section"`
+	Reason  string `json:"reason"`
+}
+
+func (d *Diff) markSkipped(section, reason string) {
+	skip := SkippedSection{Section: section, Reason: reason}
+	if !slices.Contains(d.skipped, skip) {
+		d.skipped = append(d.skipped, skip)
+	}
+}
+
+// skippedError is returned by a task whose section does not apply to the
+// inputs, such as a kernel its parser does not support.
+type skippedError struct{ reason string }
+
+func (e *skippedError) Error() string { return "skipped: " + e.reason }
 
 func (d *Diff) failedSectionsError() error {
 	if len(d.failed) == 0 {
@@ -1054,14 +1075,12 @@ func (d *Diff) diffDSCBetweenRoots(oldRoot, newRoot string) error {
 
 	d.Old.Webkit, err = dcmd.GetWebkitVersion(dscOLD)
 	if err != nil {
-		log.WithError(err).Error("failed to get WebKit version from 'old' DSC")
-		d.markFailed("webkit version")
+		d.webkitVersionMissing("old", err)
 	}
 
 	d.New.Webkit, err = dcmd.GetWebkitVersion(dscNEW)
 	if err != nil {
-		log.WithError(err).Error("failed to get WebKit version from 'new' DSC")
-		d.markFailed("webkit version")
+		d.webkitVersionMissing("new", err)
 	}
 
 	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, d.dscDiffConfig())
@@ -1122,6 +1141,17 @@ func openDSCFromMount(mountRoot string, isMacOS bool, mode inputMode, side strin
 		return nil, fmt.Errorf("failed to open DSC: %v", err)
 	}
 	return dsc, nil
+}
+
+// webkitVersionMissing records why a WebKit version is absent. A cache that
+// does not ship WebKit is a skip; a WebKit image that cannot be read is a failure.
+func (d *Diff) webkitVersionMissing(side string, err error) {
+	if errors.Is(err, dyld.ErrImageNotFound) {
+		d.markSkipped("webkit version", fmt.Sprintf("WebKit is not in the %s dyld shared cache", side))
+		return
+	}
+	log.WithError(err).Errorf("failed to get WebKit version from '%s' DSC", side)
+	d.markFailed("webkit version")
 }
 
 // preferGenericDSC picks dyld_shared_cache_arm64e (then arm64) over ISA

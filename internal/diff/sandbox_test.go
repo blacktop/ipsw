@@ -3,6 +3,7 @@
 package diff
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -59,5 +60,18 @@ func TestSandboxParserConfigUsesContextProductVersion(t *testing.T) {
 			fallback.CatalogPlatform,
 			fallback.CatalogOSVersion,
 		)
+	}
+}
+
+func TestSandboxDocumentsErrorSkipsOnlyUnsupportedKernels(t *testing.T) {
+	unsupported := fmt.Errorf("collection: failed to create sandbox parser: %w", sandbox.ErrUnsupportedKernel)
+	if _, ok := errors.AsType[*skippedError](sandboxDocumentsError("old", unsupported)); !ok {
+		t.Fatal("an unsupported kernel must skip the sandbox section")
+	}
+
+	parseFailure := errors.New("collection: failed to parse collection data")
+	err := sandboxDocumentsError("new", parseFailure)
+	if _, ok := errors.AsType[*skippedError](err); ok || !errors.Is(err, parseFailure) {
+		t.Fatalf("a parse failure must stay a failure, got %v", err)
 	}
 }
