@@ -3,6 +3,7 @@ package ent
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -97,5 +98,31 @@ func TestGetDatabaseWritesDeviceScopedBlob(t *testing.T) {
 	}
 	if _, err := GetDatabase(conf); err != nil {
 		t.Fatalf("reload from device-scoped cache: %v", err)
+	}
+}
+
+func TestDiffDatabasesOnlyDiffsChangedEntitlements(t *testing.T) {
+	dir := t.TempDir()
+	script := "#!/bin/sh\necho run >>\"" + filepath.Join(dir, "runs") + "\"\nprintf 'h1\\nh2\\nh3\\nh4\\n-<old/>\\n+<new/>\\n'\nexit 1\n"
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	oldDB := map[string]string{"/bin/same": "<same/>", "/bin/changed": "<old/>"}
+	newDB := map[string]string{"/bin/same": "<same/>", "/bin/changed": "<new/>"}
+	out, err := DiffDatabases(oldDB, newDB, &Config{Markdown: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "`/bin/changed`") || !strings.Contains(out, "+<new/>") || strings.Contains(out, "/bin/same") {
+		t.Fatalf("unexpected diff:\n%s", out)
+	}
+	runs, err := os.ReadFile(filepath.Join(dir, "runs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(runs), "run"); got != 1 {
+		t.Fatalf("diff tool ran %d times, want 1 for the single changed file", got)
 	}
 }
