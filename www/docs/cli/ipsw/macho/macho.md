@@ -35,8 +35,10 @@ ipsw macho [flags]
 * [ipsw macho a2o](/docs/cli/ipsw/macho/a2o)	 - Convert MachO address to offset
 * [ipsw macho a2s](/docs/cli/ipsw/macho/a2s)	 - Lookup symbol at unslid address
 * [ipsw macho bbl](/docs/cli/ipsw/macho/bbl)	 - Create single universal/fat MachO out many MachOs
+* [ipsw macho decrypt-ipa](/docs/cli/ipsw/macho/decrypt-ipa)	 - Decrypt an IPA using an exported local authorization file
 * [ipsw macho disass](/docs/cli/ipsw/macho/disass)	 - Disassemble ARM64 MachO at symbol/vaddr
 * [ipsw macho dump](/docs/cli/ipsw/macho/dump)	 - Dump MachO data at given virtual address
+* [ipsw macho export-auth](/docs/cli/ipsw/macho/export-auth)	 - Export existing local authorization for offline IPA decryption
 * [ipsw macho info](/docs/cli/ipsw/macho/info)	 - Explore a MachO file
 * [ipsw macho lipo](/docs/cli/ipsw/macho/lipo)	 - Extract single MachO out of a universal/fat MachO
 * [ipsw macho o2a](/docs/cli/ipsw/macho/o2a)	 - Convert MachO offset to address
