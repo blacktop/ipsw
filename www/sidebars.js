@@ -43,6 +43,7 @@ const sidebars = {
         "guides/info",
         "guides/extract",
         "guides/macho",
+        "guides/offline-ipa",
         "guides/kernel",
         "guides/dyld",
         "guides/ota",
