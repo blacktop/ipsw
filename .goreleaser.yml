@@ -5,6 +5,8 @@ version: 2
 git:
   ignore_tags:
     - v0.0.0-prerelease
+    # non-semver preview tag for the offline IPA assets
+    - offline-ipa-preview-20261110
     # legacy date-based (CalVer) tags that semver-sort above the current v3.x
     # scheme; ignore so they can never be picked as the current/previous tag.
     - "v18.*"

@@ -47,6 +47,7 @@ _require-engine:
 	  echo "       Targets requiring it: snapshot, dry_release, release, release-minor."; \
 	  exit 1; \
 	}
+	@hack/goreleaser/with-engine run "$(IPSW_FP_MANIFEST)" true
 
 .PHONY: dry_release
 dry_release: _require-sandbox _require-engine ## Run goreleaser without releasing/pushing artifacts to github
