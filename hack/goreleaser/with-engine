@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Run a release command with verified prebuilt offline-engine archives.
+
+usage: with-engine run MANIFEST COMMAND [ARG...]
+       with-engine check
+
+run reads an explicit manifest of the three prebuilt libipsw_fp.a archives,
+exports one library directory and one SHA-256 per target, verifies them and
+then replaces itself with COMMAND. check verifies the exported values again;
+GoReleaser runs it as a before hook so a build never starts on a missing or
+changed archive.
+
+Manifest schema: {"archives": {"macos-arm64": {"path": ".../libipsw_fp.a",
+"sha256": "..."}, "linux-arm64": {...}, "linux-amd64": {...}}}. Relative paths
+are based on the manifest directory.
+"""
+
+import hashlib
+import json
+import os
+import re
+import stat
+import sys
+from pathlib import Path
+
+TARGETS = {
+    "macos-arm64": "DARWIN_ARM64",
+    "linux-arm64": "LINUX_ARM64",
+    "linux-amd64": "LINUX_AMD64",
+}
+ARCHIVE = "libipsw_fp.a"
+SHA256 = re.compile(r"[0-9a-f]{64}")
+# The directory is interpolated into quoted CGO_LDFLAGS.
+UNQUOTABLE = re.compile(r'["\\\n]')
+
+
+class EngineInputError(Exception):
+    pass
+
+
+def unique_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise EngineInputError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def manifest_inputs(manifest):
+    """Returns {target: (library directory, expected SHA-256)} from the manifest."""
+    document = json.loads(manifest.read_text(encoding="utf-8"), object_pairs_hook=unique_keys)
+    if not isinstance(document, dict) or set(document) != {"archives"}:
+        raise EngineInputError("manifest must contain exactly archives")
+    archives = document["archives"]
+    if not isinstance(archives, dict) or set(archives) != set(TARGETS):
+        raise EngineInputError("archives must name exactly " + ", ".join(TARGETS))
+    inputs = {}
+    for target, entry in archives.items():
+        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
+            raise EngineInputError(f"{target} must contain exactly path and sha256")
+        name, expected = entry["path"], entry["sha256"]
+        if not isinstance(name, str) or not isinstance(expected, str):
+            raise EngineInputError(f"{target} path and sha256 must be text")
+        archive = Path(os.path.abspath(manifest.parent / name))
+        if archive.name != ARCHIVE:
+            raise EngineInputError(f"{target} path must name {ARCHIVE}")
+        inputs[target] = (str(archive.parent), expected)
+    return inputs
+
+
+def verify(target, directory, expected):
+    if not directory or not os.path.isabs(directory) or UNQUOTABLE.search(directory):
+        raise EngineInputError(
+            f"{target} library directory is missing or not a plain absolute path"
+        )
+    if not SHA256.fullmatch(expected):
+        raise EngineInputError(f"{target} sha256 must be 64 lowercase hexadecimal digits")
+    archive = Path(directory) / ARCHIVE
+    try:
+        if not stat.S_ISREG(archive.lstat().st_mode):
+            raise EngineInputError(f"{target} archive is not a regular file: {archive}")
+        digest = hashlib.sha256()
+        with archive.open("rb") as source:
+            for chunk in iter(lambda: source.read(1 << 20), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise EngineInputError(f"{target} archive is unreadable: {error}") from error
+    if digest.hexdigest() != expected:
+        raise EngineInputError(f"SHA-256 mismatch for the {target} archive")
+
+
+def check(environment):
+    for target, suffix in TARGETS.items():
+        verify(
+            target,
+            environment.get(f"IPSW_FP_LIB_{suffix}", ""),
+            environment.get(f"IPSW_FP_SHA_{suffix}", ""),
+        )
+
+
+def run(manifest, command):
+    environment = dict(os.environ)
+    for target, (directory, expected) in manifest_inputs(manifest).items():
+        environment[f"IPSW_FP_LIB_{TARGETS[target]}"] = directory
+        environment[f"IPSW_FP_SHA_{TARGETS[target]}"] = expected
+    check(environment)
+    os.execvpe(command[0], command, environment)
+
+
+def main(arguments):
+    try:
+        if arguments == ["check"]:
+            check(os.environ)
+        elif len(arguments) >= 3 and arguments[0] == "run":
+            run(Path(arguments[1]), arguments[2:])
+        else:
+            sys.exit(__doc__.strip())
+    except (EngineInputError, OSError, ValueError) as error:
+        sys.exit(
+            f"error: {error}\n"
+            "Releases need the prebuilt offline-engine archives; "
+            "pass their manifest with IPSW_FP_MANIFEST=path."
+        )
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -37,29 +37,40 @@ _require-sandbox:
 	  exit 1; \
 	}
 
+# GoReleaser links prebuilt offline-engine archives; IPSW_FP_MANIFEST names their manifest.
+GORELEASER := hack/goreleaser/with-engine run "$(IPSW_FP_MANIFEST)" goreleaser
+
+.PHONY: _require-engine
+_require-engine:
+	@test -n "$(IPSW_FP_MANIFEST)" || { \
+	  echo "ERROR: set IPSW_FP_MANIFEST to the offline-engine archive manifest."; \
+	  echo "       Targets requiring it: snapshot, dry_release, release, release-minor."; \
+	  exit 1; \
+	}
+
 .PHONY: dry_release
-dry_release: _require-sandbox ## Run goreleaser without releasing/pushing artifacts to github
+dry_release: _require-sandbox _require-engine ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_extras_build --clean --timeout 60m --snapshot --single-target --output dist/ipsw
+	@GOROOT=$(shell go env GOROOT) $(GORELEASER) build --id darwin_extras_build --clean --timeout 60m --snapshot --single-target --output dist/ipsw
 
 .PHONY: snapshot
-snapshot: _require-sandbox ## Run goreleaser snapshot
+snapshot: _require-sandbox _require-engine ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --snapshot
+	@GOROOT=$(shell go env GOROOT) $(GORELEASER) --clean --timeout 60m --snapshot
 
 .PHONY: release
-release: _require-sandbox ## Create a new release from the NEXT_VERSION
+release: _require-sandbox _require-engine ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@GOROOT=$(shell go env GOROOT) GITHUB_TOKEN=$(shell gh auth token) goreleaser --clean --timeout 60m --skip=validate
+	@GOROOT=$(shell go env GOROOT) GITHUB_TOKEN=$(shell gh auth token) $(GORELEASER) --clean --timeout 60m --skip=validate
 	@echo " > Update Portfile ${NEXT_VERSION}"
 	@hack/make/portfile ../ports
 
 .PHONY: release-minor
-release-minor: _require-sandbox ## Create a new minor semver release
+release-minor: _require-sandbox _require-engine ## Create a new minor semver release
 	@echo " > Creating Release $(shell go tool svu --tag.pattern 'v3.1.*' minor)"
 	@hack/make/release $(shell go tool svu --tag.pattern 'v3.1.*' minor)
-	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip=validate
+	@GOROOT=$(shell go env GOROOT) $(GORELEASER) --clean --timeout 60m --skip=validate
 
 .PHONY: destroy
 destroy: ## Remove release from the CUR_VERSION

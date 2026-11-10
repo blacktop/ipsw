@@ -13,6 +13,8 @@ git:
 
 before:
   hooks:
+    # Fail before any build if a prebuilt offline-engine archive is missing or changed.
+    - ./hack/goreleaser/with-engine check
     - go mod tidy
     - go generate ./...
     - ./hack/make/completions
@@ -49,6 +51,23 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+    # The offline IPA engine is a prebuilt static archive; see hack/goreleaser/with-engine.
+    overrides:
+      - goos: darwin
+        goarch: arm64
+        goarm64: v8.0
+        tags:
+          - sandbox
+          - ipsw_fp
+        env:
+          - MACOSX_DEPLOYMENT_TARGET=26.0
+          - CGO_CFLAGS=-O2 -g0 -mmacosx-version-min=26.0
+          - CGO_CXXFLAGS=-O2 -g0 -mmacosx-version-min=26.0
+          - CGO_LDFLAGS=-L "{{ .Env.IPSW_FP_LIB_DARWIN_ARM64 }}" -Wl,-dead_strip -Wl,-dead_strip_dylibs
+        ldflags:
+          - -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+          - -buildid=ipsw-fp-v1-darwin-arm64-{{ .Env.IPSW_FP_SHA_DARWIN_ARM64 }}
+          - -extldflags '-Wl,-unexported_symbols_list,pkg/fairplay/ipsw_fp_macos.hidden'
   - id: darwin_ios_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -157,6 +176,33 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+    overrides:
+      - goos: linux
+        goarch: amd64
+        goamd64: v1
+        tags:
+          - sandbox
+          - ipsw_fp
+        env:
+          - CGO_LDFLAGS=-L "{{ .Env.IPSW_FP_LIB_LINUX_AMD64 }}"
+        ldflags:
+          - -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+          - -linkmode external
+          - -buildid=ipsw-fp-v1-linux-amd64-{{ .Env.IPSW_FP_SHA_LINUX_AMD64 }}-static
+          - -extldflags '-static -Wl,--gc-sections'
+      - goos: linux
+        goarch: arm64
+        goarm64: v8.0
+        tags:
+          - sandbox
+          - ipsw_fp
+        env:
+          - CGO_LDFLAGS=-L "{{ .Env.IPSW_FP_LIB_LINUX_ARM64 }}"
+        ldflags:
+          - -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildCommit={{.Commit}}
+          - -linkmode external
+          - -buildid=ipsw-fp-v1-linux-arm64-{{ .Env.IPSW_FP_SHA_LINUX_ARM64 }}-static
+          - -extldflags '-static -Wl,--gc-sections'
   # - id: linux_amd64_extras_build
   #   hooks:
   #     pre:
