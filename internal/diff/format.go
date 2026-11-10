@@ -77,7 +77,7 @@ const diffMarkdownTemplate = `
 {{ if .Old.Kernel.Version }}
 ### Version
 
-| iOS                                     | Version                                 | Build                                | Date                                  |
+| {{ .OSName }}                           | Version                                 | Build                                | Date                                  |
 | :-------------------------------------- | :-------------------------------------- | :----------------------------------- | :------------------------------------ |
 | {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Kernel.Version.KernelVersion.Darwin }} | {{ .Old.Kernel.Version.KernelVersion.XNU }} | {{ .Old.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
 | {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Kernel.Version.KernelVersion.Darwin }} | {{ .New.Kernel.Version.KernelVersion.XNU }} | {{ .New.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
@@ -245,7 +245,7 @@ const diffMarkdownTemplate = `
 {{ if .Old.Webkit }}
 ### WebKit
 
-| iOS                                     | Version           |
+| {{ .OSName }}                           | Version           |
 | :-------------------------------------- | :---------------- |
 | {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Webkit }} |
 | {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Webkit }} |
@@ -515,6 +515,7 @@ func (d *Diff) ToJSON() error {
 
 type diffHTMLPageData struct {
 	Title      string
+	OSName     string
 	OldInput   string
 	NewInput   string
 	OldVersion string
@@ -1101,7 +1102,7 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
           <h3 id="kernel-version">Version</h3>
           <table>
             <caption>Kernel version comparison across the old and new inputs.</caption>
-            <thead><tr><th>iOS</th><th>Version</th><th>Build</th><th>Date</th></tr></thead>
+            <thead><tr><th>{{ .OSName }}</th><th>Version</th><th>Build</th><th>Date</th></tr></thead>
             <tbody>
               <tr><td>{{ .OldVersion }} <em>({{ .OldBuild }})</em></td><td>{{ .OldKernelDarwin }}</td><td>{{ .OldKernelXNU }}</td><td>{{ .OldKernelDate }}</td></tr>
               <tr><td>{{ .NewVersion }} <em>({{ .NewBuild }})</em></td><td>{{ .NewKernelDarwin }}</td><td>{{ .NewKernelXNU }}</td><td>{{ .NewKernelDate }}</td></tr>
@@ -1138,7 +1139,7 @@ const diffHTMLPageTemplate = `<!DOCTYPE html>
           <h3 id="webkit">WebKit</h3>
           <table>
             <caption>WebKit version comparison across the old and new inputs.</caption>
-            <thead><tr><th>iOS</th><th>Version</th></tr></thead>
+            <thead><tr><th>{{ .OSName }}</th><th>Version</th></tr></thead>
             <tbody>
               <tr><td>{{ .OldVersion }} <em>({{ .OldBuild }})</em></td><td>{{ .OldWebkit }}</td></tr>
               <tr><td>{{ .NewVersion }} <em>({{ .NewBuild }})</em></td><td>{{ .NewWebkit }}</td></tr>
@@ -1638,6 +1639,7 @@ func (d *Diff) renderHTML() (string, error) {
 
 	data := diffHTMLPageData{
 		Title:                 d.Title,
+		OSName:                d.OSName(),
 		OldInput:              filepath.Base(d.Old.IPSWPath),
 		NewInput:              filepath.Base(d.New.IPSWPath),
 		OldVersion:            d.Old.Version,

@@ -110,10 +110,11 @@ func (d *Diff) Markdown() error {
 		if hasKernelVersion {
 			fmt.Fprintf(&out,
 				"### Version\n\n"+
-					"| iOS | Version | Build | Date |\n"+
+					"| %s | Version | Build | Date |\n"+
 					"| :-- | :------ | :---- | :--- |\n"+
 					"| %s *(%s)* | %s | %s | %s |\n"+
 					"| %s *(%s)* | %s | %s | %s |\n\n",
+				d.OSName(),
 				d.Old.Version, d.Old.Build,
 				d.Old.Kernel.Version.KernelVersion.Darwin, d.Old.Kernel.Version.KernelVersion.XNU,
 				d.Old.Kernel.Version.KernelVersion.Date.Format("Mon, 02Jan2006 15:04:05 MST"),
@@ -196,10 +197,11 @@ func (d *Diff) Markdown() error {
 		out.WriteString(
 			fmt.Sprintf(
 				"### WebKit\n\n"+
-					"| iOS | Version |\n"+
+					"| %s | Version |\n"+
 					"| :-- | :------ |\n"+
 					"| %s *(%s)* | %s |\n"+
 					"| %s *(%s)* | %s |\n\n",
+				d.OSName(),
 				d.Old.Version, d.Old.Build, d.Old.Webkit,
 				d.New.Version, d.New.Build, d.New.Webkit,
 			),

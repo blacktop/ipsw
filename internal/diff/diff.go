@@ -23,6 +23,7 @@ import (
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	mountcmd "github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/diff/storage"
+	"github.com/blacktop/ipsw/internal/model"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/iboot"
@@ -240,6 +241,20 @@ func (d *Diff) SetOutput(output string) {
 	} else {
 		d.conf.Output = output
 	}
+}
+
+// OSName returns the operating system the inputs belong to ("iOS", "macOS",
+// "watchOS", "tvOS" or "visionOS") for the version-table headers. Every
+// renderer reads it so a macOS report never labels its builds as iOS.
+func (d *Diff) OSName() string {
+	if d.Old.IsMacOS {
+		return string(model.PlatformMacOS)
+	}
+	var inf *info.Info
+	if d.Old.Info != nil && d.Old.Info.Plists != nil {
+		inf = d.Old.Info
+	}
+	return string(ent.DetectPlatformFromIPSW(d.Old.IPSWPath, inf))
 }
 
 func (d *Diff) TitleToFilename() string {

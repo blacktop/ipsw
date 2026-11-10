@@ -551,3 +551,55 @@ func assertStatusNoteAboveInputs(t *testing.T, name, report string) {
 		t.Errorf("%s Inputs section = %q, want exactly two bullets", name, lines)
 	}
 }
+
+// TestVersionTablesNameTheInputOS pins the first column of every version
+// table to the inputs' operating system: a macOS report must not label its
+// builds "iOS" in the README, the text output or the HTML page.
+func TestVersionTablesNameTheInputOS(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		macOS   bool
+		ipsw    string
+		want    string
+		notWant string
+	}{
+		{name: "macOS", macOS: true, ipsw: "UniversalMac_27.2_26B123_Restore.ipsw", want: "macOS", notWant: "iOS"},
+		{name: "watchOS by filename", ipsw: "Watch7,1_26.6_25G70_Restore.ipsw", want: "watchOS", notWant: "iOS"},
+		{name: "iOS default", ipsw: "iPhone18,1_26.6_25G70_Restore.ipsw", want: "iOS", notWant: "macOS"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newSameKernelDiff(t, testKernelVersion())
+			d.Old.IsMacOS, d.New.IsMacOS = tc.macOS, tc.macOS
+			d.Old.IPSWPath, d.New.IPSWPath = tc.ipsw, tc.ipsw
+			d.Old.Webkit, d.New.Webkit = "7625.1.1", "7625.1.2"
+			d.IBoot = &IBootDiff{Versions: []string{"iBoot-13822.1.1", "iBoot-13822.1.2"}}
+			if got := d.OSName(); got != tc.want {
+				t.Fatalf("OSName() = %q, want %q", got, tc.want)
+			}
+			if err := d.Markdown(); err != nil {
+				t.Fatal(err)
+			}
+			readme, err := os.ReadFile(filepath.Join(d.conf.Output, "README.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for name, out := range map[string]string{
+				"README":      string(readme),
+				"Diff.String": d.String(),
+				"renderHTML":  mustRenderHTML(t, d),
+			} {
+				// The text renderer has no iBoot section, so only require it elsewhere.
+				if !strings.Contains(out, "### WebKit") && !strings.Contains(out, ">WebKit<") ||
+					name != "Diff.String" && !strings.Contains(out, "### iBoot") && !strings.Contains(out, ">iBoot<") {
+					t.Fatalf("%s: WebKit or iBoot version table did not render:\n%s", name, out)
+				}
+				if !strings.Contains(out, tc.want+" ") && !strings.Contains(out, ">"+tc.want+"<") {
+					t.Errorf("%s: version table header is not %q:\n%s", name, tc.want, out)
+				}
+				if strings.Contains(out, "| "+tc.notWant+" ") || strings.Contains(out, ">"+tc.notWant+"<") {
+					t.Errorf("%s: version table header still says %q", name, tc.notWant)
+				}
+			}
+		})
+	}
+}

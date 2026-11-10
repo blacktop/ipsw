@@ -131,10 +131,11 @@ func (t *ibootTask) Markdown(w *strings.Builder, outputDir string) error {
 	if len(t.d.IBoot.Versions) >= 2 {
 		fmt.Fprintf(w,
 			"### iBoot\n\n"+
-				"| iOS | Version |\n"+
+				"| %s | Version |\n"+
 				"| :-- | :------ |\n"+
 				"| %s *(%s)* | %s |\n"+
 				"| %s *(%s)* | %s |\n\n",
+			t.d.OSName(),
 			t.d.Old.Version, t.d.Old.Build, t.d.IBoot.Versions[0],
 			t.d.New.Version, t.d.New.Build, t.d.IBoot.Versions[1],
 		)
@@ -162,7 +163,7 @@ const ibootHTMLTemplate = `
           {{- if ge (len .IBoot.Versions) 2 }}
           <table>
             <caption>iBoot version comparison across the old and new inputs.</caption>
-            <thead><tr><th>iOS</th><th>Version</th></tr></thead>
+            <thead><tr><th>{{ .OSName }}</th><th>Version</th></tr></thead>
             <tbody>
               <tr><td>{{ .OldVersion }} <em>({{ .OldBuild }})</em></td><td>{{ index .IBoot.Versions 0 }}</td></tr>
               <tr><td>{{ .NewVersion }} <em>({{ .NewBuild }})</em></td><td>{{ index .IBoot.Versions 1 }}</td></tr>
@@ -199,6 +200,7 @@ const ibootHTMLTemplate = `
 // version table needs.
 type ibootHTMLData struct {
 	IBoot      *htmlIBootDiff
+	OSName     string
 	OldVersion string
 	OldBuild   string
 	NewVersion string
@@ -213,6 +215,7 @@ func (t *ibootTask) HTML() (HTMLFragment, error) {
 	}
 	data := ibootHTMLData{
 		IBoot:      ib,
+		OSName:     t.d.OSName(),
 		OldVersion: t.d.Old.Version,
 		OldBuild:   t.d.Old.Build,
 		NewVersion: t.d.New.Version,
