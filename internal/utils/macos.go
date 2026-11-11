@@ -16,6 +16,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/spawn"
 	"github.com/blacktop/ipsw/internal/utils/lsof"
 	semver "github.com/hashicorp/go-version"
 	"golang.org/x/sys/execabs"
@@ -484,7 +485,7 @@ var ErrMountResourceBusy = errors.New("hdiutil: mount failed - Resource busy")
 // makes exec.Cmd.Wait block forever waiting for CombinedOutput's pipe to reach
 // EOF. A regular file lets Wait return with the direct process while preserving
 // the command output needed for error reporting.
-func runCommandWithFileOutput(cmd *exec.Cmd) ([]byte, error) {
+func runCommandWithFileOutput(cmd *spawn.Cmd) ([]byte, error) {
 	outputFile, err := os.CreateTemp("", "ipsw-command-output-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command output file: %w", err)
@@ -728,12 +729,12 @@ func MountDMG(image string, customMountPoint string) (DMGMount, error) {
 func Unmount(mountPoint string, force bool) error {
 	switch runtime.GOOS {
 	case "darwin":
-		var cmd *exec.Cmd
+		var cmd *spawn.Cmd
 
 		if force {
-			cmd = exec.Command("hdiutil", "detach", mountPoint, "-force")
+			cmd = spawn.Command("hdiutil", "detach", mountPoint, "-force")
 		} else {
-			cmd = exec.Command("hdiutil", "detach", mountPoint)
+			cmd = spawn.Command("hdiutil", "detach", mountPoint)
 		}
 
 		if err := cmd.Run(); err != nil {

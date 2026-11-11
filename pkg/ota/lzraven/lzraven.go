@@ -15,10 +15,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"golang.org/x/sys/execabs"
+
+	"github.com/blacktop/ipsw/internal/spawn"
 )
 
 // Magic is the stream magic of LZRaven-compressed Apple Archive data.
@@ -45,7 +46,7 @@ func CheckHost() error {
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUnsupported, err)
 	}
-	cmd := exec.Command(aaPath, "list")
+	cmd := spawn.Command(aaPath, "list")
 	cmd.Stdin = bytes.NewReader(probe)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%w: aa failed to read an LZRaven sample: %v: %s",

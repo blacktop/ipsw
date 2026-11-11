@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/blacktop/ipsw/internal/spawn"
 )
 
 func TestDMGMountUnmountOwnership(t *testing.T) {
@@ -151,7 +152,7 @@ func TestAttachDarwinImageBackends(t *testing.T) {
 					}
 				})
 				calls := 0
-				err := attachDarwinImage(image, mountPoint, password, func(cmd *exec.Cmd) ([]byte, error) {
+				err := attachDarwinImage(image, mountPoint, password, func(cmd *spawn.Cmd) ([]byte, error) {
 					calls++
 					if calls == 1 {
 						probe := []string{"/usr/sbin/diskutil", "image", "attach", "-help"}
@@ -201,7 +202,7 @@ func TestAttachDarwinImageDoesNotFallbackOnFailure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
-			err := attachDarwinImage("/tmp/test.dmg", filepath.Join(t.TempDir(), "test.mount"), nil, func(cmd *exec.Cmd) ([]byte, error) {
+			err := attachDarwinImage("/tmp/test.dmg", filepath.Join(t.TempDir(), "test.mount"), nil, func(cmd *spawn.Cmd) ([]byte, error) {
 				calls++
 				if calls == 1 {
 					return []byte(tc.probe), tc.probeErr
@@ -231,7 +232,7 @@ func TestAttachDarwinImagePreservesMultilinePassword(t *testing.T) {
 	for _, password := range []string{"synthetic-password\n", "synthetic\npassword", "synthetic\rpassword"} {
 		t.Run(fmt.Sprintf("%q", password), func(t *testing.T) {
 			calls := 0
-			err := attachDarwinImage("/tmp/test.dmg", filepath.Join(t.TempDir(), "test.mount"), strings.NewReader(password), func(cmd *exec.Cmd) ([]byte, error) {
+			err := attachDarwinImage("/tmp/test.dmg", filepath.Join(t.TempDir(), "test.mount"), strings.NewReader(password), func(cmd *spawn.Cmd) ([]byte, error) {
 				calls++
 				if calls == 1 {
 					return []byte(doubleHyphenHelp), nil

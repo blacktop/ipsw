@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/blacktop/ipsw/internal/spawn"
 	"github.com/go-git/go-git/v5"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"golang.org/x/sys/execabs"
@@ -147,7 +148,7 @@ func createGitDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) {
 	}
 	defer os.Remove(tmpDst)
 
-	out, err := runDiffTool(exec.Command("git", "diff", "--no-color", "--no-index", tmpSrc, tmpDst))
+	out, err := runDiffTool(spawn.Command("git", "diff", "--no-color", "--no-index", tmpSrc, tmpDst))
 	if err != nil {
 		return "", err
 	}
@@ -187,12 +188,12 @@ func writeDiffInput(pattern, content string) (string, error) {
 
 // runDiffTool returns the stdout of an external diff command. Diff tools exit 1
 // when the inputs differ, so only other failures are errors.
-func runDiffTool(cmd *exec.Cmd) (string, error) {
+func runDiffTool(cmd *spawn.Cmd) (string, error) {
 	out, err := cmd.Output()
 	if err == nil {
 		return string(out), nil
 	}
-	exitErr, ok := errors.AsType[*exec.ExitError](err)
+	exitErr, ok := errors.AsType[*spawn.ExitError](err)
 	if !ok {
 		return "", fmt.Errorf("failed to run %s: %w", cmd.Args[0], err)
 	}
@@ -228,7 +229,7 @@ func createDeltaDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) 
 		width = twidth
 	}
 
-	return runDiffTool(exec.Command(
+	return runDiffTool(spawn.Command(
 		"delta",
 		"--dark",
 		"--diff-so-fancy",

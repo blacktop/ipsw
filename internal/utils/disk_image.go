@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"slices"
 	"strings"
+
+	"github.com/blacktop/ipsw/internal/spawn"
 )
 
 // darwinImageBackend is a tool that can attach a disk image on macOS.
@@ -45,7 +46,7 @@ var hdiutilBackend = darwinImageBackend{
 // Retrying a failed attachment with a different tool could hide permission
 // errors or attach an image twice.
 func attachDarwinImage(
-	image, mountPoint string, password io.Reader, run func(*exec.Cmd) ([]byte, error),
+	image, mountPoint string, password io.Reader, run func(*spawn.Cmd) ([]byte, error),
 ) error {
 	backend, err := probeDarwinImageBackend(run)
 	if err != nil {
@@ -79,7 +80,7 @@ func attachDarwinImage(
 	if password != nil {
 		flags = append(flags, backend.passwordFlag)
 	}
-	cmd := exec.Command(backend.tool, slices.Concat(backend.args, flags, []string{image})...)
+	cmd := spawn.Command(backend.tool, slices.Concat(backend.args, flags, []string{image})...)
 	cmd.Stdin = password
 	out, err := run(cmd)
 	if err != nil {
@@ -96,8 +97,8 @@ func attachDarwinImage(
 // because older diskutil builds reject --help. Help that names the flag is
 // trusted even when the probe exits non-zero, since older builds may print
 // usage with a failure status.
-func probeDarwinImageBackend(run func(*exec.Cmd) ([]byte, error)) (darwinImageBackend, error) {
-	out, err := run(exec.Command("/usr/sbin/diskutil", "image", "attach", "-help"))
+func probeDarwinImageBackend(run func(*spawn.Cmd) ([]byte, error)) (darwinImageBackend, error) {
+	out, err := run(spawn.Command("/usr/sbin/diskutil", "image", "attach", "-help"))
 	help := string(out)
 	switch {
 	case strings.Contains(help, `did not recognize verb "image"`):

@@ -2,12 +2,12 @@ package utils
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"testing"
-	"time"
+
+	"github.com/blacktop/ipsw/internal/spawn"
 )
 
 func TestSanitizeArchivePath(t *testing.T) {
@@ -81,8 +81,7 @@ func TestRunCommandWithFileOutputDoesNotWaitForDescendantDescriptors(t *testing.
 		t.Skip("requires /bin/sh")
 	}
 
-	cmd := exec.Command("/bin/sh", "-c", `printf attached; sleep 1 &`)
-	cmd.WaitDelay = 100 * time.Millisecond
+	cmd := spawn.Command("/bin/sh", "-c", `printf attached; sleep 1 &`)
 	out, err := runCommandWithFileOutput(cmd)
 	if err != nil {
 		t.Fatalf("runCommandWithFileOutput() failed: %v", err)
@@ -97,7 +96,7 @@ func TestRunCommandWithFileOutputPreservesFailureOutput(t *testing.T) {
 		t.Skip("requires /bin/sh")
 	}
 
-	out, err := runCommandWithFileOutput(exec.Command("/bin/sh", "-c", `printf 'hdiutil: mount failed - Resource busy' >&2; exit 9`))
+	out, err := runCommandWithFileOutput(spawn.Command("/bin/sh", "-c", `printf 'hdiutil: mount failed - Resource busy' >&2; exit 9`))
 	if err == nil {
 		t.Fatal("runCommandWithFileOutput() error = nil, want command failure")
 	}

@@ -5,10 +5,11 @@ package utils
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/blacktop/ipsw/internal/spawn"
 )
 
 // Opt in with: go test -tags integration -run TestNativeDMGMount -v ./internal/utils
@@ -36,7 +37,7 @@ func TestNativeDMGMount(t *testing.T) {
 		}
 		path := filepath.Join(root, side, "same.dmg")
 		images = append(images, path)
-		out, err := runCommandWithFileOutput(exec.Command("/usr/bin/hdiutil", "create", "-size", "16m", "-fs", "HFS+", "-volname", "ipsw-test-"+side, "-srcfolder", source, path))
+		out, err := runCommandWithFileOutput(spawn.Command("/usr/bin/hdiutil", "create", "-size", "16m", "-fs", "HFS+", "-volname", "ipsw-test-"+side, "-srcfolder", source, path))
 		if err != nil {
 			t.Fatalf("create synthetic image: %v: %s", err, out)
 		}
@@ -121,7 +122,7 @@ func cleanupNativeDMGs(t *testing.T, root string, images, mountDirs []string) {
 			t.Errorf("retaining %s: no device for test image %s", root, img.ImagePath)
 			return
 		}
-		if out, err := runCommandWithFileOutput(exec.Command("/usr/bin/hdiutil", "detach", device, "-force")); err != nil {
+		if out, err := runCommandWithFileOutput(spawn.Command("/usr/bin/hdiutil", "detach", device, "-force")); err != nil {
 			t.Errorf("retaining %s: detach test device %s: %v: %s", root, device, err, out)
 			return
 		}

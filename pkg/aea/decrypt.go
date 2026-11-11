@@ -17,12 +17,12 @@ import (
 	"io"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/spawn"
 	"github.com/blacktop/lzfse-cgo"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/sync/errgroup"
@@ -705,7 +705,7 @@ func aea(in, out, key string) (string, error) {
 		if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
 			return "", fmt.Errorf("failed to create output directory '%s': %v", filepath.Dir(out), err)
 		}
-		cmd := exec.Command(aeaBinPath, "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
+		cmd := spawn.Command(aeaBinPath, "decrypt", "-i", in, "-o", out, "-key-value", fmt.Sprintf("base64:%s", key))
 		cout, err := cmd.CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("failed to decrypt using '%s' (bad key?) %v: %s", aeaBinPath, err, cout)
