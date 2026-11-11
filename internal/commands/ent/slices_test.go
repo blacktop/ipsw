@@ -224,3 +224,24 @@ func TestEntitlementScanStopsOnFDExhaustion(t *testing.T) {
 		t.Fatalf("got (%q, %v, %v) once descriptors are available", output, ok, err)
 	}
 }
+
+func TestEntitlementScanSkipsUnreadableFilesQuietly(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file modes")
+	}
+	path := filepath.Join(t.TempDir(), ".file")
+	if err := os.WriteFile(path, []byte("not a macho"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	log.Log = &log.Logger{Handler: text.New(&buf), Level: log.WarnLevel}
+	t.Cleanup(func() { log.Log = &log.Logger{Handler: text.New(os.Stderr), Level: log.InfoLevel} })
+
+	output, ok, err := scanFileEntitlements(path, &Config{})
+	if err != nil || ok || output != "" {
+		t.Fatalf("got (%q, %v, %v), want a silent skip", output, ok, err)
+	}
+	if buf.Len() != 0 {
+		t.Fatalf("permission denied was logged at warn level:\n%s", buf.String())
+	}
+}

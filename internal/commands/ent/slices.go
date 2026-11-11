@@ -50,6 +50,9 @@ func scanFileEntitlements(path string, conf *Config) (output string, ok bool, er
 		return "", false, nil
 	case utils.IsFDExhaustion(err):
 		return "", false, fmt.Errorf("failed to get entitlements for %s: %w", path, err)
+	case errors.Is(err, fs.ErrPermission):
+		log.WithError(err).Debugf("skipping unreadable %s", path)
+		return "", false, nil
 	default:
 		log.WithError(err).Warnf("failed to get entitlements for %s", path)
 		return "", false, nil
