@@ -46,8 +46,11 @@ func (d *Diff) parseSandboxProfiles() (string, error) {
 // sandboxDocumentsError turns a kernel the sandbox parser does not support
 // into a skipped section. Any other failure is a failed section.
 func sandboxDocumentsError(side string, err error) error {
-	if errors.Is(err, sandbox.ErrUnsupportedKernel) {
+	switch {
+	case errors.Is(err, sandbox.ErrUnsupportedKernel):
 		return &skippedError{reason: fmt.Sprintf("the %s kernelcache's Darwin version is not supported by the sandbox profile diff", side)}
+	case errors.Is(err, sandbox.ErrUnknownOperationTable):
+		return &skippedError{reason: fmt.Sprintf("this ipsw release has no sandbox operation table for the %s kernelcache's build", side)}
 	}
 	return fmt.Errorf("%s sandbox profiles: %w", side, err)
 }

@@ -5,6 +5,7 @@ package diff
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/blacktop/ipsw/pkg/sandbox"
@@ -67,6 +68,13 @@ func TestSandboxDocumentsErrorSkipsOnlyUnsupportedKernels(t *testing.T) {
 	unsupported := fmt.Errorf("collection: failed to create sandbox parser: %w", sandbox.ErrUnsupportedKernel)
 	if _, ok := errors.AsType[*skippedError](sandboxDocumentsError("old", unsupported)); !ok {
 		t.Fatal("an unsupported kernel must skip the sandbox section")
+	}
+
+	unknownTable := fmt.Errorf("collection: failed to parse collection data: %w: table has 196 names but binary header expects 197",
+		sandbox.ErrUnknownOperationTable)
+	skip, ok := errors.AsType[*skippedError](sandboxDocumentsError("new", unknownTable))
+	if !ok || !strings.Contains(skip.reason, "no sandbox operation table for the new kernelcache") {
+		t.Fatalf("an unknown operation table must skip the sandbox section with its reason, got %v", skip)
 	}
 
 	parseFailure := errors.New("collection: failed to parse collection data")
