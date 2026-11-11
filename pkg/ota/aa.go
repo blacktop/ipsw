@@ -2,6 +2,7 @@ package ota
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -10,7 +11,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -22,6 +22,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/spawn"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/bom"
@@ -481,9 +482,11 @@ func (r *Reader) GetPayloadFiles(pattern, payloadRange, output string) error {
 }
 
 // GetPayloadFilesWithCallback extracts every file matching pattern from the
-// OTA's payloadv2 members into output. onFile, when non-nil, is called with the
-// destination path of each materialized file; callers extracting the entire
-// filesystem pass nil to avoid accumulating one string per OTA member.
+// OTA's payloadv2 members into output, then recreates the hardlink names
+// payloadv2/links.txt lists for them (see [linkPayloadNames]). onFile, when
+// non-nil, is called with the destination path of each materialized file;
+// callers extracting the entire filesystem pass nil to avoid accumulating one
+// string per OTA member.
 func (r *Reader) GetPayloadFilesWithCallback(pattern, payloadRange, output string, onFile func(dst string)) error {
 	r.initFileList()
 	pre := regexp.MustCompile(`^payload.\d+$`)
@@ -511,7 +514,107 @@ func (r *Reader) GetPayloadFilesWithCallback(pattern, payloadRange, output strin
 			errs = append(errs, wrapPhase(PhasePayloadExtract, file.Base(), err))
 		}
 	}
+	if err := r.linkPayloadNames(pattern, output, onFile); err != nil {
+		errs = append(errs, wrapPhase(PhasePayloadExtract, payloadLinksName, err))
+	}
 	return errors.Join(errs...)
+}
+
+// payloadLinksName is the payloadv2 manifest of hardlink groups. Each "=path"
+// line names a file the payload members carry; the "+path" lines after it are
+// that file's other names on the installed system. The members never carry
+// those names (an OTA may pick a different carrier for the same group than the
+// build before it), so without this manifest an extracted payload filesystem
+// is missing them.
+const payloadLinksName = "payloadv2/links.txt"
+
+// linkPayloadNames recreates the hardlink names the OTA's links.txt lists, for
+// every name matching pattern whose carrier is present under output. An OTA
+// without the manifest has nothing to link.
+func (r *Reader) linkPayloadNames(pattern, output string, onFile func(dst string)) error {
+	var member *File
+	for _, file := range r.Files() {
+		if !file.isDir && strings.HasSuffix(file.Name(), payloadLinksName) {
+			member = file
+			break
+		}
+	}
+	if member == nil {
+		return nil
+	}
+	match, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Errorf("failed to compile pattern '%s': %w", pattern, err)
+	}
+	f, err := r.Open(member.Name(), false)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	linked, skipped, err := linkPayloadNames(f, match, output, onFile)
+	if skipped > 0 {
+		utils.Indent(log.Warn, 2)(fmt.Sprintf(
+			"%d hardlink names skipped because their carrier file was not extracted (widen the pattern to include it)", skipped))
+	}
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Linked %d hardlink names from %s", linked, payloadLinksName))
+	return err
+}
+
+// linkPayloadNames applies a links.txt manifest to the tree under output and
+// returns how many names it linked and how many it skipped for lack of an
+// extracted carrier. A name the tree already holds is left as extracted.
+func linkPayloadNames(links io.Reader, match *regexp.Regexp, output string, onFile func(dst string)) (linked, skipped int, err error) {
+	sc := bufio.NewScanner(links)
+	sc.Buffer(make([]byte, 0, 64<<10), 1<<20)
+	var carrier string
+	for n := 1; sc.Scan(); n++ {
+		line := sc.Text()
+		switch {
+		case line == "":
+			continue
+		case line[0] == '=':
+			carrier = line[1:]
+		case line[0] == '+':
+			if carrier == "" {
+				return linked, skipped, fmt.Errorf("line %d: %q has no preceding \"=\" carrier", n, line)
+			}
+			name := line[1:]
+			if !match.MatchString(name) {
+				continue
+			}
+			src, err := utils.SanitizeArchivePath(output, carrier)
+			if err != nil {
+				return linked, skipped, err
+			}
+			dst, err := utils.SanitizeArchivePath(output, name)
+			if err != nil {
+				return linked, skipped, err
+			}
+			if _, err := os.Lstat(src); err != nil {
+				if !errors.Is(err, fs.ErrNotExist) {
+					return linked, skipped, err
+				}
+				skipped++
+				continue
+			}
+			if _, err := os.Lstat(dst); err == nil {
+				continue
+			}
+			if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
+				return linked, skipped, fmt.Errorf("failed to create dir for %s: %w", name, err)
+			}
+			if err := os.Link(src, dst); err != nil {
+				return linked, skipped, fmt.Errorf("failed to link %s to %s: %w", name, carrier, err)
+			}
+			linked++
+			if onFile != nil {
+				onFile(dst)
+			}
+		default:
+			return linked, skipped, fmt.Errorf("line %d: unexpected prefix in %q", n, line)
+		}
+	}
+	return linked, skipped, sc.Err()
 }
 
 // checkPayloadCodec fails fast when payloadv2 members need LZRaven support the
@@ -651,7 +754,7 @@ func aaList(in io.Reader, pattern string, json bool) (string, error) {
 		args = append(args, "-v")
 	}
 
-	cmd := exec.Command(aaPath, args...)
+	cmd := spawn.Command(aaPath, args...)
 	cmd.Stdin = in
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -675,7 +778,7 @@ func aaExtractPattern(in io.Reader, pattern, output string) error {
 	// walks files and creates their parents itself. Excluding them here also
 	// prevents archived directory modes without a search bit (for example 0600)
 	// from making the staging tree impossible to walk or remove.
-	cmd := exec.Command(aaPath, "extract", "-d", output, "-include-regex", pattern, "-exclude-type", "d")
+	cmd := spawn.Command(aaPath, "extract", "-d", output, "-include-regex", pattern, "-exclude-type", "d")
 	cmd.Stdin = in
 	// aa exits 0 when the regex simply matches nothing, so any non-zero status
 	// is a real failure. Suppressing it would let a failed payload member

@@ -1,6 +1,8 @@
 package ota
 
 import (
+	"archive/zip"
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -1011,5 +1013,118 @@ func TestStageCryptexBaseMissing(t *testing.T) {
 	var pe *PhaseError
 	if !errors.As(err, &pe) || pe.Phase != PhaseCryptexPatch {
 		t.Fatalf("stageCryptexBase() phase = %v, want %s", err, PhaseCryptexPatch)
+	}
+}
+
+// TestLinkPayloadNames pins the links.txt contract: "+" names become hardlinks
+// of the preceding "=" carrier, names the pattern excludes or whose carrier is
+// not on disk are skipped, extracted names win over links, and a malformed
+// manifest is an error rather than a partial tree.
+func TestLinkPayloadNames(t *testing.T) {
+	out := t.TempDir()
+	for _, name := range []string{"sbin/md5", "bin/[", "bin/test"} {
+		if err := os.MkdirAll(filepath.Join(out, filepath.Dir(name)), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(out, name), []byte(name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifest := "=sbin/md5\n+sbin/sha1\n+sbin/sha1sum\n=bin/[\n+bin/test\n=usr/bin/at\n+usr/bin/batch\n"
+	var seen []string
+	linked, skipped, err := linkPayloadNames(strings.NewReader(manifest), regexp.MustCompile(`^(sbin|bin)/`), out,
+		func(dst string) { seen = append(seen, dst) })
+	if err != nil || linked != 2 || skipped != 0 {
+		t.Fatalf("linkPayloadNames() = (%d, %d, %v), want (2, 0, nil)", linked, skipped, err)
+	}
+	if len(seen) != 2 {
+		t.Fatalf("onFile saw %v, want the two links", seen)
+	}
+	md5, err := os.Stat(filepath.Join(out, "sbin/md5"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"sbin/sha1", "sbin/sha1sum"} {
+		fi, err := os.Stat(filepath.Join(out, name))
+		if err != nil || !os.SameFile(fi, md5) {
+			t.Fatalf("%s is not a hardlink of sbin/md5: %v", name, err)
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(out, "bin/test")); err != nil || string(data) != "bin/test" {
+		t.Fatalf("bin/test was replaced by a link: %q %v", data, err)
+	}
+
+	// The pattern now admits usr/bin/batch, whose carrier was never extracted.
+	linked, skipped, err = linkPayloadNames(strings.NewReader(manifest), regexp.MustCompile(`.*`), out, nil)
+	if err != nil || linked != 0 || skipped != 1 {
+		t.Fatalf("linkPayloadNames(all) = (%d, %d, %v), want (0, 1, nil)", linked, skipped, err)
+	}
+
+	for _, bad := range []string{"+sbin/sha1\n", "=sbin/md5\n?sbin/sha1\n", "=sbin/md5\n+../escape\n"} {
+		if _, _, err := linkPayloadNames(strings.NewReader(bad), regexp.MustCompile(`.*`), out, nil); err == nil {
+			t.Errorf("linkPayloadNames(%q) = nil, want an error", bad)
+		}
+	}
+}
+
+// TestGetPayloadFilesLinksNames runs the payload extraction end to end on a
+// synthetic OTA whose payload member carries one file and whose links.txt
+// gives it a second name.
+func TestGetPayloadFilesLinksNames(t *testing.T) {
+	aaPath, err := exec.LookPath("aa")
+	if err != nil {
+		t.Skip("aa not available")
+	}
+	src := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(src, "sbin"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "sbin/md5"), []byte("digest tool"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(t.TempDir(), "payload.000")
+	if out, err := exec.Command(aaPath, "archive", "-d", src, "-o", archive).CombinedOutput(); err != nil {
+		t.Fatalf("aa archive: %v: %s", err, out)
+	}
+	payload, err := os.ReadFile(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data bytes.Buffer
+	zw := zip.NewWriter(&data)
+	for name, content := range map[string][]byte{
+		"AssetData/payloadv2/payload.000": payload,
+		"AssetData/payloadv2/links.txt":   []byte("=sbin/md5\n+sbin/sha1\n"),
+	} {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ota, err := NewOTA(bytes.NewReader(data.Bytes()), int64(data.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	var extracted []string
+	if err := ota.GetPayloadFilesWithCallback(".*", "", out, func(dst string) { extracted = append(extracted, dst) }); err != nil {
+		t.Fatalf("GetPayloadFilesWithCallback: %v", err)
+	}
+	md5, err := os.Stat(filepath.Join(out, "sbin/md5"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sha1, err := os.Stat(filepath.Join(out, "sbin/sha1"))
+	if err != nil || !os.SameFile(md5, sha1) {
+		t.Fatalf("sbin/sha1 is not a hardlink of sbin/md5: %v", err)
+	}
+	if len(extracted) != 2 {
+		t.Fatalf("callback saw %v, want the file and its link", extracted)
 	}
 }
