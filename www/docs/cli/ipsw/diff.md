@@ -33,6 +33,8 @@ ipsw diff <IPSW|OTA|DIR> <IPSW|OTA|DIR> [flags]
 ❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
 # Diff two OTAs (darwin only, requires full OTAs)
 ❯ ipsw diff <old.ota> <new.ota> --output <output/folder> --markdown
+# Diff two macOS OTAs using one Mac's kernelcache
+❯ ipsw diff <old.ota> <new.ota> --device Mac17,6 --output <output/folder> --markdown
 # Diff two OTAs with AEA key database
 ❯ ipsw diff <old.ota> <new.ota> --key-db keys.json --output <output/folder> --markdown
 # Diff two ota patch rsr output directories
@@ -51,7 +53,7 @@ ipsw diff <IPSW|OTA|DIR> <IPSW|OTA|DIR> [flags]
       --cache-dir string                       Override default cache directory (default: $XDG_CACHE_HOME/ipsw/diffs or ~/Library/Caches/ipsw/diffs)
       --cache-max-size string                  LRU eviction threshold for the cache directory (e.g. 5GiB, 500MB) (default "5GiB")
       --clean[=true|false]                     Delete the cached DB for this IPSW pair before running
-      --device string                          IPSW device product type or board to compare
+      --device string                          Device product type or board to compare (IPSW and OTA inputs)
       --ent[=true|false]                       Diff MachO entitlements
       --feat[=true|false]                      Diff feature flags
       --files[=true|false]                     Diff files

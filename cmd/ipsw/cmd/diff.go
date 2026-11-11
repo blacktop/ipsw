@@ -67,7 +67,7 @@ func buildDiffCacheConfig() (diff.CacheConfig, error) {
 
 func init() {
 	rootCmd.AddCommand(diffCmd)
-	diffCmd.Flags().String("device", "", "IPSW device product type or board to compare")
+	diffCmd.Flags().String("device", "", "Device product type or board to compare (IPSW and OTA inputs)")
 	viper.BindPFlag("diff.device", diffCmd.Flags().Lookup("device"))
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
 	diffCmd.Flags().BoolP("markdown", "m", false, "Output diff as Markdown")
@@ -183,6 +183,8 @@ var diffCmd = &cobra.Command{
 		❯ ipsw diff <old.ipsw> <new.ipsw> --fw --launchd --output <output/folder> --markdown
 		# Diff two OTAs (darwin only, requires full OTAs)
 		❯ ipsw diff <old.ota> <new.ota> --output <output/folder> --markdown
+		# Diff two macOS OTAs using one Mac's kernelcache
+		❯ ipsw diff <old.ota> <new.ota> --device Mac17,6 --output <output/folder> --markdown
 		# Diff two OTAs with AEA key database
 		❯ ipsw diff <old.ota> <new.ota> --key-db keys.json --output <output/folder> --markdown
 		# Diff two ota patch rsr output directories

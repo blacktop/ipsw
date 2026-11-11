@@ -342,15 +342,23 @@ func (d *Diff) getInfo() (err error) {
 			newOTA.Close()
 			return err
 		}
-		if d.conf.Device != "" {
-			return closeBoth(fmt.Errorf("--device selects IPSW build identities and cannot be used with OTA diffs"))
-		}
 		// Both are OTAs — validate scope (Phase 1: full OTAs only).
 		if err := validateOTAScope(oldInfo); err != nil {
 			return closeBoth(fmt.Errorf("'Old' OTA: %w", err))
 		}
 		if err := validateOTAScope(newInfo); err != nil {
 			return closeBoth(fmt.Errorf("'New' OTA: %w", err))
+		}
+		// --device narrows each BuildManifest to one device's identities, so the
+		// kernelcache pair comes from the same device IPSW mode would diff.
+		if d.conf.Device != "" {
+			var err error
+			if oldInfo, err = oldInfo.ForDevice(d.conf.Device); err != nil {
+				return closeBoth(fmt.Errorf("'Old' OTA: %w", err))
+			}
+			if newInfo, err = newInfo.ForDevice(d.conf.Device); err != nil {
+				return closeBoth(fmt.Errorf("'New' OTA: %w", err))
+			}
 		}
 		if err := configureOTAContext(&d.Old, oldInfo, d.tmpDir); err != nil {
 			return closeBoth(fmt.Errorf("'Old' OTA: %w", err))
@@ -372,6 +380,9 @@ func (d *Diff) getInfo() (err error) {
 				d.Old.Version, d.Old.Build,
 				d.New.Version, d.New.Build,
 			)
+			if d.conf.Device != "" {
+				d.Title += fmt.Sprintf(" (%s)", d.conf.Device)
+			}
 		}
 		return nil
 

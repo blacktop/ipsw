@@ -706,3 +706,71 @@ func TestLookupAEAKeyUsesArchiveStemFromDownloadedFilename(t *testing.T) {
 		t.Fatalf("lookupAEAKey() = %q, want %q", key, "db-key")
 	}
 }
+
+// otaWithKernelcaches builds a synthetic OTA whose BuildManifest lists one
+// kernelcache per board, with a member for each under AssetData/boot/.
+func otaWithKernelcaches(t *testing.T, boards map[string]string) (*otapkg.AA, *info.Info) {
+	t.Helper()
+	var data bytes.Buffer
+	zw := zip.NewWriter(&data)
+	manifest := &plist.BuildManifest{}
+	for board, kernel := range boards {
+		w, err := zw.Create("AssetData/boot/" + kernel)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte("synthetic kernelcache")); err != nil {
+			t.Fatal(err)
+		}
+		manifest.BuildIdentities = append(manifest.BuildIdentities, plist.BuildIdentity{
+			ApProductType: "Mac" + board,
+			Info:          plist.IdentityInfo{DeviceClass: board},
+			Manifest:      map[string]plist.IdentityManifest{"KernelCache": {Info: map[string]any{"Path": kernel}}},
+		})
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ota, err := otapkg.NewOTA(bytes.NewReader(data.Bytes()), int64(data.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ota, &info.Info{Plists: &plist.Plists{BuildManifest: manifest}}
+}
+
+// TestSelectOTAKernelcachePairFollowsSelectedDevice pins the kernelcache pair
+// to the device --device selects: without it the first shared board in sorted
+// order is used, with it the manifest narrowed by ForDevice decides.
+func TestSelectOTAKernelcachePairFollowsSelectedDevice(t *testing.T) {
+	boards := map[string]string{"J132AP": "kernelcache.release.mac14j", "J474SAP": "kernelcache.release.mac17j"}
+	oldOTA, oldInfo := otaWithKernelcaches(t, boards)
+	newOTA, newInfo := otaWithKernelcaches(t, boards)
+	oldCtx := &Context{otaFile: oldOTA, Info: oldInfo, IsMacOS: true}
+	newCtx := &Context{otaFile: newOTA, Info: newInfo, IsMacOS: true}
+
+	oldMember, newMember, err := selectOTAKernelcachePair(oldCtx, newCtx)
+	if err != nil || filepath.Base(oldMember) != "kernelcache.release.mac14j" || oldMember != newMember {
+		t.Fatalf("default pair = (%q, %q, %v), want the first board's kernelcache", oldMember, newMember, err)
+	}
+
+	for _, device := range []string{"MacJ474SAP", "j474sap"} {
+		selOld, err := oldInfo.ForDevice(device)
+		if err != nil {
+			t.Fatal(err)
+		}
+		selNew, err := newInfo.ForDevice(device)
+		if err != nil {
+			t.Fatal(err)
+		}
+		oldMember, newMember, err = selectOTAKernelcachePair(
+			&Context{otaFile: oldOTA, Info: selOld, IsMacOS: true},
+			&Context{otaFile: newOTA, Info: selNew, IsMacOS: true})
+		if err != nil || filepath.Base(oldMember) != "kernelcache.release.mac17j" || oldMember != newMember {
+			t.Fatalf("--device %s pair = (%q, %q, %v), want that board's kernelcache", device, oldMember, newMember, err)
+		}
+	}
+
+	if _, err := oldInfo.ForDevice("Mac99,9"); err == nil {
+		t.Fatal("ForDevice accepted a device the manifest does not list")
+	}
+}

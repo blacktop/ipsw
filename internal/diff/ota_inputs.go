@@ -538,9 +538,11 @@ func selectOTAKernelcachePair(
 	return selectKernelcacheViaBasename(oldCtx, newCtx)
 }
 
-// macOSKernelcacheDevice is the preferred baseline for macOS OTA kernel pairing.
-const macOSKernelcacheDevice = "Macmini9,1"
-
+// selectKernelcacheViaManifest pairs kernelcaches by the board (device class)
+// the BuildManifest lists them under. With --device the manifests were narrowed
+// to that device before this runs; otherwise the first board in sorted order
+// that both OTAs share is used, so a macOS OTA diff without --device may pick
+// a different Mac than the IPSW diff next to it.
 func selectKernelcacheViaManifest(
 	oldCtx, newCtx *Context,
 ) (string, string, error) {
@@ -552,20 +554,6 @@ func selectKernelcacheViaManifest(
 		models = append(models, m)
 	}
 	sort.Strings(models)
-	// For macOS OTAs (which expose many device-specific
-	// kernelcaches), prefer the same fixed device the IPSW path
-	// uses so repeated runs and IPSW vs OTA diffs are consistent.
-	if oldCtx.IsMacOS {
-		if _, ok := oldKCs[macOSKernelcacheDevice]; ok {
-			rest := make([]string, 0, len(models))
-			for _, m := range models {
-				if m != macOSKernelcacheDevice {
-					rest = append(rest, m)
-				}
-			}
-			models = append([]string{macOSKernelcacheDevice}, rest...)
-		}
-	}
 
 	for _, kmodel := range models {
 		oldPaths := oldKCs[kmodel]
