@@ -168,14 +168,20 @@ func (d *Diff) Markdown() error {
 	}
 
 	// SECTION: Firmware — owned by firmwaresTask (body in tasks_firmwares.go).
-	if ft := newFirmwaresTask(d); !ft.Empty() {
+	// The iBoot sub-section lives under it, so the heading is written here when
+	// iBoot has rows but no firmware changed; otherwise `### iBoot` would land
+	// under whatever section came before.
+	ft, it := newFirmwaresTask(d), newIBootTask(d)
+	if !ft.Empty() {
 		if err := ft.Markdown(&out, d.conf.Output); err != nil {
 			return err
 		}
+	} else if !it.Empty() {
+		out.WriteString("## Firmware\n\n")
 	}
 
-	// SECTION: iBoot — owned by ibootTask (body in tasks_iboot.go).
-	if err := newIBootTask(d).Markdown(&out, d.conf.Output); err != nil {
+	// SUB-SECTION: iBoot — owned by ibootTask (body in tasks_iboot.go).
+	if err := it.Markdown(&out, d.conf.Output); err != nil {
 		return err
 	}
 

@@ -603,3 +603,24 @@ func TestVersionTablesNameTheInputOS(t *testing.T) {
 		})
 	}
 }
+
+// TestIBootRendersUnderFirmwareHeading pins the iBoot sub-section to the
+// Firmware section even when no firmware image changed, so `### iBoot` never
+// lands under the section rendered before it.
+func TestIBootRendersUnderFirmwareHeading(t *testing.T) {
+	d := newSameKernelDiff(t, testKernelVersion())
+	d.IBoot = &IBootDiff{Versions: []string{"iBoot-13822.1.1", "iBoot-13822.1.2"}}
+	if err := d.Markdown(); err != nil {
+		t.Fatal(err)
+	}
+	readme, err := os.ReadFile(filepath.Join(d.conf.Output, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(readme), "## Firmware\n\n### iBoot\n") {
+		t.Fatalf("iBoot is not under a Firmware heading:\n%s", readme)
+	}
+	if strings.Count(string(readme), "## Firmware\n") != 1 {
+		t.Fatalf("Firmware heading written more than once:\n%s", readme)
+	}
+}
