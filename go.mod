@@ -77,7 +77,7 @@ require (
 	github.com/vbauerster/cupwriter v0.0.5
 	github.com/vbauerster/mpb/v8 v8.16.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.58.0
+	golang.org/x/crypto v0.59.0
 	golang.org/x/exp v0.0.0-20261109185158-a52e3aef5920
 	golang.org/x/image v0.48.0
 	golang.org/x/net v0.62.0
