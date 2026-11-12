@@ -452,7 +452,7 @@ func (f *File) getPrebuiltLoaderSet(uuid types.UUID) string {
 		output = fmt.Sprintf("Prebuilt Loader Set:         %3dMB, address: 0x%09X -> 0x%09X\n",
 			(f.Headers[uuid].ProgramsPblSetPoolAddr-f.Headers[uuid].DylibsPblSetAddr)/1024/1024,
 			f.Headers[uuid].DylibsPblSetAddr,
-			f.Headers[uuid].ProgramsPblSetPoolAddr-f.Headers[uuid].DylibsPblSetAddr)
+			f.Headers[uuid].ProgramsPblSetPoolAddr)
 	}
 	return output
 }
