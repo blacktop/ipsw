@@ -176,7 +176,7 @@ var diffCmd = &cobra.Command{
 		and any sections skipped because they do not apply to the inputs.
 
 		With --markdown and --output, status.json beside README.md records the same:
-		{"complete": false, "failed_sections": ["..."], "skipped_sections": [{"section": "...", "reason": "..."}]}
+		` + "`" + `{"complete": false, "failed_sections": ["..."], "skipped_sections": [{"section": "...", "reason": "..."}]}` + "`" + `
 		A nonzero exit with "complete": true means only cleanup failed.`),
 	Example: heredoc.Doc(`
 		# Diff two IPSWs
