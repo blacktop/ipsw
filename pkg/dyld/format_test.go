@@ -128,3 +128,14 @@ func TestSwiftOptsInfoHeaderGuard(t *testing.T) {
 		}
 	}
 }
+
+func TestPrebuiltLoaderSetRange(t *testing.T) {
+	uuid := types.UUID{1}
+	f := &File{IsDyld4: true, Headers: map[types.UUID]CacheHeader{
+		uuid: {DylibsPblSetAddr: 0x2DC6B19D0, ProgramsPblSetPoolAddr: 0x2DCEF1D90},
+	}}
+	want := "Prebuilt Loader Set:           8MB, address: 0x2DC6B19D0 -> 0x2DCEF1D90\n"
+	if got := f.getPrebuiltLoaderSet(uuid); got != want {
+		t.Fatalf("getPrebuiltLoaderSet() = %q, want %q", got, want)
+	}
+}
