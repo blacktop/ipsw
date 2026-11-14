@@ -43,7 +43,7 @@ type ByProductType struct{ Devices }
 func (s ByProductType) Less(i, j int) bool {
 	devI := utils.DeconstructDevice(s.Devices[i].ProductType)
 	devJ := utils.DeconstructDevice(s.Devices[j].ProductType)
-	return fmt.Sprintf("%s%02d%02d", devI.Family, devI.Major, devI.Minor) < fmt.Sprintf("%s%02d%02d", devJ.Family, devJ.Major, devJ.Minor)
+	return fmt.Sprintf("%s%02d%02d%s", devI.Family, devI.Major, devI.Minor, devI.Variant) < fmt.Sprintf("%s%02d%02d%s", devJ.Family, devJ.Major, devJ.Minor, devJ.Variant)
 }
 
 // DeviceTrait object
