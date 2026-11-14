@@ -44,7 +44,7 @@ require (
 	github.com/frida/frida-go v1.1.1-0.20260717193356-5cbe9b60fbd2
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-	github.com/gen2brain/beeep v0.11.3
+	github.com/gen2brain/beeep v0.12.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/glebarez/sqlite v1.11.0
@@ -78,7 +78,7 @@ require (
 	github.com/vbauerster/mpb/v8 v8.16.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.59.0
-	golang.org/x/exp v0.0.0-20261109185158-a52e3aef5920
+	golang.org/x/exp v0.0.0-20261113113407-e3970619a1a4
 	golang.org/x/image v0.48.0
 	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.38.0
@@ -144,6 +144,7 @@ require (
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dvsekhvalnov/jose2go v1.8.0 // indirect
+	github.com/ebitengine/purego v0.10.2 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/esiqveland/notify v0.13.3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -175,7 +176,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.10.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/jackmordaunt/icns/v3 v3.0.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
