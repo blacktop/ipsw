@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/fairplay"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
@@ -116,7 +117,7 @@ func runExportAuthorization(cmd *cobra.Command, _ []string) error {
 	if err := writeAuthorization(directory, payload); err != nil {
 		return err
 	}
-	cmd.Println("Authorization saved to", filepath.Join(directory.Name(), authorizationFilename))
+	log.Infof("Authorization saved to %s", filepath.Join(directory.Name(), authorizationFilename))
 	return nil
 }
 

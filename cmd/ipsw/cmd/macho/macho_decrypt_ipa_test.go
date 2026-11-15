@@ -8,10 +8,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/apex/log"
+	"github.com/apex/log/handlers/memory"
 	"github.com/blacktop/ipsw/pkg/fairplay"
 )
 
+// captureLog records what a command logs for the rest of the test.
+func captureLog(t *testing.T) *memory.Handler {
+	t.Helper()
+	logger := log.Log.(*log.Logger)
+	previous := logger.Handler
+	handler := memory.New()
+	log.SetHandler(handler)
+	t.Cleanup(func() { log.SetHandler(previous) })
+	return handler
+}
+
 func TestDecryptIPACommand(t *testing.T) {
+	logged := captureLog(t)
 	called := false
 	command := newMachoDecryptIPACmd(func(ipa, auth, output string) (fairplay.Result, error) {
 		called = true
@@ -20,15 +34,21 @@ func TestDecryptIPACommand(t *testing.T) {
 		}
 		return fairplay.Result{ParentSyncUnconfirmed: true}, nil
 	})
-	var stdout, stderr bytes.Buffer
-	command.SetOut(&stdout)
-	command.SetErr(&stderr)
+	command.SetOut(&bytes.Buffer{})
+	command.SetErr(&bytes.Buffer{})
 	command.SetArgs([]string{"fixture.ipa", "--auth", "fixture.fpauth", "--output", "new-output"})
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !called || !strings.Contains(stdout.String(), "new-output") || !strings.Contains(stderr.String(), "durability") {
-		t.Fatalf("missing result: %q / %q", stdout.String(), stderr.String())
+	if !called || len(logged.Entries) != 2 {
+		t.Fatalf("called = %v, logged %d entries; want the result and a warning", called, len(logged.Entries))
+	}
+	result, warning := logged.Entries[0], logged.Entries[1]
+	if result.Level != log.InfoLevel || !strings.Contains(result.Message, "new-output") {
+		t.Fatalf("unexpected result entry: %v %q", result.Level, result.Message)
+	}
+	if warning.Level != log.WarnLevel || !strings.Contains(warning.Message, "durability") {
+		t.Fatalf("unexpected warning entry: %v %q", warning.Level, warning.Message)
 	}
 }
 
@@ -51,16 +71,16 @@ func TestDecryptIPACommandRequiresExplicitInputs(t *testing.T) {
 }
 
 func TestDecryptIPACommandPreservesBackendFailure(t *testing.T) {
+	logged := captureLog(t)
 	command := newMachoDecryptIPACmd(func(_, _, _ string) (fairplay.Result, error) { return fairplay.Result{}, fairplay.ErrLicenseAbsent })
-	var stdout bytes.Buffer
-	command.SetOut(&stdout)
+	command.SetOut(&bytes.Buffer{})
 	command.SetErr(&bytes.Buffer{})
 	command.SetArgs([]string{"fixture.ipa", "--auth", "fixture.fpauth", "--output", "new-output"})
 	if err := command.Execute(); !errors.Is(err, fairplay.ErrLicenseAbsent) {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if stdout.Len() != 0 {
-		t.Fatal("failed decryption printed success")
+	if len(logged.Entries) != 0 {
+		t.Fatalf("failed decryption logged %q", logged.Entries[0].Message)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/fairplay"
 	"github.com/spf13/cobra"
 )
@@ -120,9 +121,9 @@ func newMachoDecryptIPACmd(decrypt decryptIPAFunc) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.Println("Decrypted IPA written to", output)
+			log.Infof("Decrypted IPA written to %s", output)
 			if result.ParentSyncUnconfirmed {
-				cmd.PrintErrln("Output was published, but directory durability could not be confirmed.")
+				log.Warn("Output was published, but directory durability could not be confirmed")
 			}
 			return nil
 		},
