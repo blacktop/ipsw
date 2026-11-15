@@ -443,7 +443,14 @@ func ClassifyOTAChannel(record OTARecord) string {
 		}
 		consensus = mergeOTAChannelVotes(consensus, vote)
 	}
-	consensus = mergeOTAChannelVotes(consensus, classifyOTASighting(otaAssetSighting(record.Asset)))
+	asset := otaAssetSighting(record.Asset)
+	assetVote := classifyOTASighting(asset)
+	// Apple keeps the "...RC" documentation ID on builds it ships, so on an
+	// asset every sighting says was released it is a leftover, not a vote.
+	if consensus == OTAChannelRelease && assetVote == OTAChannelRC && !otaSeedMarked(asset) {
+		assetVote = otaChannelAbstain
+	}
+	consensus = mergeOTAChannelVotes(consensus, assetVote)
 	if consensus == otaChannelAbstain {
 		return OTAChannelUnknown
 	}
@@ -467,21 +474,30 @@ func mergeOTAChannelVotes(consensus, vote string) string {
 	}
 }
 
+// classifyOTASighting votes on one sighting. Release delivery with no seed
+// marker outranks an RC documentation ID: Apple serves shipped builds to the
+// release audience under the documentation ID their RC had.
 func classifyOTASighting(sighting OTASighting) string {
+	released := sighting.Source == OTASourceMesu ||
+		sighting.Source == OTASourcePallas && otaReleaseAudience(sighting.AudienceName)
 	switch {
-	case otaRCDocumentationID.MatchString(sighting.DocumentationID):
+	case otaRCDocumentationID.MatchString(sighting.DocumentationID) && (!released || otaSeedMarked(sighting)):
 		return OTAChannelRC
 	case sighting.ReleaseType == "Beta", strings.Contains(sighting.DocumentationID, "Beta"):
 		return OTAChannelBeta
-	case sighting.ReleaseType != "", sighting.IsSeed != nil && *sighting.IsSeed:
+	case otaSeedMarked(sighting):
 		return OTAChannelUnknown
-	case sighting.Source == OTASourceMesu:
-		return OTAChannelRelease
-	case sighting.Source == OTASourcePallas && otaReleaseAudience(sighting.AudienceName):
+	case released:
 		return OTAChannelRelease
 	default:
 		return otaChannelAbstain
 	}
+}
+
+// otaSeedMarked reports whether Apple marked the asset as anything but a
+// plain release: a ReleaseType or a true seed flag.
+func otaSeedMarked(sighting OTASighting) bool {
+	return sighting.ReleaseType != "" || sighting.IsSeed != nil && *sighting.IsSeed
 }
 
 func otaAssetSighting(asset types.Asset) OTASighting {

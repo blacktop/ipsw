@@ -211,10 +211,11 @@ var downloadOtaCmd = &cobra.Command{
 		encryption, and provenance. Anything Apple did not supply is null; sha256,
 		posting_date, and RC status are never inferred. channel.kind is release,
 		beta, rc, or unknown. Every sighting and the asset's own markers are
-		classified from Apple markers only (rc when the documentation ID ends in
-		RC, beta when Apple's ReleaseType is Beta or the documentation ID contains
-		Beta, release when a release audience or the public mesu feed served the
-		asset with no seed marker) and the kind is emitted only when all decided
+		classified from Apple markers only (release when a release audience or the
+		public mesu feed served the asset with no seed marker, even under an RC
+		documentation ID, which Apple keeps on shipped builds; otherwise rc when the
+		documentation ID ends in RC, beta when Apple's ReleaseType is Beta or the
+		documentation ID contains Beta) and the kind is emitted only when all decided
 		evidence agrees; conflicting or undecided evidence yields unknown.
 		channel.audiences and provenance.sightings list every Pallas audience and
 		asset set that advertised the URL, each with its own nullable is_seed.

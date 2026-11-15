@@ -163,15 +163,16 @@ func TestNewOTAJSONEnvelopeConflictingChannelEvidenceIsUnknown(t *testing.T) {
 		Build: "23G6083", DocumentationID: "iOS2661Short", ReleaseType: "Beta", IsSeed: &seed,
 	})
 
-	rcVersusRelease := otaFixtureRecord()
-	rcVersusRelease.Asset.RelativePath = "rc.aea"
-	rcVersusRelease.Asset.DocumentationID = "iOS2661RC"
+	seededRCVersusRelease := otaFixtureRecord()
+	seededRCVersusRelease.Asset.RelativePath = "rc.aea"
+	seededRCVersusRelease.Asset.DocumentationID = "iOS2661RC"
+	seededRCVersusRelease.Asset.ReleaseType = "Beta"
 
 	assetOnlyBeta := otaFixtureRecord()
 	assetOnlyBeta.Asset.RelativePath = "asset-beta.aea"
 	assetOnlyBeta.Asset.ReleaseType = "Beta"
 
-	_, env := otaEnvelopeJSON(t, mixed, rcVersusRelease, assetOnlyBeta)
+	_, env := otaEnvelopeJSON(t, mixed, seededRCVersusRelease, assetOnlyBeta)
 	if len(env.OTAs) != 3 {
 		t.Fatalf("got %d otas, want 3", len(env.OTAs))
 	}
@@ -294,14 +295,26 @@ func TestNewOTAJSONEnvelopePostingDateNullWhenAssetSetDisagrees(t *testing.T) {
 	}
 }
 
-func TestNewOTAJSONEnvelopeRCOnlyFromDocumentationID(t *testing.T) {
-	release := otaFixtureRecord()
-	release.Asset.ProductSystemName = "macOS"
-	release.Asset.OSVersion = "13.7.8"
-	release.Asset.Build = "22H730"
-	release.Asset.DocumentationID = "macOS1378RC"
-	release.Asset.RelativePath = "mac.zip"
-	release.Sightings[0].DocumentationID = "macOS1378RC"
+// TestNewOTAJSONEnvelopeReleaseDeliveryOutranksRCDocumentationID pins the RC
+// rule: Apple keeps the "...RC" documentation ID on builds it ships, so an
+// asset the release audience serves with no seed marker is a release, and rc
+// is reported only for an RC documentation ID outside release delivery.
+func TestNewOTAJSONEnvelopeReleaseDeliveryOutranksRCDocumentationID(t *testing.T) {
+	// The macOS 26.7.3 final: RC documentation ID, release audience, is_seed false.
+	notSeed := false
+	shipped := otaFixtureRecord()
+	shipped.Asset.ProductSystemName = "macOS"
+	shipped.Asset.OSVersion = "26.7.3"
+	shipped.Asset.Build = "25G342"
+	shipped.Asset.DocumentationID = "macOS2673RC"
+	shipped.Asset.RelativePath = "mac.zip"
+	shipped.Sightings[0].DocumentationID = "macOS2673RC"
+	shipped.Sightings[0].IsSeed = &notSeed
+
+	// Only the asset carries the leftover ID; the sighting has the release one.
+	leftover := otaFixtureRecord()
+	leftover.Asset.RelativePath = "leftover.aea"
+	leftover.Asset.DocumentationID = "iOS2661RC"
 
 	seed := true
 	seeded := otaFixtureRecord()
@@ -313,10 +326,18 @@ func TestNewOTAJSONEnvelopeRCOnlyFromDocumentationID(t *testing.T) {
 		AudienceVersion: "27", DocumentationID: "iOS27RC2", ReleaseType: "Beta", IsSeed: &seed,
 	}}
 
-	_, env := otaEnvelopeJSON(t, release, seeded)
+	_, env := otaEnvelopeJSON(t, shipped, leftover, seeded)
+	want := map[string]string{
+		"https://updates.example/mac.zip":      download.OTAChannelRelease,
+		"https://updates.example/leftover.aea": download.OTAChannelRelease,
+		"https://updates.example/rc.aea":       download.OTAChannelRC,
+	}
+	if len(env.OTAs) != len(want) {
+		t.Fatalf("got %d otas, want %d", len(env.OTAs), len(want))
+	}
 	for _, ota := range env.OTAs {
-		if ota.Channel.Kind != download.OTAChannelRC {
-			t.Fatalf("%s kind = %q, want rc (documentation_id %s)", ota.URL, ota.Channel.Kind, deref(ota.Channel.DocumentationID))
+		if ota.Channel.Kind != want[ota.URL] {
+			t.Fatalf("%s kind = %q, want %q (documentation_id %s)", ota.URL, ota.Channel.Kind, want[ota.URL], deref(ota.Channel.DocumentationID))
 		}
 	}
 }
@@ -611,6 +632,8 @@ func TestSelectOTARecordsByChannelFailsClosed(t *testing.T) {
 	rc.Asset.SupportedDevices = []string{"iPhone16,1"}
 	rc.Asset.SupportedDeviceModels = []string{"D83AP"}
 	rc.Sightings[0].DocumentationID = "iOS27RC"
+	rc.Sightings[0].AudienceID = otaTestDevBetaAudienceID
+	rc.Sightings[0].AudienceName = download.OTAAudienceDeveloperBeta
 	rc.Devices = []string{"iPhone16,1", "iPhone16,2"}
 	rc.Models = []string{"D83AP", "D84AP"}
 
