@@ -15,7 +15,7 @@ terminal. The command requests sudo approval for its own short-lived helper;
 do not run the whole command with sudo.
 
 ```sh
-./ipsw macho export-auth
+ipsw macho export-auth
 ```
 
 The export creates `~/.config/ipsw/fairplay/authorization.fpauth`; pass
@@ -35,11 +35,11 @@ authorization. The authorization is read from
 `~/.config/ipsw/fairplay/authorization.fpauth` unless you pass `--auth FILE`:
 
 ```sh
-./ipsw macho decrypt-ipa ./LicensedApp.ipa --output ./decrypted-app
+ipsw macho decrypt-ipa licensedApp.ipa --output ./decrypted
 ```
 
-The output directory must not already exist. Successful decryption writes
-`decrypted-app/repacked.ipa`; the input IPA is preserved. A "matching license
+Successful decryption writes `decrypted/repacked.ipa`; the input IPA is
+preserved. Decrypting into the same directory again replaces the earlier result. A "matching license
 record was not found" error means the exported authorization does not contain
 the license record required by that IPA. Decryption does not replace the app's
 signing or provisioning requirements and does not make the result installable

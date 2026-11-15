@@ -3,6 +3,7 @@ package macho
 import (
 	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -60,6 +61,86 @@ func TestDecryptIPACommandPreservesBackendFailure(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Fatal("failed decryption printed success")
+	}
+}
+
+// newDirectoryEngine writes one result file the way the engine does: only into a new directory.
+func newDirectoryEngine(content string) decryptIPAFunc {
+	return func(_, _, output string) (fairplay.Result, error) {
+		if err := os.Mkdir(output, 0o700); err != nil {
+			return fairplay.Result{}, fairplay.ErrOfflineProcessing
+		}
+		return fairplay.Result{}, os.WriteFile(filepath.Join(output, "repacked.ipa"), []byte(content), 0o400)
+	}
+}
+
+func runDecryptIPA(t *testing.T, decrypt decryptIPAFunc, output string) error {
+	t.Helper()
+	command := newMachoDecryptIPACmd(decrypt)
+	command.SetOut(&bytes.Buffer{})
+	command.SetErr(&bytes.Buffer{})
+	command.SetArgs([]string{"fixture.ipa", "--auth", "fixture.fpauth", "--output", output})
+	return command.Execute()
+}
+
+func outputNames(t *testing.T, output string) string {
+	t.Helper()
+	entries, err := os.ReadDir(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, len(entries))
+	for i, entry := range entries {
+		names[i] = entry.Name()
+	}
+	return strings.Join(names, ",")
+}
+
+func TestDecryptIPACommandRerunReplacesEarlierResult(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "decrypted")
+	if err := runDecryptIPA(t, newDirectoryEngine("first"), output); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(output, "notes.txt"), []byte("mine"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := runDecryptIPA(t, newDirectoryEngine("second"), output); err != nil {
+		t.Fatal(err)
+	}
+	result, err := os.ReadFile(filepath.Join(output, "repacked.ipa"))
+	if err != nil || string(result) != "second" {
+		t.Fatalf("result = %q, %v; want the rerun's result", result, err)
+	}
+	if names := outputNames(t, output); names != "notes.txt,repacked.ipa" {
+		t.Fatalf("output holds %q; want the result beside the untouched file", names)
+	}
+}
+
+func TestDecryptIPACommandFailedRerunKeepsEarlierResult(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "decrypted")
+	if err := runDecryptIPA(t, newDirectoryEngine("first"), output); err != nil {
+		t.Fatal(err)
+	}
+	failing := func(_, _, _ string) (fairplay.Result, error) {
+		return fairplay.Result{}, fairplay.ErrLicenseAbsent
+	}
+	if err := runDecryptIPA(t, failing, output); !errors.Is(err, fairplay.ErrLicenseAbsent) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result, err := os.ReadFile(filepath.Join(output, "repacked.ipa"))
+	if err != nil || string(result) != "first" || outputNames(t, output) != "repacked.ipa" {
+		t.Fatalf("earlier result changed: %q, %v, %q", result, err, outputNames(t, output))
+	}
+}
+
+func TestDecryptIPACommandRejectsFileOutput(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "decrypted")
+	if err := os.WriteFile(output, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := runDecryptIPA(t, newDirectoryEngine("unused"), output)
+	if err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

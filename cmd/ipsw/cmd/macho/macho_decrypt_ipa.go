@@ -1,7 +1,9 @@
 package macho
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -22,13 +24,66 @@ func defaultAuthorizationDirectory() (string, error) {
 	return filepath.Join(home, ".config", "ipsw", "fairplay"), nil
 }
 
+type decryptIPAFunc func(ipa, authorization, output string) (fairplay.Result, error)
+
+// decryptInto makes a rerun replace the earlier result. The engine only writes a new
+// directory, so an existing output receives a fresh result decrypted inside it.
+func decryptInto(
+	decrypt decryptIPAFunc, ipa, authorization, output string,
+) (fairplay.Result, error) {
+	info, err := os.Stat(output)
+	if errors.Is(err, fs.ErrNotExist) {
+		return decrypt(ipa, authorization, output)
+	}
+	if err != nil {
+		return fairplay.Result{}, err
+	}
+	if !info.IsDir() {
+		return fairplay.Result{}, fmt.Errorf("output %q exists and is not a directory", output)
+	}
+	staging, err := os.MkdirTemp(output, ".decrypt-ipa-")
+	if err != nil {
+		return fairplay.Result{}, err
+	}
+	defer os.RemoveAll(staging)
+	fresh := filepath.Join(staging, "result")
+	result, err := decrypt(ipa, authorization, fresh)
+	if err != nil {
+		return fairplay.Result{}, err
+	}
+	entries, err := os.ReadDir(fresh)
+	if err != nil {
+		return fairplay.Result{}, err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if err := os.Rename(filepath.Join(fresh, name), filepath.Join(output, name)); err != nil {
+			return fairplay.Result{}, err
+		}
+	}
+	if err := syncDirectory(output); err != nil {
+		result.ParentSyncUnconfirmed = true
+	}
+	return result, nil
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
+}
+
 func init() { MachoCmd.AddCommand(newMachoDecryptIPACmd(fairplay.DecryptIPA)) }
 
-func newMachoDecryptIPACmd(decrypt func(string, string, string) (fairplay.Result, error)) *cobra.Command {
+func newMachoDecryptIPACmd(decrypt decryptIPAFunc) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "decrypt-ipa <IPA>",
 		Short: "Decrypt an IPA using an exported local authorization file",
-		Long: "Decrypt a licensed IPA into a new output directory. The authorization exported by " +
+		Long: "Decrypt a licensed IPA into an output directory; decrypting into the same directory " +
+			"again replaces the earlier result. The authorization exported by " +
 			"'ipsw macho export-auth' is read from ~/.config/ipsw/fairplay/authorization.fpauth " +
 			"unless --auth names another file.",
 		Example: heredoc.Doc(`
@@ -61,7 +116,7 @@ func newMachoDecryptIPACmd(decrypt func(string, string, string) (fairplay.Result
 			if err := cmd.Context().Err(); err != nil {
 				return err
 			}
-			result, err := decrypt(args[0], authorization, output)
+			result, err := decryptInto(decrypt, args[0], authorization, output)
 			if err != nil {
 				return err
 			}
@@ -74,7 +129,7 @@ func newMachoDecryptIPACmd(decrypt func(string, string, string) (fairplay.Result
 	}
 	command.Flags().String("auth", "",
 		"Exported local authorization file (default ~/.config/ipsw/fairplay/authorization.fpauth)")
-	command.Flags().StringP("output", "o", "", "New output directory (must not exist)")
+	command.Flags().StringP("output", "o", "", "Output directory (created if missing)")
 	_ = command.MarkFlagRequired("output")
 	_ = command.MarkFlagFilename("auth")
 	return command
