@@ -44,10 +44,18 @@ GORELEASER := hack/goreleaser/with-engine run "$(IPSW_FP_MANIFEST)" goreleaser
 _require-engine:
 	@test -n "$(IPSW_FP_MANIFEST)" || { \
 	  echo "ERROR: set IPSW_FP_MANIFEST to the offline-engine archive manifest."; \
-	  echo "       Targets requiring it: snapshot, dry_release, release, release-minor."; \
+	  echo "       Targets requiring it: snapshot, dry_release, test-engine, release, release-minor."; \
 	  exit 1; \
 	}
 	@hack/goreleaser/with-engine run "$(IPSW_FP_MANIFEST)" true
+
+.PHONY: test-engine
+test-engine: _require-sandbox _require-engine ## Decrypt the IPSW_FP_REPLAY fixture with each offline-engine build
+	@hack/goreleaser/test-engine check
+	@echo " > Building offline-engine targets"
+	@GOROOT=$(shell go env GOROOT) $(GORELEASER) build --id darwin_build --id darwin_extras_build --id linux_build --clean --timeout 60m --snapshot
+	@echo " > Testing offline-engine builds"
+	@hack/goreleaser/test-engine run dist
 
 .PHONY: dry_release
 dry_release: _require-sandbox _require-engine ## Run goreleaser without releasing/pushing artifacts to github
@@ -60,7 +68,7 @@ snapshot: _require-sandbox _require-engine ## Run goreleaser snapshot
 	@GOROOT=$(shell go env GOROOT) $(GORELEASER) --clean --timeout 60m --snapshot
 
 .PHONY: release
-release: _require-sandbox _require-engine ## Create a new release from the NEXT_VERSION
+release: _require-sandbox _require-engine test-engine ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
 	@GOROOT=$(shell go env GOROOT) GITHUB_TOKEN=$(shell gh auth token) $(GORELEASER) --clean --timeout 60m --skip=validate
@@ -68,7 +76,7 @@ release: _require-sandbox _require-engine ## Create a new release from the NEXT_
 	@hack/make/portfile ../ports
 
 .PHONY: release-minor
-release-minor: _require-sandbox _require-engine ## Create a new minor semver release
+release-minor: _require-sandbox _require-engine test-engine ## Create a new minor semver release
 	@echo " > Creating Release $(shell go tool svu --tag.pattern 'v3.1.*' minor)"
 	@hack/make/release $(shell go tool svu --tag.pattern 'v3.1.*' minor)
 	@GOROOT=$(shell go env GOROOT) $(GORELEASER) --clean --timeout 60m --skip=validate

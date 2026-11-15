@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Decrypt a known IPA with every release binary that links the offline engine.
+
+usage: test-engine check
+       test-engine run DIST
+
+run reads DIST/artifacts.json from a GoReleaser build and tests each binary
+that must carry the engine. Every binary is invoked through a symbolic link,
+as Homebrew installs it: a decrypt of missing input must report the engine's
+file error, and a decrypt of the replay IPA must produce the expected
+repacked IPA. Linux binaries run in Docker. check validates the replay
+fixture alone, so a release fails before its long build.
+
+IPSW_FP_REPLAY names the fixture: {"ipa": "...", "authorization": "...",
+"sha256": "..."}, where sha256 is the expected repacked.ipa. Relative paths
+are based on the fixture directory.
+"""
+
+import contextlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+# (GoReleaser build id, GOOS, GOARCH) of every binary that ships the engine.
+ENGINE_BUILDS = {
+    ("darwin_build", "darwin", "arm64"),
+    # The universal binary carries the engine in its arm64 slice.
+    ("darwin_build", "darwin", "all"),
+    ("darwin_extras_build", "darwin", "arm64"),
+    ("linux_build", "linux", "arm64"),
+    ("linux_build", "linux", "amd64"),
+}
+LINUX_IMAGE = "alpine:3.22"
+MISSING_INPUT = "offline operation could not read or write its files"
+SHA256 = re.compile(r"[0-9a-f]{64}")
+DECRYPT_TIMEOUT = 600
+
+
+class EngineTestError(Exception):
+    pass
+
+
+class Session:
+    """Runs commands where one binary executes: this host or a Linux container."""
+
+    def __init__(self, prefix, digest, paths):
+        self.prefix = prefix
+        self.digest = digest
+        self.binary, self.ipa, self.authorization, self.work = paths
+
+    def run(self, arguments, timeout=60):
+        try:
+            return subprocess.run(
+                self.prefix + arguments,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise EngineTestError(f"timed out after {timeout} seconds") from error
+
+    def must(self, arguments):
+        result = self.run(arguments)
+        if result.returncode != 0:
+            raise EngineTestError(f"{arguments[0]} failed: {last_line(result.stdout)}")
+        return result.stdout
+
+
+def last_line(output):
+    lines = output.strip().splitlines()
+    return lines[-1].strip() if lines else "no output"
+
+
+def replay_fixture(environment):
+    """Returns (IPA path, authorization path, expected SHA-256) from the fixture."""
+    name = environment.get("IPSW_FP_REPLAY", "")
+    if not name:
+        raise EngineTestError("set IPSW_FP_REPLAY to the replay fixture")
+    fixture = Path(name)
+    document = json.loads(fixture.read_text(encoding="utf-8"))
+    keys = ("ipa", "authorization", "sha256")
+    if not isinstance(document, dict) or set(document) != set(keys):
+        raise EngineTestError("replay fixture must contain exactly " + ", ".join(keys))
+    if not all(isinstance(document[key], str) for key in keys):
+        raise EngineTestError("replay fixture values must be text")
+    if not SHA256.fullmatch(document["sha256"]):
+        raise EngineTestError("replay sha256 must be 64 lowercase hexadecimal digits")
+    paths = []
+    for key in ("ipa", "authorization"):
+        path = Path(os.path.abspath(fixture.parent / document[key]))
+        if not path.is_file():
+            raise EngineTestError(f"replay {key} is not a file: {path}")
+        paths.append(path)
+    return paths[0], paths[1], document["sha256"]
+
+
+def engine_binaries(dist):
+    """Returns {(build id, GOOS, GOARCH): binary path} for every engine build."""
+    artifacts = json.loads((dist / "artifacts.json").read_text(encoding="utf-8"))
+    binaries = {}
+    for artifact in artifacts:
+        if artifact.get("type") != "Binary":
+            continue
+        build = (artifact.get("extra", {}).get("ID"), artifact.get("goos"), artifact.get("goarch"))
+        if build in ENGINE_BUILDS:
+            binaries[build] = Path(os.path.abspath(artifact["path"]))
+    missing = sorted(ENGINE_BUILDS - set(binaries))
+    if missing:
+        raise EngineTestError(
+            "the build produced no binary for " + ", ".join("/".join(build) for build in missing)
+        )
+    return binaries
+
+
+@contextlib.contextmanager
+def host_session(binary, ipa, authorization):
+    with tempfile.TemporaryDirectory(prefix="ipsw-engine-test-") as work:
+        yield Session(
+            [], ["shasum", "-a", "256"], (str(binary), str(ipa), str(authorization), work)
+        )
+
+
+@contextlib.contextmanager
+def linux_session(binary, ipa, authorization, architecture):
+    if shutil.which("docker") is None:
+        raise EngineTestError("Docker is required to test the Linux builds")
+    owner = f"uid={os.getuid()},gid={os.getgid()}"
+    private = f"rw,nosuid,nodev,noexec,mode=0700,{owner}"
+    paths = (
+        "/usr/local/bin/ipsw",
+        "/input/app.ipa",
+        "/authorization/authorization.fpauth",
+        "/work",
+    )
+    command = ["docker", "run", "--rm", "-d", "--platform", f"linux/{architecture}"]
+    command += ["--network", "none", "--read-only", "--cap-drop", "ALL"]
+    command += ["--security-opt", "no-new-privileges", "--user", f"{os.getuid()}:{os.getgid()}"]
+    command += ["--tmpfs", f"/authorization:{private},size=1m"]
+    command += ["--tmpfs", f"{paths[3]}:{private},size=2g"]
+    for source, destination in zip((binary, ipa, authorization), paths):
+        command += ["--mount", f"type=bind,src={source},dst={destination},readonly"]
+    started = subprocess.run(
+        command + [LINUX_IMAGE, "sleep", "infinity"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    if started.returncode != 0:
+        raise EngineTestError(f"could not start the container: {last_line(started.stdout)}")
+    container = last_line(started.stdout)
+    try:
+        yield Session(["docker", "exec", container], ["sha256sum"], paths)
+    finally:
+        subprocess.run(
+            ["docker", "rm", "-f", container], capture_output=True, timeout=60, check=False
+        )
+
+
+def exercise(session, expected):
+    link = session.work + "/ipsw"
+    session.must(["ln", "-s", session.binary, link])
+    decrypt = [link, "--config", "/dev/null", "--config-quiet", "macho", "decrypt-ipa"]
+    absent = session.work + "/absent"
+    missing = session.run(
+        decrypt + [absent + ".ipa", "--auth", absent + ".fpauth", "--output", absent]
+    )
+    if missing.returncode == 0 or MISSING_INPUT not in missing.stdout:
+        raise EngineTestError(
+            f"missing input must report {MISSING_INPUT!r}, got: {last_line(missing.stdout)}"
+        )
+    output = session.work + "/replay"
+    replay = session.run(
+        decrypt + [session.ipa, "--auth", session.authorization, "--output", output],
+        timeout=DECRYPT_TIMEOUT,
+    )
+    if replay.returncode != 0:
+        raise EngineTestError(f"replay decrypt failed: {last_line(replay.stdout)}")
+    digest = session.must(session.digest + [output + "/repacked.ipa"]).split()[0]
+    if digest != expected:
+        raise EngineTestError(f"repacked.ipa is {digest}, expected {expected}")
+
+
+def run(dist):
+    ipa, authorization, expected = replay_fixture(os.environ)
+    failures = 0
+    for build, binary in sorted(engine_binaries(dist).items()):
+        label = "/".join(build)
+        if build[1] == "linux":
+            session = linux_session(binary, ipa, authorization, build[2])
+        else:
+            session = host_session(binary, ipa, authorization)
+        try:
+            with session as active:
+                exercise(active, expected)
+        except EngineTestError as error:
+            failures += 1
+            print(f"FAIL {label}: {error}", flush=True)
+        else:
+            print(f"PASS {label}", flush=True)
+    if failures:
+        raise EngineTestError(f"{failures} offline-engine build(s) failed")
+
+
+def main(arguments):
+    try:
+        if arguments == ["check"]:
+            replay_fixture(os.environ)
+        elif len(arguments) == 2 and arguments[0] == "run":
+            run(Path(arguments[1]))
+        else:
+            sys.exit(__doc__.strip())
+    except (EngineTestError, OSError, ValueError) as error:
+        sys.exit(f"error: {error}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
