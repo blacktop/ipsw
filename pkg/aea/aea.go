@@ -11,6 +11,7 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -230,15 +231,42 @@ func (md Metadata) DecryptFCS(pemData []byte, pemDB string, proxy string, insecu
 	return recv.Open(nil, wrappedKeyData)
 }
 
+// SymmetricKey resolves the archive key from metadata: an embedded key if
+// present, otherwise the HPKE-wrapped FCS key.
+func (md Metadata) SymmetricKey(pemData []byte, pemDB string, proxy string, insecure bool) ([]byte, error) {
+	if encKey, ok := md["encryption_key"]; ok {
+		key, err := hex.DecodeString(string(encKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode hex sym key: %w", err)
+		}
+		return key, nil
+	}
+	key, err := md.DecryptFCS(pemData, pemDB, proxy, insecure)
+	if err != nil {
+		return nil, fmt.Errorf("failed to HPKE decrypt fcs-key: %w", err)
+	}
+	return key, nil
+}
+
 func Info(in string) (Metadata, error) {
-	// Structured metadata is small. Opaque auth data can be larger and is
-	// streamed by decryption when an explicit symmetric key is provided.
-	const maxMetadataSize = 16 << 20
 	f, err := os.Open(in)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return ReadMetadata(f, info.Size())
+}
+
+// ReadMetadata reads bounded AEA metadata without reading the encrypted payload.
+func ReadMetadata(source io.ReaderAt, size int64) (Metadata, error) {
+	// Structured metadata is small. Opaque auth data can be larger and is
+	// streamed by decryption when an explicit symmetric key is provided.
+	const maxMetadataSize = 16 << 20
+	f := io.NewSectionReader(source, 0, size)
 
 	var hdr Header
 	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
@@ -252,11 +280,7 @@ func Info(in string) (Metadata, error) {
 	if hdr.AuthDataLength > maxMetadataSize {
 		return nil, fmt.Errorf("AEA metadata exceeds %d bytes", maxMetadataSize)
 	}
-	finfo, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if int64(hdr.AuthDataLength) > finfo.Size()-int64(binary.Size(hdr)) {
+	if int64(hdr.AuthDataLength) > size-int64(binary.Size(hdr)) {
 		return nil, fmt.Errorf("truncated AEA metadata: %w", io.ErrUnexpectedEOF)
 	}
 	metadata := make(Metadata)

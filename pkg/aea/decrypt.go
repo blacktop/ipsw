@@ -12,7 +12,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -369,101 +368,96 @@ func verifyPadding(ctx context.Context, r io.ReaderAt, offset, size int64, mainK
 	return nil
 }
 
-func queueDecryptSegments(ctx context.Context, r *os.File, jobs chan<- decryptSegment, mainKey []byte, clusterMAC HMAC, root RootHeader, archiveSize int64, checksumBytes uint32) error {
+// walkSegments authenticates the cluster header chain starting at offset and
+// passes every segment to emit in order, without reading segment payloads. It
+// returns the offset and expected HMAC of the trailing padding.
+func walkSegments(ctx context.Context, r io.ReaderAt, offset, archiveSize int64, mainKey []byte, clusterMAC HMAC, root RootHeader, checksumBytes uint32, emit func(decryptSegment) error) (int64, HMAC, error) {
 	entrySize := int(checksumBytes) + 8
 	headersSize := entrySize * int(root.SegmentsPerCluster)
 	clusterHeader := make([]byte, headersSize+32+32*int(root.SegmentsPerCluster))
 	var output uint64
 	for cluster := uint32(0); output < root.FileSize; cluster++ {
 		if err := ctx.Err(); err != nil {
-			return err
+			return 0, clusterMAC, err
 		}
 		clusterKey, material, err := clusterKeyMaterial(mainKey, cluster)
 		if err != nil {
-			return err
+			return 0, clusterMAC, err
 		}
-		if _, err := io.ReadFull(r, clusterHeader); err != nil {
-			return fmt.Errorf("failed to read cluster %d header: %w", cluster, err)
+		if offset > archiveSize-int64(len(clusterHeader)) {
+			return 0, clusterMAC, fmt.Errorf("failed to read cluster %d header: %w", cluster, io.ErrUnexpectedEOF)
+		}
+		if _, err := r.ReadAt(clusterHeader, offset); err != nil {
+			return 0, clusterMAC, fmt.Errorf("failed to read cluster %d header: %w", cluster, err)
 		}
 		headers, macs := clusterHeader[:headersSize], clusterHeader[headersSize:]
 		mac := getHMAC(material.MAC[:], headers, macs)
 		if !hmac.Equal(clusterMAC[:], mac[:]) {
-			return fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cluster, clusterMAC, mac)
+			return 0, clusterMAC, fmt.Errorf("invalid cluster #%d HMAC: %x; expected %x", cluster, clusterMAC, mac)
 		}
 		copy(clusterMAC[:], macs[:32])
 		if err := decryptCTRInPlace(headers, material.Key[:], material.IV[:]); err != nil {
-			return fmt.Errorf("failed to decrypt segment headers: %w", err)
+			return 0, clusterMAC, fmt.Errorf("failed to decrypt segment headers: %w", err)
 		}
-		input, err := r.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return fmt.Errorf("failed to locate cluster data: %w", err)
-		}
+		offset += int64(len(clusterHeader))
 		prk := hkdf.Extract(sha256.New, clusterKey, nil)
 		for index := uint32(0); index < root.SegmentsPerCluster; index++ {
 			entry := headers[int(index)*entrySize : (int(index)+1)*entrySize]
-			job := decryptSegment{cluster: cluster, index: index, clusterPRK: prk, input: input, output: int64(output)}
+			job := decryptSegment{cluster: cluster, index: index, clusterPRK: prk, input: offset, output: int64(output)}
 			job.header.DecompressedSize = binary.LittleEndian.Uint32(entry)
 			job.header.CompressedSize = binary.LittleEndian.Uint32(entry[4:])
 			copy(job.header.Checksum[:], entry[8:])
 			copy(job.mac[:], macs[32+32*int(index):32+32*(int(index)+1)])
 			expected := min(uint64(root.SegmentSize), root.FileSize-output)
 			if uint64(job.header.DecompressedSize) != expected {
-				return fmt.Errorf("invalid segment %d (cluster %d) size: %d; expected %d", index, cluster, job.header.DecompressedSize, expected)
+				return 0, clusterMAC, fmt.Errorf("invalid segment %d (cluster %d) size: %d; expected %d", index, cluster, job.header.DecompressedSize, expected)
 			}
 			compressed := int64(job.header.CompressedSize)
 			if expected == 0 {
 				if compressed != 0 {
-					return fmt.Errorf("nonempty unused segment %d (cluster %d)", index, cluster)
+					return 0, clusterMAC, fmt.Errorf("nonempty unused segment %d (cluster %d)", index, cluster)
 				}
 				continue
 			}
-			if compressed == 0 || compressed > int64(root.SegmentSize) || input > archiveSize || compressed > archiveSize-input {
-				return fmt.Errorf("invalid compressed size for segment %d (cluster %d): %d", index, cluster, compressed)
+			if compressed == 0 || compressed > int64(root.SegmentSize) || compressed > archiveSize-offset {
+				return 0, clusterMAC, fmt.Errorf("invalid compressed size for segment %d (cluster %d): %d", index, cluster, compressed)
 			}
-			select {
-			case jobs <- job:
-			case <-ctx.Done():
-				return ctx.Err()
+			if err := emit(job); err != nil {
+				return 0, clusterMAC, err
 			}
-			input += compressed
+			offset += compressed
 			output += expected
 		}
-		if _, err := r.Seek(input, io.SeekStart); err != nil {
-			return fmt.Errorf("failed to seek to next cluster: %w", err)
-		}
 	}
-	paddingOffset, err := r.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return fmt.Errorf("failed to locate padding: %w", err)
-	}
-	return verifyPadding(ctx, r, paddingOffset, archiveSize-paddingOffset, mainKey, clusterMAC)
+	return offset, clusterMAC, nil
 }
 
-func decryptClusters(ctx context.Context, r *os.File, outfile *os.File, mainKey []byte, clusterMAC HMAC, root RootHeader) error {
+// validateRoot bounds an authenticated root header against the archive size.
+func validateRoot(root RootHeader, archiveSize int64) (uint32, error) {
 	checksumBytes, ok := checksumSize[root.Checksum]
 	if !ok {
-		return fmt.Errorf("unsupported checksum type: %d", root.Checksum)
+		return 0, fmt.Errorf("unsupported checksum type: %d", root.Checksum)
 	}
 	if root.FileSize > math.MaxInt64 || root.SegmentSize == 0 || root.SegmentSize > maxAEASegmentSize || root.SegmentsPerCluster == 0 || root.SegmentsPerCluster > maxAEASegmentsPerCluster {
-		return fmt.Errorf("invalid AEA root dimensions")
+		return 0, fmt.Errorf("invalid AEA root dimensions")
 	}
 	clusterSize := uint64(root.SegmentSize) * uint64(root.SegmentsPerCluster)
 	if root.FileSize > 0 && (root.FileSize-1)/clusterSize >= 1<<32 {
-		return fmt.Errorf("too many AEA clusters")
+		return 0, fmt.Errorf("too many AEA clusters")
 	}
-	info, err := r.Stat()
+	if root.EncyptedSize != uint64(archiveSize) {
+		return 0, fmt.Errorf("invalid encrypted file size: %d; expected %d", archiveSize, root.EncyptedSize)
+	}
+	return uint32(checksumBytes), nil
+}
+
+func decryptClusters(ctx context.Context, r io.ReaderAt, archiveSize, offset int64, outfile *os.File, mainKey []byte, clusterMAC HMAC, root RootHeader) error {
+	checksumBytes, err := validateRoot(root, archiveSize)
 	if err != nil {
-		return fmt.Errorf("failed to get encrypted file size: %w", err)
-	}
-	if root.EncyptedSize != uint64(info.Size()) {
-		return fmt.Errorf("invalid encrypted file size: %d; expected %d", info.Size(), root.EncyptedSize)
+		return err
 	}
 	if root.FileSize == 0 {
-		offset, err := r.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return err
-		}
-		return verifyPadding(ctx, r, offset, info.Size()-offset, mainKey, clusterMAC)
+		return verifyPadding(ctx, r, offset, archiveSize-offset, mainKey, clusterMAC)
 	}
 
 	// Larger valid AppleArchive blocks may exceed the budget for one worker.
@@ -506,7 +500,18 @@ func decryptClusters(ctx context.Context, r *os.File, outfile *os.File, mainKey 
 	}
 	group.Go(func() error {
 		defer close(jobs)
-		return queueDecryptSegments(groupCtx, r, jobs, mainKey, clusterMAC, root, info.Size(), checksumBytes)
+		padding, paddingMAC, err := walkSegments(groupCtx, r, offset, archiveSize, mainKey, clusterMAC, root, checksumBytes, func(job decryptSegment) error {
+			select {
+			case jobs <- job:
+				return nil
+			case <-groupCtx.Done():
+				return groupCtx.Err()
+			}
+		})
+		if err != nil {
+			return err
+		}
+		return verifyPadding(groupCtx, r, padding, archiveSize-padding, mainKey, paddingMAC)
 	})
 	group.Go(func() error {
 		pending := make(map[int64]decryptedSegment, workers)
@@ -540,47 +545,41 @@ func decryptClusters(ctx context.Context, r *os.File, outfile *os.File, mainKey 
 	return group.Wait()
 }
 
-func decrypt(in, out string, symmetricKey []byte) (string, error) {
-	f, err := os.Open(in)
-	if err != nil {
-		return "", fmt.Errorf("decrypt: failed to open AEA file: %v", err)
-	}
-	defer f.Close()
-
+// readPrologue authenticates the root header of a symmetric archive. It returns
+// the main key, the root header, and the offset and expected HMAC of the first
+// cluster header.
+func readPrologue(r io.ReaderAt, size int64, symmetricKey []byte) (mainKey []byte, root RootHeader, clusterMAC HMAC, offset int64, err error) {
+	f := io.NewSectionReader(r, 0, size)
 	var hdr Header
 	if err := binary.Read(f, binary.LittleEndian, &hdr); err != nil {
-		return "", fmt.Errorf("failed to read AEA header: %v", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to read AEA header: %v", err)
 	}
 
 	if string(hdr.Magic[:]) != Magic {
-		return "", fmt.Errorf("invalid AEA header: found '%s' expected '%s'", string(hdr.Magic[:]), Magic)
+		return nil, root, clusterMAC, 0, fmt.Errorf("invalid AEA header: found '%s' expected '%s'", string(hdr.Magic[:]), Magic)
 	}
 
 	if hdr.ProfileID() != SymmetricEncryption {
-		return "", fmt.Errorf("invalid profile: %d; expected %d", hdr.ProfileID(), SymmetricEncryption)
+		return nil, root, clusterMAC, 0, fmt.Errorf("invalid profile: %d; expected %d", hdr.ProfileID(), SymmetricEncryption)
 	}
 
 	authOffset := int64(binary.Size(hdr))
 	authSize := int64(hdr.AuthDataLength)
-	finfo, err := f.Stat()
-	if err != nil {
-		return "", fmt.Errorf("failed to get input file info: %w", err)
+	if size < authOffset+authSize+32+int64(binary.Size(encRootHeader{})) {
+		return nil, root, clusterMAC, 0, fmt.Errorf("truncated AEA prologue: %w", io.ErrUnexpectedEOF)
 	}
-	if finfo.Size() < authOffset+authSize+32+int64(binary.Size(encRootHeader{})) {
-		return "", fmt.Errorf("truncated AEA prologue: %w", io.ErrUnexpectedEOF)
-	}
-	authData := io.NewSectionReader(f, authOffset, authSize)
+	authData := io.NewSectionReader(r, authOffset, authSize)
 	if _, err := f.Seek(authOffset+authSize, io.SeekStart); err != nil {
-		return "", fmt.Errorf("failed to seek past auth data: %w", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to seek past auth data: %w", err)
 	}
 
 	mainSalt := make([]byte, 32)
 	if _, err := io.ReadFull(f, mainSalt); err != nil {
-		return "", fmt.Errorf("failed to read main salt: %v", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to read main salt: %v", err)
 	}
 
 	/* main key */
-	mainKey, err := deriveKey(
+	mainKey, err = deriveKey(
 		symmetricKey,
 		mainSalt,
 		binary.LittleEndian.AppendUint32(
@@ -588,12 +587,12 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 			hdr.ProfileAndScryptStrength,
 		))
 	if err != nil {
-		return "", fmt.Errorf("failed to derive main key: %v", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to derive main key: %v", err)
 	}
 
 	var encRootHdr encRootHeader
 	if err := binary.Read(f, binary.LittleEndian, &encRootHdr); err != nil {
-		return "", fmt.Errorf("failed to read encrypted root header: %v", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to read encrypted root header: %v", err)
 	}
 
 	/* root header */
@@ -603,22 +602,39 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 		binary.LittleEndian,
 		&rootHdrKey,
 	); err != nil {
-		return "", fmt.Errorf("failed to derive root header key: %v", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to derive root header key: %v", err)
 	}
 	// verify root header HMAC
 	rhmac, err := getRootHeaderHMAC(rootHdrKey.MAC[:], encRootHdr.Data[:], encRootHdr.ClusterHmac, authData, hdr.AuthDataLength)
 	if err != nil {
-		return "", fmt.Errorf("failed to get encrypted root header HMAC: %v", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to get encrypted root header HMAC: %v", err)
 	}
 	if !hmac.Equal(encRootHdr.Hmac[:], rhmac[:]) {
-		return "", fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac)
+		return nil, root, clusterMAC, 0, fmt.Errorf("invalid root header HMAC: %x; expected %x", encRootHdr.Hmac, rhmac)
 	}
 	rootHdrData, err := cryptCTR(encRootHdr.Data[:], rootHdrKey.Key[:], rootHdrKey.IV[:])
 	if err != nil {
-		return "", fmt.Errorf("failed to decrypt root header: %v", err)
+		return nil, root, clusterMAC, 0, fmt.Errorf("failed to decrypt root header: %v", err)
 	}
-	var rootHdr RootHeader
-	if err := binary.Read(bytes.NewReader(rootHdrData), binary.LittleEndian, &rootHdr); err != nil {
+	if err := binary.Read(bytes.NewReader(rootHdrData), binary.LittleEndian, &root); err != nil {
+		return nil, root, clusterMAC, 0, err
+	}
+	offset, _ = f.Seek(0, io.SeekCurrent)
+	return mainKey, root, encRootHdr.ClusterHmac, offset, nil
+}
+
+func decrypt(in, out string, symmetricKey []byte) (string, error) {
+	f, err := os.Open(in)
+	if err != nil {
+		return "", fmt.Errorf("decrypt: failed to open AEA file: %v", err)
+	}
+	defer f.Close()
+	finfo, err := f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("failed to get input file info: %w", err)
+	}
+	mainKey, rootHdr, clusterMAC, offset, err := readPrologue(f, finfo.Size(), symmetricKey)
+	if err != nil {
 		return "", err
 	}
 
@@ -628,7 +644,7 @@ func decrypt(in, out string, symmetricKey []byte) (string, error) {
 	}
 	defer of.Close()
 
-	if err := decryptClusters(context.Background(), f, of, mainKey, encRootHdr.ClusterHmac, rootHdr); err != nil {
+	if err := decryptClusters(context.Background(), f, finfo.Size(), offset, of, mainKey, clusterMAC, rootHdr); err != nil {
 		return "", fmt.Errorf("failed to decrypt clusters: %v", err)
 	}
 
@@ -667,16 +683,9 @@ func Decrypt(c *DecryptConfig) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to Decrypt AEA: %w", err)
 		}
-		if encKey, ok := metadata["encryption_key"]; ok {
-			c.symEncKey, err = hex.DecodeString(string(encKey))
-			if err != nil {
-				return "", fmt.Errorf("failed to decode hex sym key: %w", err)
-			}
-		} else {
-			c.symEncKey, err = metadata.DecryptFCS(c.PrivKeyData, c.PemDB, c.Proxy, c.Insecure)
-			if err != nil {
-				return "", fmt.Errorf("failed to HPKE decrypt fcs-key: %w", err)
-			}
+		c.symEncKey, err = metadata.SymmetricKey(c.PrivKeyData, c.PemDB, c.Proxy, c.Insecure)
+		if err != nil {
+			return "", err
 		}
 		c.B64SymKey = base64.StdEncoding.EncodeToString(c.symEncKey)
 	}
