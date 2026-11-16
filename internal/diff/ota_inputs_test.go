@@ -774,3 +774,72 @@ func TestSelectOTAKernelcachePairFollowsSelectedDevice(t *testing.T) {
 		t.Fatal("ForDevice accepted a device the manifest does not list")
 	}
 }
+
+func TestExtractOTAExclaveOS(t *testing.T) {
+	exclaveManifest := func(path string) *info.Info {
+		manifest := &plist.BuildManifest{BuildIdentities: []plist.BuildIdentity{{
+			Manifest: map[string]plist.IdentityManifest{"Ap,ExclaveOS": {Info: map[string]any{"Path": path}}},
+		}}}
+		return &info.Info{Plists: &plist.Plists{BuildManifest: manifest}}
+	}
+	for _, tc := range []struct {
+		name    string
+		members []string
+		content string
+		inf     *info.Info
+		want    string
+	}{
+		{name: "shipped whole under boot", members: []string{"AssetData/boot/000-00000-001.dmg"},
+			inf: exclaveManifest("000-00000-001.dmg"), want: "000-00000-001.dmg"},
+		{name: "encrypted image keeps its name", members: []string{"AssetData/boot/000-00000-002.dmg.aea"},
+			content: "AEA1 synthetic", inf: exclaveManifest("000-00000-002.dmg.aea"), want: "000-00000-002.dmg.aea"},
+		{name: "plain image named .aea loses the suffix", members: []string{"AssetData/boot/000-00000-003.dmg.aea"},
+			inf: exclaveManifest("000-00000-003.dmg.aea"), want: "000-00000-003.dmg"},
+		{name: "device without exclaves", members: []string{"AssetData/boot/000-00000-001.dmg"},
+			inf: &info.Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{}}}},
+		{name: "manifest names an image the OTA lacks", members: []string{"AssetData/boot/other.dmg"},
+			inf: exclaveManifest("000-00000-001.dmg")},
+		{name: "no manifest", members: []string{"AssetData/boot/000-00000-001.dmg"}, inf: &info.Info{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.content == "" {
+				tc.content = "synthetic exclave image"
+			}
+			var data bytes.Buffer
+			zw := zip.NewWriter(&data)
+			for _, member := range tc.members {
+				w, err := zw.Create(member)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := w.Write([]byte(tc.content)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := zw.Close(); err != nil {
+				t.Fatal(err)
+			}
+			ota, err := otapkg.NewOTA(bytes.NewReader(data.Bytes()), int64(data.Len()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			outDir := t.TempDir()
+			got, err := extractOTAExclaveOS(&Context{otaFile: ota, Info: tc.inf}, outDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if got != "" {
+					t.Fatalf("extracted %q, want no ExclaveOS image", got)
+				}
+				return
+			}
+			if got != filepath.Join(outDir, tc.want) {
+				t.Fatalf("path = %q, want %q", got, filepath.Join(outDir, tc.want))
+			}
+			if content, err := os.ReadFile(got); err != nil || string(content) != tc.content {
+				t.Fatalf("image content = %q, %v", content, err)
+			}
+		})
+	}
+}

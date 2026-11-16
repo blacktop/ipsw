@@ -333,6 +333,9 @@ func ensureOTAPayloadFilesystem(ctx *Context) error {
 	if err := ctx.otaFile.GetPayloadFiles(".*", "", payloadRoot); err != nil {
 		return fmt.Errorf("failed to extract OTA payload filesystem: %w", err)
 	}
+	if err := ctx.otaFile.ExtractStagedApps(payloadRoot); err != nil {
+		return fmt.Errorf("failed to extract OTA staged system apps: %w", err)
+	}
 
 	ctx.payloadRoot = payloadRoot
 	ctx.payloadReady = true
@@ -398,7 +401,12 @@ func otaVersionBuildProduct(
 // mountOTACryptexes extracts and mounts the system (and, when
 // present, app) cryptexes from the OTA. Uses ctx.Folder as the
 // extraction directory so Old and New don't collide.
-func mountOTACryptexes(ctx *Context) error {
+func mountOTACryptexes(ctx *Context) (err error) {
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, unmountOTACryptexes(ctx.Build, ctx))
+		}
+	}()
 	outDir := ctx.Folder
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create cryptex output dir: %w", err)
@@ -424,22 +432,86 @@ func mountOTACryptexes(ctx *Context) error {
 	// App cryptex is optional; mount it when present so file and
 	// MachO diffs see app-side content.
 	appDMG, err := ctx.otaFile.ExtractCryptex("app", outDir)
-	if err != nil {
-		if errors.Is(err, otapkg.ErrCryptexNotFound) {
-			utils.Indent(log.Debug, 2)("OTA has no app cryptex")
-			return nil
+	switch {
+	case errors.Is(err, otapkg.ErrCryptexNotFound):
+		utils.Indent(log.Debug, 2)("OTA has no app cryptex")
+	case err != nil:
+		return fmt.Errorf("failed to extract app cryptex: %w", err)
+	default:
+		appMount := filepath.Join(
+			outDir, filepath.Base(appDMG)+".mount",
+		)
+		appMnt, err := mountCryptexDMG(appDMG, appMount)
+		if err != nil {
+			return fmt.Errorf("failed to mount app cryptex: %w", err)
 		}
-		return errors.Join(fmt.Errorf("failed to extract app cryptex: %w", err), unmountOTACryptexes(ctx.Build, ctx))
+		ctx.Mount["AppOS"] = appMnt
 	}
-	appMount := filepath.Join(
-		outDir, filepath.Base(appDMG)+".mount",
-	)
-	appMnt, err := mountCryptexDMG(appDMG, appMount)
+
+	exclaveDMG, err := extractOTAExclaveOS(ctx, outDir)
 	if err != nil {
-		return errors.Join(fmt.Errorf("failed to mount app cryptex: %w", err), unmountOTACryptexes(ctx.Build, ctx))
+		return err
 	}
-	ctx.Mount["AppOS"] = appMnt
+	if exclaveDMG == "" {
+		return nil
+	}
+	exclaveMnt, err := mountNamedDMG("ExclaveOS", exclaveDMG, ctx.PemDB)
+	if err != nil {
+		return err
+	}
+	ctx.Mount["ExclaveOS"] = exclaveMnt
 	return nil
+}
+
+// extractOTAExclaveOS writes the ExclaveOS image to outDir and returns its
+// path, or "" when the OTA has none. A full OTA ships the image whole (not as
+// a cryptex patch) under AssetData/boot, named by the BuildManifest's
+// Ap,ExclaveOS entry; devices without exclaves have no such entry.
+func extractOTAExclaveOS(ctx *Context, outDir string) (string, error) {
+	if ctx.Info == nil {
+		return "", nil
+	}
+	name, err := ctx.Info.GetExclaveOSDmg()
+	if err != nil {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("OTA has no single ExclaveOS image: %v", err))
+		return "", nil
+	}
+	member := findOTAMember(ctx.otaFile, filepath.Base(name))
+	if member == "" {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("OTA does not carry the ExclaveOS image %s", name))
+		return "", nil
+	}
+	utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting ExclaveOS image %s", member))
+	src, err := ctx.otaFile.Open(member, false)
+	if err != nil {
+		return "", fmt.Errorf("failed to open ExclaveOS image %s in OTA: %w", member, err)
+	}
+	defer src.Close()
+	dmgPath := filepath.Join(outDir, filepath.Base(member))
+	dst, err := os.Create(dmgPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create ExclaveOS image %s: %w", dmgPath, err)
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		return "", errors.Join(fmt.Errorf("failed to extract ExclaveOS image %s: %w", member, err), dst.Close())
+	}
+	if err := dst.Close(); err != nil {
+		return "", fmt.Errorf("failed to write ExclaveOS image %s: %w", dmgPath, err)
+	}
+	// A macOS OTA names the image .dmg.aea but ships it already decrypted.
+	if plain, ok := strings.CutSuffix(dmgPath, ".aea"); ok {
+		encrypted, err := magic.IsAEA(dmgPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read ExclaveOS image %s: %w", dmgPath, err)
+		}
+		if !encrypted {
+			if err := os.Rename(dmgPath, plain); err != nil {
+				return "", fmt.Errorf("failed to rename ExclaveOS image %s: %w", dmgPath, err)
+			}
+			return plain, nil
+		}
+	}
+	return dmgPath, nil
 }
 
 // extractOTASystemCryptex extracts the system cryptex DMG. On macOS it
@@ -493,32 +565,10 @@ func mountCryptexDMG(dmgPath, mountPoint string) (mount, error) {
 	}, nil
 }
 
-// unmountOTACryptexes unmounts and cleans up cryptex mounts for
-// an OTA diff.
-func unmountOTACryptexes(label string, ctx *Context) (err error) {
-	for _, name := range sortedMountNames(ctx.Mount) {
-		mnt := ctx.Mount[name]
-		if mnt.IsMounted {
-			utils.Indent(log.Info, 2)(
-				fmt.Sprintf(
-					"Leaving '%s' %s cryptex mounted",
-					label, name,
-				),
-			)
-			continue
-		}
-		utils.Indent(log.Info, 2)(
-			fmt.Sprintf(
-				"Unmounting '%s' %s cryptex", label, name,
-			),
-		)
-		if closeErr := mnt.unmount(); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("%w: failed to unmount '%s' %s cryptex %s at %s: %v", utils.ErrMountCleanup, label, name, mnt.DmgPath, mnt.MountPath, closeErr))
-			continue
-		}
-		delete(ctx.Mount, name)
-	}
-	return err
+// unmountOTACryptexes unmounts and cleans up the images mounted for an OTA
+// diff.
+func unmountOTACryptexes(label string, ctx *Context) error {
+	return releaseDirectoryMounts(label, ctx.Mount)
 }
 
 // selectOTAKernelcachePair chooses which kernelcache members to
