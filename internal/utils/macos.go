@@ -762,21 +762,22 @@ func detachDarwinImage(
 	if err == nil {
 		return nil
 	}
-	detail := strings.TrimSpace(string(out))
+	var detail strings.Builder
+	detail.WriteString(strings.TrimSpace(string(out)))
 	if strings.Contains(err.Error(), "exit status 16") {
-		detail += " (Resource busy)"
+		detail.WriteString(" (Resource busy)")
 	} else if info, ierr := mountInfo(); ierr == nil && info.Mount(mountPoint) == nil {
 		log.Debugf("hdiutil detach %s failed (%v) but nothing is attached there", mountPoint, err)
 		return nil
 	}
 	if procs, lerr := lsof.MountPoint(mountPoint); lerr == nil {
-		detail += "\n  Processes using mount point:"
+		detail.WriteString("\n  Processes using mount point:")
 		for _, proc := range procs {
-			detail += fmt.Sprintf("\n    %s", proc)
+			detail.WriteString(fmt.Sprintf("\n    %s", proc))
 		}
-		detail += "\n"
+		detail.WriteString("\n")
 	}
-	return fmt.Errorf("failed to unmount %s: %v: %s", mountPoint, err, detail)
+	return fmt.Errorf("failed to unmount %s: %v: %s", mountPoint, err, detail.String())
 }
 
 type systemEntry struct {
