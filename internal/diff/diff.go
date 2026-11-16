@@ -1422,50 +1422,57 @@ func (d *Diff) parseIBoot() (err error) {
 			return iBootInputError("New", "IPSW", err)
 		}
 	}
-	d.IBoot.Versions = []string{oldIBoot.Version, newIBoot.Version}
+	d.IBoot = diffIBootStrings(oldIBoot, newIBoot)
+	return nil
+}
+
+// ibootMinDiffStringLen is the shortest string compared between two builds of
+// the same iBoot payload; shorter ones are mostly noise.
+const ibootMinDiffStringLen = 10
+
+// diffIBootStrings lists, per iBoot payload, the strings only the new build
+// has and the strings only the old build has. A payload that is new reports
+// all of its strings; a payload that was removed reports none. Each list is
+// sorted, so the same pair of inputs always renders the same report.
+func diffIBootStrings(oldIBoot, newIBoot *iboot.IBoot) *IBootDiff {
+	out := &IBootDiff{
+		Versions: []string{oldIBoot.Version, newIBoot.Version},
+		New:      make(map[string][]string),
+		Removed:  make(map[string][]string),
+	}
+	only := func(strs, other map[int64]string, minLen int) []string {
+		seen := make(map[string]struct{}, len(other))
+		for _, str := range other {
+			seen[str] = struct{}{}
+		}
+		var missing []string
+		for _, str := range strs {
+			if _, ok := seen[str]; !ok && len(str) >= minLen {
+				missing = append(missing, str)
+			}
+		}
+		slices.Sort(missing)
+		return missing
+	}
 	for name, strs := range newIBoot.Strings {
-		if _, ok := oldIBoot.Strings[name]; ok {
-			for _, str := range strs {
-				if len(str) < 10 {
-					continue
-				}
-				found := false
-				for _, oldStr := range oldIBoot.Strings[name] {
-					if str == oldStr {
-						found = true
-						break
-					}
-				}
-				if !found {
-					d.IBoot.New[name] = append(d.IBoot.New[name], str)
-				}
-			}
-		} else {
-			for _, str := range strs {
-				d.IBoot.New[name] = append(d.IBoot.New[name], str)
-			}
+		minLen := ibootMinDiffStringLen
+		if _, ok := oldIBoot.Strings[name]; !ok {
+			minLen = 0
+		}
+		if added := only(strs, oldIBoot.Strings[name], minLen); len(added) > 0 {
+			out.New[name] = added
 		}
 	}
 	for name, strs := range oldIBoot.Strings {
-		if _, ok := newIBoot.Strings[name]; ok {
-			for _, str := range strs {
-				if len(str) < 10 {
-					continue
-				}
-				found := false
-				for _, newStr := range newIBoot.Strings[name] {
-					if str == newStr {
-						found = true
-						break
-					}
-				}
-				if !found {
-					d.IBoot.Removed[name] = append(d.IBoot.Removed[name], str)
-				}
-			}
+		newStrs, ok := newIBoot.Strings[name]
+		if !ok {
+			continue
+		}
+		if removed := only(strs, newStrs, ibootMinDiffStringLen); len(removed) > 0 {
+			out.Removed[name] = removed
 		}
 	}
-	return nil
+	return out
 }
 
 // parseFeatureFlags handles OTA and Directory input modes. IPSW mode is

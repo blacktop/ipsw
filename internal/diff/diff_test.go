@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/diff/storage"
 	"github.com/blacktop/ipsw/internal/search"
+	"github.com/blacktop/ipsw/pkg/iboot"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -1107,5 +1109,32 @@ func TestParseIBootSkipsOnlyEncryptedPayloads(t *testing.T) {
 	skipped, ok := errors.AsType[*skippedError](d.parseIBoot())
 	if !ok || !strings.Contains(skipped.reason, "'Old' iBoot is encrypted") {
 		t.Fatalf("parseIBoot() = %v, want a skip naming the encrypted 'Old' iBoot", d.parseIBoot())
+	}
+}
+
+func TestDiffIBootStringsIsSortedAndStable(t *testing.T) {
+	oldIBoot := &iboot.IBoot{Version: "iBoot-1.0", Strings: map[string]map[int64]string{
+		"iboot":     {0x10: "shared string one", 0x20: "zulu old string", 0x30: "alpha old string", 0x40: "short"},
+		"gone.bin":  {0x10: "dropped payload string"},
+		"RTKit.bin": {0x10: "rtkit shared string"},
+	}}
+	newIBoot := &iboot.IBoot{Version: "iBoot-2.0", Strings: map[string]map[int64]string{
+		"iboot":     {0x10: "shared string one", 0x50: "zulu new string", 0x60: "mike new string", 0x70: "alpha new string", 0x80: "tiny"},
+		"RTKit.bin": {0x10: "rtkit shared string"},
+		"fresh.bin": {0x10: "zz fresh", 0x20: "aa"},
+	}}
+	want := &IBootDiff{
+		Versions: []string{"iBoot-1.0", "iBoot-2.0"},
+		New: map[string][]string{
+			"iboot":     {"alpha new string", "mike new string", "zulu new string"},
+			"fresh.bin": {"aa", "zz fresh"},
+		},
+		Removed: map[string][]string{"iboot": {"alpha old string", "zulu old string"}},
+	}
+	for range 20 {
+		got := diffIBootStrings(oldIBoot, newIBoot)
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("iBoot diff = %+v, want %+v", got, want)
+		}
 	}
 }

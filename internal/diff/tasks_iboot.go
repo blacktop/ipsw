@@ -51,7 +51,7 @@ func (t *ibootTask) Parse(_ context.Context, d *Diff) error {
 // ibootTask. Bump it whenever the persisted row layout (the IBootDiff), the
 // iBoot string-diff logic, or the rendered iBoot section semantics change in a
 // way that invalidates rows written by a prior ipsw build.
-const ibootCacheVersion = 1
+const ibootCacheVersion = 2
 
 // Version reports the cache payload / output-semantics version. See
 // ibootCacheVersion.
