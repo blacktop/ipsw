@@ -729,29 +729,9 @@ func MountDMG(image string, customMountPoint string) (DMGMount, error) {
 func Unmount(mountPoint string, force bool) error {
 	switch runtime.GOOS {
 	case "darwin":
-		var cmd *spawn.Cmd
-
-		if force {
-			cmd = spawn.Command("hdiutil", "detach", mountPoint, "-force")
-		} else {
-			cmd = spawn.Command("hdiutil", "detach", mountPoint)
-		}
-
-		if err := cmd.Run(); err != nil {
-			var edetail string
-			if strings.Contains(err.Error(), "exit status 16") {
-				edetail = " (Resource busy)"
-			}
-			procs, lerr := lsof.MountPoint(mountPoint)
-			if lerr == nil {
-				edetail += "\n  Processes using mount point:"
-				for _, proc := range procs {
-					edetail += fmt.Sprintf("\n    %s", proc)
-				}
-				edetail += "\n"
-			}
-			return fmt.Errorf("failed to unmount %s: %v%s", mountPoint, err, edetail)
-		}
+		return detachDarwinImage(mountPoint, force, func(args ...string) ([]byte, error) {
+			return runCommandWithFileOutput(spawn.Command("hdiutil", args...))
+		}, MountInfo)
 	case "linux":
 		// First unmount the filesystem
 		cmd := exec.Command("umount", mountPoint)
@@ -764,6 +744,39 @@ func Unmount(mountPoint string, force bool) error {
 	}
 
 	return nil
+}
+
+// detachDarwinImage detaches mountPoint with hdiutil. A failed detach is not
+// an error when nothing is attached there any more: hdiutil exits 1 for a
+// mount point that is already gone, and the cleanup the caller wanted is done.
+func detachDarwinImage(
+	mountPoint string, force bool,
+	hdiutil func(args ...string) ([]byte, error),
+	mountInfo func() (*HdiUtilInfo, error),
+) error {
+	args := []string{"detach", mountPoint}
+	if force {
+		args = append(args, "-force")
+	}
+	out, err := hdiutil(args...)
+	if err == nil {
+		return nil
+	}
+	detail := strings.TrimSpace(string(out))
+	if strings.Contains(err.Error(), "exit status 16") {
+		detail += " (Resource busy)"
+	} else if info, ierr := mountInfo(); ierr == nil && info.Mount(mountPoint) == nil {
+		log.Debugf("hdiutil detach %s failed (%v) but nothing is attached there", mountPoint, err)
+		return nil
+	}
+	if procs, lerr := lsof.MountPoint(mountPoint); lerr == nil {
+		detail += "\n  Processes using mount point:"
+		for _, proc := range procs {
+			detail += fmt.Sprintf("\n    %s", proc)
+		}
+		detail += "\n"
+	}
+	return fmt.Errorf("failed to unmount %s: %v: %s", mountPoint, err, detail)
 }
 
 type systemEntry struct {

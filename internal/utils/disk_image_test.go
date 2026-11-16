@@ -289,3 +289,40 @@ func TestMountInfoMatchesSymlinkedMountPoint(t *testing.T) {
 		t.Fatalf("mount alias not resolved: %+v", got)
 	}
 }
+
+func TestDetachDarwinImageToleratesAlreadyDetachedMount(t *testing.T) {
+	mountPoint := filepath.Join(t.TempDir(), "image.dmg.mount")
+	attached := &HdiUtilInfo{Images: []image{{SystemEntities: []systemEntry{{MountPoint: mountPoint}}}}}
+	for _, tc := range []struct {
+		name      string
+		detachErr error
+		info      *HdiUtilInfo
+		infoErr   error
+		wantErr   string
+	}{
+		{name: "detached"},
+		{name: "already gone", detachErr: errors.New("exit status 1"), info: &HdiUtilInfo{}},
+		{name: "still attached", detachErr: errors.New("exit status 16"), info: attached,
+			wantErr: "exit status 16: synthetic hdiutil output (Resource busy)"},
+		{name: "mount state unknown", detachErr: errors.New("exit status 1"), infoErr: errors.New("no hdiutil"),
+			wantErr: "exit status 1: synthetic hdiutil output"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := detachDarwinImage(mountPoint, true, func(args ...string) ([]byte, error) {
+				if want := []string{"detach", mountPoint, "-force"}; !slices.Equal(args, want) {
+					t.Fatalf("hdiutil args = %q, want %q", args, want)
+				}
+				return []byte("synthetic hdiutil output\n"), tc.detachErr
+			}, func() (*HdiUtilInfo, error) { return tc.info, tc.infoErr })
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v, want it to contain %q", err, tc.wantErr)
+			}
+		})
+	}
+}
