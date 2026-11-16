@@ -75,8 +75,8 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg6
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
-github.com/KishanBagaria/go-apfs v1.0.31-0.20261116081741-1df8f134c2db h1:h1rUbn2Me6YKX/i3GJ2glkEstqC8r/8Ed+eQ3ij0nOk=
-github.com/KishanBagaria/go-apfs v1.0.31-0.20261116081741-1df8f134c2db/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
+github.com/KishanBagaria/go-apfs v1.0.31-0.20261116125621-86f0080aadbe h1:RfNe23AyXfKybbbolkUBiJasp58Dqq/SL1QHcpRHWVc=
+github.com/KishanBagaria/go-apfs v1.0.31-0.20261116125621-86f0080aadbe/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
 github.com/MakeNowJust/heredoc/v2 v2.0.1 h1:rlCHh70XXXv7toz95ajQWOWQnN4WNLt0TdpZYIR/J6A=
 github.com/MakeNowJust/heredoc/v2 v2.0.1/go.mod h1:6/2Abh5s+hc3g9nbWLe9ObDIOhaRrqsyY9MWy+4JdRM=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=

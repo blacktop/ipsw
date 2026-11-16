@@ -267,4 +267,4 @@ require (
 	modernc.org/sqlite v1.55.0 // indirect
 )
 
-replace github.com/blacktop/go-apfs => github.com/KishanBagaria/go-apfs v1.0.31-0.20261116081741-1df8f134c2db
+replace github.com/blacktop/go-apfs => github.com/KishanBagaria/go-apfs v1.0.31-0.20261116125621-86f0080aadbe
