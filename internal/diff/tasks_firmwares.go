@@ -57,7 +57,7 @@ func (t *firmwaresTask) Parse(_ context.Context, d *Diff) error {
 // persisted row layout (the firmware MachoDiff), the firmware enumeration/diff
 // pipeline, or the rendered `## Firmware` section semantics change in a way that
 // invalidates rows written by a prior ipsw build.
-const firmwaresCacheVersion = 2
+const firmwaresCacheVersion = 3
 
 // Version reports the cache payload / output-semantics version. See
 // firmwaresCacheVersion.

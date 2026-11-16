@@ -878,6 +878,13 @@ func diffFirmwaresFromOTA(
 	return diff, nil
 }
 
+// otaFirmwareKey names a firmware Mach-O by its containing OTA member. A full
+// OTA keeps the IPSW's root layout under AssetData/boot, so that prefix is
+// dropped and the same firmware has the same key in an IPSW and an OTA report.
+func otaFirmwareKey(member, name string) string {
+	return search.FirmwareMemberKey(strings.TrimPrefix(member, "AssetData/boot/"), name)
+}
+
 // forEachOTAFirmware iterates im4p firmware files in an OTA,
 // opens each as a MachO, and calls handler.
 func forEachOTAFirmware(
@@ -934,7 +941,7 @@ func forEachOTAFirmware(
 				if err != nil {
 					continue
 				}
-				name := search.FirmwareMemberKey(f.Name(), "agx_"+filepath.Base(string(entry.Tag[:])))
+				name := otaFirmwareKey(f.Name(), "agx_"+filepath.Base(string(entry.Tag[:])))
 				if err := handler(name, m); err != nil {
 					m.Close()
 					ft.Close()
@@ -964,7 +971,7 @@ func forEachOTAFirmware(
 				if err != nil {
 					continue
 				}
-				name := search.FirmwareMemberKey(f.Name(), "exclave_"+filepath.Base(path))
+				name := otaFirmwareKey(f.Name(), "exclave_"+filepath.Base(path))
 				if err := handler(name, m); err != nil {
 					m.Close()
 					_ = os.RemoveAll(tmpDir)
@@ -982,7 +989,7 @@ func forEachOTAFirmware(
 				// Not a MachO (e.g. raw firmware blob) — skip.
 				continue
 			}
-			name := search.FirmwareMemberKey(f.Name(), "")
+			name := otaFirmwareKey(f.Name(), "")
 			if err := handler(name, m); err != nil {
 				m.Close()
 				return fmt.Errorf(

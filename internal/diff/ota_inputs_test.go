@@ -466,6 +466,18 @@ func TestOTAFirmwareMemberKeySourceQualifiesDuplicateBasenames(t *testing.T) {
 	}
 }
 
+func TestOTAFirmwareKeyMatchesIPSWLayout(t *testing.T) {
+	for member, want := range map[string]string{
+		"AssetData/boot/Firmware/agx/armfw_g99.im4p":         "Firmware/agx/armfw_g99.im4p/agx_fw",
+		"AssetData/payload/replace/usr/all_flash/fake.im4p":  "AssetData/payload/replace/usr/all_flash/fake.im4p/agx_fw",
+		"Firmware/AssetData/boot/Firmware/dcp/fake_dcp.im4p": "Firmware/AssetData/boot/Firmware/dcp/fake_dcp.im4p/agx_fw",
+	} {
+		if got := otaFirmwareKey(member, "agx_fw"); got != want {
+			t.Errorf("otaFirmwareKey(%q) = %q, want %q", member, got, want)
+		}
+	}
+}
+
 func TestDetectInputMode(t *testing.T) {
 	tmpDir := t.TempDir()
 
