@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -514,11 +515,47 @@ func extractOTAExclaveOS(ctx *Context, outDir string) (string, error) {
 	return dmgPath, nil
 }
 
-// extractOTASystemCryptex extracts the system cryptex DMG. On macOS it
+// otaSystemCryptexTags returns the image_patches members the build identities
+// name as their SystemOS image (Cryptex1,SystemOS ImagePatchTag), sorted. A
+// macOS 27 OTA holds one per image variant, such as cryptex-system-arm64e and
+// cryptex-system-arm64e.x1, and which devices use which changes per build.
+func otaSystemCryptexTags(inf *info.Info) []string {
+	if inf == nil || inf.Plists == nil || inf.Plists.BuildManifest == nil {
+		return nil
+	}
+	var tags []string
+	for _, bi := range inf.Plists.BuildIdentities {
+		if tag, ok := bi.Manifest["Cryptex1,SystemOS"].Info["ImagePatchTag"].(string); ok && tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	slices.Sort(tags)
+	return slices.Compact(tags)
+}
+
+// extractOTASystemCryptex extracts the system cryptex DMG: the one the
+// selected build identities name, when they agree on one. Otherwise macOS
 // prefers arm64e before falling back to other architectures. Numbered arm64e
 // variants (cryptex-system-arm64e.xN) are deltas on arm64e, so they can never
 // stand in for a missing arm64e cryptex.
 func extractOTASystemCryptex(ctx *Context, tmpDir string) (string, error) {
+	tags := otaSystemCryptexTags(ctx.Info)
+	switch len(tags) {
+	case 0:
+	case 1:
+		dmg, err := ctx.otaFile.ExtractCryptex(strings.TrimPrefix(tags[0], "cryptex-"), tmpDir)
+		if err == nil {
+			return dmg, nil
+		}
+		if !errors.Is(err, otapkg.ErrCryptexNotFound) {
+			return "", fmt.Errorf("failed to extract system cryptex %s: %w", tags[0], err)
+		}
+		utils.Indent(log.Warn, 2)(fmt.Sprintf("OTA lacks the system cryptex %s its BuildManifest names", tags[0]))
+	default:
+		utils.Indent(log.Warn, 2)(fmt.Sprintf(
+			"OTA devices use different system cryptexes (%s); using the generic one, pass --device to select",
+			strings.Join(tags, ", ")))
+	}
 	if ctx.IsMacOS {
 		dmg, err := ctx.otaFile.ExtractCryptex("system-arm64e", tmpDir)
 		if err == nil {
