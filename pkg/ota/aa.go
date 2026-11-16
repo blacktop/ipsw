@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -615,6 +616,80 @@ func linkPayloadNames(links io.Reader, match *regexp.Regexp, output string, onFi
 		}
 	}
 	return linked, skipped, sc.Err()
+}
+
+// stagedAppsDir is where an installed system keeps the system apps an OTA
+// ships as payloadv2/app_patches members, relative to the filesystem root.
+const stagedAppsDir = "private/var/staged_system_apps"
+
+// appPatchMagic starts every payloadv2/app_patches member: a directory diff
+// holding two archives, the app's directory tree and then its files.
+const appPatchMagic = "DIDIFF10"
+
+var reAppPatch = regexp.MustCompile(`(^|/)payloadv2/app_patches/[^/]+$`)
+
+// ExtractStagedApps materializes the system apps a full OTA ships outside its
+// payload members into root, at the path an installed system keeps them
+// (private/var/staged_system_apps/<name>.app). An OTA without such members
+// extracts nothing.
+func (r *Reader) ExtractStagedApps(root string) error {
+	appsDir := filepath.Join(root, stagedAppsDir)
+	var errs []error
+	for _, file := range r.Files() {
+		if file.isDir || !reAppPatch.MatchString(file.Name()) {
+			continue
+		}
+		if err := r.extractStagedApp(file, appsDir); err != nil {
+			errs = append(errs, wrapPhase(PhasePayloadExtract, file.Base(), err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (r *Reader) extractStagedApp(file *File, appsDir string) (err error) {
+	appDir, err := utils.SanitizeArchivePath(appsDir, file.Base())
+	if err != nil {
+		return err
+	}
+	f, err := r.Open(file.Name(), false)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, f.Close()) }()
+
+	files, err := appPatchFiles(f)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(appDir, 0o750); err != nil {
+		return fmt.Errorf("failed to create dir %s: %w", appDir, err)
+	}
+	return aaExtractPattern(files, ".*", appDir)
+}
+
+// appPatchFiles returns the archive of file entries inside an app_patches
+// member. The header is the magic, a zero word, and the byte lengths of the
+// directory archive and the file archive that follow it.
+func appPatchFiles(member io.Reader) (io.Reader, error) {
+	var header struct {
+		Magic    [len(appPatchMagic)]byte
+		Reserved uint32
+		DirSize  uint64
+		FileSize uint64
+	}
+	if err := binary.Read(member, binary.LittleEndian, &header); err != nil {
+		return nil, fmt.Errorf("failed to read app patch header: %w", err)
+	}
+	if string(header.Magic[:]) != appPatchMagic {
+		return nil, fmt.Errorf("unsupported app patch format %q", header.Magic[:])
+	}
+	if header.DirSize > math.MaxInt64 || header.FileSize > math.MaxInt64 {
+		return nil, fmt.Errorf("app patch section sizes out of range: %d, %d", header.DirSize, header.FileSize)
+	}
+	if _, err := io.CopyN(io.Discard, member, int64(header.DirSize)); err != nil {
+		return nil, fmt.Errorf("failed to skip app patch directory archive: %w", err)
+	}
+	return io.LimitReader(member, int64(header.FileSize)), nil
 }
 
 // checkPayloadCodec fails fast when payloadv2 members need LZRaven support the

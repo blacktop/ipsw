@@ -3,6 +3,7 @@ package ota
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -1126,5 +1127,105 @@ func TestGetPayloadFilesLinksNames(t *testing.T) {
 	}
 	if len(extracted) != 2 {
 		t.Fatalf("callback saw %v, want the file and its link", extracted)
+	}
+}
+
+// appPatchMember builds a payloadv2/app_patches member: the header, a
+// directory archive and a file archive.
+func appPatchMember(magic string, dirs, files []byte) []byte {
+	var member bytes.Buffer
+	member.WriteString(magic)
+	_ = binary.Write(&member, binary.LittleEndian, uint32(0))
+	_ = binary.Write(&member, binary.LittleEndian, uint64(len(dirs)))
+	_ = binary.Write(&member, binary.LittleEndian, uint64(len(files)))
+	member.Write(dirs)
+	member.Write(files)
+	return member.Bytes()
+}
+
+func TestExtractStagedApps(t *testing.T) {
+	aaPath, err := exec.LookPath("aa")
+	if err != nil {
+		t.Skip("aa not available")
+	}
+	src := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(src, "PlugIns"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{"Sample": "app binary", "PlugIns/Widget": "plugin binary"} {
+		if err := os.WriteFile(filepath.Join(src, name), []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	archive := filepath.Join(t.TempDir(), "files.aar")
+	if out, err := exec.Command(aaPath, "archive", "-d", src, "-o", archive).CombinedOutput(); err != nil {
+		t.Fatalf("aa archive: %v: %s", err, out)
+	}
+	files, err := os.ReadFile(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newOTA := func(t *testing.T, members map[string][]byte) *AA {
+		t.Helper()
+		var data bytes.Buffer
+		zw := zip.NewWriter(&data)
+		for name, content := range members {
+			w, err := zw.Create(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := w.Write(content); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		ota, err := NewOTA(bytes.NewReader(data.Bytes()), int64(data.Len()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ota
+	}
+
+	t.Run("apps land where an installed system keeps them", func(t *testing.T) {
+		ota := newOTA(t, map[string][]byte{
+			"AssetData/payloadv2/app_patches/Sample App.app": appPatchMember(appPatchMagic, []byte("directory archive"), files),
+			"AssetData/payloadv2/payload.000":                []byte("not an app"),
+		})
+		root := t.TempDir()
+		if err := ota.ExtractStagedApps(root); err != nil {
+			t.Fatalf("ExtractStagedApps: %v", err)
+		}
+		app := filepath.Join(root, "private/var/staged_system_apps/Sample App.app")
+		for name, want := range map[string]string{"Sample": "app binary", "PlugIns/Widget": "plugin binary"} {
+			if got, err := os.ReadFile(filepath.Join(app, name)); err != nil || string(got) != want {
+				t.Fatalf("%s = %q, %v; want %q", name, got, err, want)
+			}
+		}
+	})
+
+	t.Run("no app members extracts nothing", func(t *testing.T) {
+		root := t.TempDir()
+		if err := newOTA(t, map[string][]byte{"AssetData/payloadv2/payload.000": []byte("x")}).ExtractStagedApps(root); err != nil {
+			t.Fatalf("ExtractStagedApps: %v", err)
+		}
+		if entries, err := os.ReadDir(root); err != nil || len(entries) != 0 {
+			t.Fatalf("root entries = %v, %v; want none", entries, err)
+		}
+	})
+
+	for name, member := range map[string][]byte{
+		"unknown container": appPatchMember("BXDIFF50", nil, files),
+		"truncated header":  []byte(appPatchMagic),
+		"truncated section": appPatchMember(appPatchMagic, []byte("directory archive"), files)[:40],
+	} {
+		t.Run(name+" is reported", func(t *testing.T) {
+			ota := newOTA(t, map[string][]byte{"AssetData/payloadv2/app_patches/Broken.app": member})
+			err := ota.ExtractStagedApps(t.TempDir())
+			if err == nil || !strings.Contains(err.Error(), "Broken.app") {
+				t.Fatalf("error = %v, want one naming Broken.app", err)
+			}
+		})
 	}
 }
