@@ -13,7 +13,35 @@ import (
 // A destination symlink is replaced. Call Resolve first to write through it.
 // The callback must not close the supplied file.
 func Write(path string, perm os.FileMode, write func(*os.File) error) error {
-	info, err := os.Lstat(path)
+	return replace(osFS{}, path, perm, write)
+}
+
+// WriteRoot is Write for a name inside root: the temporary file and the rename
+// are both confined to root.
+func WriteRoot(root *os.Root, name string, perm os.FileMode, write func(*os.File) error) error {
+	return replace(root, name, perm, write)
+}
+
+// filesystem is the part of *os.Root that replace needs; osFS is the same
+// operations on unconfined paths.
+type filesystem interface {
+	Lstat(name string) (os.FileInfo, error)
+	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
+	Remove(name string) error
+	Rename(oldname, newname string) error
+}
+
+type osFS struct{}
+
+func (osFS) Lstat(name string) (os.FileInfo, error) { return os.Lstat(name) }
+func (osFS) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag, perm)
+}
+func (osFS) Remove(name string) error             { return os.Remove(name) }
+func (osFS) Rename(oldname, newname string) error { return os.Rename(oldname, newname) }
+
+func replace(fsys filesystem, path string, perm os.FileMode, write func(*os.File) error) error {
+	info, err := fsys.Lstat(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -23,13 +51,13 @@ func Write(path string, perm os.FileMode, write func(*os.File) error) error {
 	}
 
 	temp := filepath.Join(filepath.Dir(path), ".ipsw-"+rand.Text()+".tmp")
-	f, err := os.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	f, err := fsys.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		_ = f.Close()
-		_ = os.Remove(temp)
+		_ = fsys.Remove(temp)
 	}()
 	if preserve {
 		// Restore bits masked by the umask when recreating an existing file.
@@ -46,7 +74,7 @@ func Write(path string, perm os.FileMode, write func(*os.File) error) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temp, path)
+	return fsys.Rename(temp, path)
 }
 
 // Resolve follows destination symlinks, including links to a missing final
