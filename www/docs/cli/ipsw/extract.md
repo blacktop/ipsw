@@ -80,6 +80,8 @@ $ ipsw extract --dyld --driverkit macOS.ipsw
   -p, --pattern string           Extract files that match regex
       --pem-db string            AEA pem DB JSON file
       --proxy string             HTTP/HTTPS proxy
+      --ranged[=true|false]      Read remote APFS files with byte ranges; never download or mount whole DMGs
+      --ranged-dmg string        Disk image for --ranged: fs, sys, app, exc (default "fs")
   -r, --remote[=true|false]      Extract from URL
       --sep[=true|false]         Extract sep-firmware
       --sptm[=true|false]        Extract SPTM and TXM Firmwares

@@ -4,6 +4,7 @@ package extract
 import (
 	"archive/zip"
 	"bytes"
+	"cmp"
 	"crypto/aes"
 	"encoding/hex"
 	"encoding/json"
@@ -87,6 +88,9 @@ type Config struct {
 	Insecure bool `json:"insecure,omitempty"`
 	// search the DMGs for files
 	DMGs bool `json:"dmgs,omitempty"`
+	// Ranged reads matching files without downloading or mounting a disk image.
+	Ranged    bool   `json:"ranged,omitempty"`
+	RangedDMG string `json:"ranged_dmg,omitempty"`
 	// type of DMG to extract
 	// pattern: (app|sys|fs|exc|rdisk|rosetta)
 	DmgType string `json:"dmg_type,omitempty"`
@@ -438,6 +442,27 @@ func matchingZipFiles(files []*zip.File, pattern *regexp.Regexp) []*zip.File {
 		matches = append(matches, file)
 	}
 	return matches
+}
+
+// dmgPathForType returns the IPSW member for a DMG type; ident selects the
+// RestoreRamDisk variant.
+func dmgPathForType(i *info.Info, dmgType, ident string) (string, error) {
+	get := map[string]func() (string, error){
+		"app":     i.GetAppOsDmg,
+		"sys":     i.GetSystemOsDmg,
+		"fs":      i.GetFileSystemOsDmg,
+		"exc":     i.GetExclaveOSDmg,
+		"rdisk":   func() (string, error) { return i.GetRestoreRamDiskDmg(ident) },
+		"rosetta": i.GetRosettaOsDmg,
+	}[dmgType]
+	if get == nil {
+		return "", fmt.Errorf("unknown DMG type %q", dmgType)
+	}
+	dmgPath, err := get()
+	if err != nil {
+		return "", fmt.Errorf("failed to find %s DMG in IPSW: %w", dmgType, err)
+	}
+	return dmgPath, nil
 }
 
 func matchingZipFileName(files []*zip.File, name string) []*zip.File {
@@ -1323,40 +1348,9 @@ func DMG(c *Config) ([]string, error) {
 		return nil, err
 	}
 
-	var dmgPath string
-	switch c.DmgType {
-	case "app":
-		dmgPath, err = i.GetAppOsDmg()
-		if err != nil {
-			return nil, fmt.Errorf("failed to find appOS DMG in IPSW: %v", err)
-		}
-	case "sys":
-		dmgPath, err = i.GetSystemOsDmg()
-		if err != nil {
-			return nil, fmt.Errorf("failed to find systemOS DMG in IPSW: %w", err)
-		}
-	case "fs":
-		dmgPath, err = i.GetFileSystemOsDmg()
-		if err != nil {
-			return nil, fmt.Errorf("failed to find filesystem DMG in IPSW: %v", err)
-		}
-	case "exc":
-		dmgPath, err = i.GetExclaveOSDmg()
-		if err != nil {
-			return nil, fmt.Errorf("failed to find exclaveOS DMG in IPSW: %v", err)
-		}
-	case "rdisk":
-		dmgPath, err = i.GetRestoreRamDiskDmg(c.Ident)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find RestoreRamDisk DMG in IPSW: %v", err)
-		}
-	case "rosetta":
-		dmgPath, err = i.GetRosettaOsDmg()
-		if err != nil {
-			return nil, fmt.Errorf("failed to find RosettaOS DMG in IPSW: %v", err)
-		}
-	default:
-		return nil, fmt.Errorf("unknown DMG type %q", c.DmgType)
+	dmgPath, err := dmgPathForType(i, c.DmgType, c.Ident)
+	if err != nil {
+		return nil, err
 	}
 
 	dmgRegex := exactZipNamePattern(dmgPath)
@@ -1630,6 +1624,18 @@ func FcsKeys(c *Config) ([]string, error) {
 
 // Search searches for files matching a pattern in an IPSW
 func Search(c *Config, tempDirectory ...string) ([]string, error) {
+	if c.Ranged {
+		if c.URL == "" || !c.DMGs {
+			return nil, fmt.Errorf("ranged filesystem extraction requires a remote URL and file search")
+		}
+		if c.Flatten {
+			return nil, fmt.Errorf("ranged filesystem extraction cannot flatten output paths")
+		}
+		if !slices.Contains([]string{"", "fs", "sys", "app", "exc"}, c.RangedDMG) {
+			return nil, fmt.Errorf("ranged DMG type must be fs, sys, app or exc: %q", c.RangedDMG)
+		}
+	}
+
 	var artifacts []string
 
 	if len(c.Pattern) == 0 {
@@ -1725,6 +1731,14 @@ func Search(c *Config, tempDirectory ...string) ([]string, error) {
 		}
 		if len(tempDirectory) > 0 {
 			destPath = tempDirectory[0]
+		}
+		if c.Ranged {
+			name, err := dmgPathForType(i, cmp.Or(c.RangedDMG, "fs"), "")
+			if err != nil {
+				return nil, err
+			}
+			out, err := extractRemoteDMGRanged(c, zr, name, destPath, c.PemDB, re)
+			return append(artifacts, out...), err
 		}
 		zr, err = tuneRemoteZipReader(c, zr, matchingZipFiles(zr.File, re))
 		if err != nil {

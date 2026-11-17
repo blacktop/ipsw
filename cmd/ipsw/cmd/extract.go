@@ -59,6 +59,8 @@ func init() {
 	extractCmd.Flags().Bool("fcs-key", false, "Extract AEA1 keys for SystemOS DMGs (legacy filesystem fallback)")
 	extractCmd.Flags().Bool("sys-ver", false, "Extract SystemVersion")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
+	extractCmd.Flags().String("ranged-dmg", "fs", "Disk image for --ranged: fs, sys, app, exc")
+	extractCmd.Flags().Bool("ranged", false, "Read remote APFS files with byte ranges; never download or mount whole DMGs")
 	extractCmd.Flags().String("pem-db", "", "AEA pem DB JSON file")
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
@@ -100,6 +102,8 @@ func init() {
 	viper.BindPFlag("extract.fcs-key", extractCmd.Flags().Lookup("fcs-key"))
 	viper.BindPFlag("extract.sys-ver", extractCmd.Flags().Lookup("sys-ver"))
 	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
+	viper.BindPFlag("extract.ranged-dmg", extractCmd.Flags().Lookup("ranged-dmg"))
+	viper.BindPFlag("extract.ranged", extractCmd.Flags().Lookup("ranged"))
 	viper.BindPFlag("extract.pem-db", extractCmd.Flags().Lookup("pem-db"))
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
@@ -171,6 +175,25 @@ completed artifacts, sets complete to false, includes an error, and exits nonzer
 		}
 
 		// validate args
+		if viper.GetBool("extract.ranged") {
+			for _, flag := range []string{"kernel", "dyld", "dtree", "iboot", "sep", "sptm", "exclave", "kbag", "fcs-key", "sys-ver", "driverkit", "flat", "lookup"} {
+				if viper.GetBool("extract." + flag) {
+					return fmt.Errorf("--ranged cannot be combined with --%s", flag)
+				}
+			}
+			if viper.GetString("extract.dmg") != "" {
+				return fmt.Errorf("use --ranged-dmg instead of --dmg with --ranged")
+			}
+			switch viper.GetString("extract.ranged-dmg") {
+			case "", "fs", "sys", "app", "exc":
+			default:
+				return fmt.Errorf("--ranged-dmg must be fs, sys, app or exc")
+			}
+			if !viper.GetBool("extract.remote") || !viper.GetBool("extract.files") {
+				return fmt.Errorf("--ranged requires --remote and --files")
+			}
+		}
+
 		if viper.GetString("extract.device") != "" {
 			supported := viper.GetBool("extract.kernel") || viper.GetBool("extract.dyld") ||
 				viper.GetString("extract.dmg") != "" || viper.GetBool("extract.files") || viper.GetBool("extract.fcs-key")
@@ -233,6 +256,8 @@ completed artifacts, sets complete to false, includes an error, and exits nonzer
 		}
 
 		config := &extract.Config{
+			Ranged:       viper.GetBool("extract.ranged"),
+			RangedDMG:    viper.GetString("extract.ranged-dmg"),
 			IPSW:         "",
 			URL:          "",
 			Pattern:      viper.GetString("extract.pattern"),

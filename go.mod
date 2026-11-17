@@ -21,7 +21,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.2
 	github.com/blacktop/arm64-cgo v1.0.76
-	github.com/blacktop/go-apfs v1.0.30
+	github.com/blacktop/go-apfs v1.0.31
 	github.com/blacktop/go-download v0.2.8
 	github.com/blacktop/go-dwarf v1.1.0
 	github.com/blacktop/go-macho v1.1.296

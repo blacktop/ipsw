@@ -173,8 +173,8 @@ github.com/bits-and-blooms/bitset v1.24.6 h1:qcrftZUVBIwfs+m+nhoCBAPT+ZPZZjti8Sb
 github.com/bits-and-blooms/bitset v1.24.6/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/blacktop/arm64-cgo v1.0.76 h1:UmmjwPjH+g/rEgcYjKH3ZZHWrI9hw3hsOFQlj8d6RfU=
 github.com/blacktop/arm64-cgo v1.0.76/go.mod h1:TEHamtch3FVfsjPoB6hMc+wyxvvoGvii0l1H4ESf62A=
-github.com/blacktop/go-apfs v1.0.30 h1:kxvvIc2fVJ1sfkNfvaOBxTF8s+Kbe3cnYPGwoYxVkRc=
-github.com/blacktop/go-apfs v1.0.30/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
+github.com/blacktop/go-apfs v1.0.31 h1:6M3NkHnI6g3SUHPTv+JQyknpSIX//bdhy/JhkuqnXqY=
+github.com/blacktop/go-apfs v1.0.31/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
 github.com/blacktop/go-download v0.2.8 h1:vRYv89vcJaFMN3mUM77cwz6r1boN3hi7XlSqW4jHYBg=
 github.com/blacktop/go-download v0.2.8/go.mod h1:R0AmlwVorsuDQct7iP7bK2yZWhDB2unQEcLbgp4A/PQ=
 github.com/blacktop/go-dwarf v1.1.0 h1:mCnIHOVYQ6v+jsiCYv0WYOF96WrDbPJMd/MbOt7+zTE=

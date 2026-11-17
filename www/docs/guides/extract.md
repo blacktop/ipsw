@@ -144,3 +144,46 @@ Via the power of `partialzip`
 ```bash
 ❯ ipsw extract --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw --pattern '.*BuildManifest.plist$'
 ```
+
+## Read individual files inside a remote APFS image
+
+Use `--remote --files --ranged` to fetch matching filesystem files through HTTP
+byte ranges, without downloading or mounting the entire disk image:
+
+```sh
+ipsw extract --remote --files --ranged --device VirtualMac2,1 \
+  --pattern '^/System/(Library|iOSSupport/System/Library)/(PrivateFrameworks|AccessibilityBundles)/(Chat|IM).*\.loctable$' \
+  --output extracted 'IPSW_URL'
+```
+
+Ranged mode selects the filesystem image by default. Use `--ranged-dmg sys`
+(or `app`, `exc`, `fs`) to choose another image. Keep a `--device` selector when
+an IPSW contains multiple device-specific SystemOS images. Anchored patterns
+allow directory pruning and avoid fetching unrelated filesystem metadata.
+Paths are preserved beneath the normal build/device output directory. File
+permission bits are preserved; ownership and other metadata are not.
+
+This opt-in path supports stored ZIP/ZIP64 members, AEA1 symmetric restore
+images, raw APFS and APFS inside UDIF/GPT images. It reads a single-volume APFS
+container with 4 KiB blocks, including sealed trees and physical extent trees.
+File compression includes inline zlib, LZVN, LZFSE and LZBITMAP, plus resource-fork
+LZVN, LZFSE and LZBITMAP. Unsupported layouts (including deflated DMGs, HFS+,
+legacy encrypted DMGs, sparse files and resource-fork zlib) return an error.
+There is no automatic full-image fallback. The existing extraction mode remains
+available for those images.
+
+Only files inside the selected image are matched, not members of the IPSW ZIP
+itself, and `--flat` and `--lookup` are rejected. Only physical regular-file
+paths are matched; symlink aliases are not followed.
+AEA root/cluster headers and every accessed segment are authenticated, and APFS
+child hashes/checksums are checked. Unread segments, AEA padding and the external
+APFS volume seal are not verified. HTTP ranges must match the requested interval
+and image size; a server returning a full body is rejected before it is read.
+Plaintext and metadata caches have fixed limits. Each output file is published
+atomically; after an error, files completed earlier stay in the output directory
+and are still reported. Failed range requests are retried twice.
+The CLI reports transferred bytes and range-request count for the selected image.
+
+Verified with Apple's UniversalMac macOS 27.2.1 (26B131) restore image: 70 Chat/IM
+loctables (including IMAP), all byte-identical to the installed files, downloaded
+using 57,608,766 bytes in 238 range requests from a 25,595,954,706-byte IPSW.

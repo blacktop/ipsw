@@ -242,3 +242,36 @@ func TestExtractDeviceModesReachInput(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractRangedValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		remote, files      bool
+		extra, value, want string
+	}{
+		{"local", false, true, "", "", "requires --remote and --files"},
+		{"no-files", true, false, "", "", "requires --remote and --files"},
+		{"full-dmg", true, true, "dmg", "fs", "use --ranged-dmg"},
+		{"dyld", true, true, "dyld", "true", "cannot be combined with --dyld"},
+		{"flat", true, true, "flat", "true", "cannot be combined with --flat"},
+		{"lookup", true, true, "lookup", "true", "cannot be combined with --lookup"},
+		{"unknown-image", true, true, "ranged-dmg", "unknown", "--ranged-dmg must"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			settings := map[string]any{"json-format": "legacy", "ranged": true, "remote": tc.remote, "files": tc.files, "ranged-dmg": "fs", "dmg": "", "dyld": false, "flat": false, "lookup": false}
+			if tc.extra != "" {
+				settings[tc.extra] = tc.value
+			}
+			for key, value := range settings {
+				key := "extract." + key
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			err := extractCmd.RunE(extractCmd, []string{"https://example.invalid/firmware.ipsw"})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v; want %s", err, tc.want)
+			}
+		})
+	}
+}
