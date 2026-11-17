@@ -250,7 +250,7 @@ func TestDecryptRejectsInvalidDimensions(t *testing.T) {
 		{FileSize: 1, SegmentSize: maxAEASegmentSize + 1, SegmentsPerCluster: segmentsPerCluster, Checksum: Sha256},
 		{FileSize: 1, SegmentSize: segmentSize, SegmentsPerCluster: maxAEASegmentsPerCluster + 1, Checksum: Sha256},
 	} {
-		if err := decryptClusters(context.Background(), in, out, make([]byte, 32), HMAC{}, root); err == nil {
+		if err := decryptClusters(context.Background(), in, 0, 0, out, make([]byte, 32), HMAC{}, root); err == nil {
 			t.Fatal("accepted invalid root dimensions")
 		}
 	}
