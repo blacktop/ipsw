@@ -75,8 +75,6 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg6
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
-github.com/KishanBagaria/go-apfs v1.0.31-0.20261116125621-86f0080aadbe h1:RfNe23AyXfKybbbolkUBiJasp58Dqq/SL1QHcpRHWVc=
-github.com/KishanBagaria/go-apfs v1.0.31-0.20261116125621-86f0080aadbe/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
 github.com/MakeNowJust/heredoc/v2 v2.0.1 h1:rlCHh70XXXv7toz95ajQWOWQnN4WNLt0TdpZYIR/J6A=
 github.com/MakeNowJust/heredoc/v2 v2.0.1/go.mod h1:6/2Abh5s+hc3g9nbWLe9ObDIOhaRrqsyY9MWy+4JdRM=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
@@ -175,8 +173,8 @@ github.com/bits-and-blooms/bitset v1.24.6 h1:qcrftZUVBIwfs+m+nhoCBAPT+ZPZZjti8Sb
 github.com/bits-and-blooms/bitset v1.24.6/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/blacktop/arm64-cgo v1.0.76 h1:UmmjwPjH+g/rEgcYjKH3ZZHWrI9hw3hsOFQlj8d6RfU=
 github.com/blacktop/arm64-cgo v1.0.76/go.mod h1:TEHamtch3FVfsjPoB6hMc+wyxvvoGvii0l1H4ESf62A=
-github.com/blacktop/go-apfs v1.0.30 h1:kxvvIc2fVJ1sfkNfvaOBxTF8s+Kbe3cnYPGwoYxVkRc=
-github.com/blacktop/go-apfs v1.0.30/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
+github.com/blacktop/go-apfs v1.0.31 h1:6M3NkHnI6g3SUHPTv+JQyknpSIX//bdhy/JhkuqnXqY=
+github.com/blacktop/go-apfs v1.0.31/go.mod h1:i2Sfy/il/t2ADGIGPN0FAm+7CAot7TnQwgmMQXzF0xs=
 github.com/blacktop/go-download v0.2.8 h1:vRYv89vcJaFMN3mUM77cwz6r1boN3hi7XlSqW4jHYBg=
 github.com/blacktop/go-download v0.2.8/go.mod h1:R0AmlwVorsuDQct7iP7bK2yZWhDB2unQEcLbgp4A/PQ=
 github.com/blacktop/go-dwarf v1.1.0 h1:mCnIHOVYQ6v+jsiCYv0WYOF96WrDbPJMd/MbOt7+zTE=
