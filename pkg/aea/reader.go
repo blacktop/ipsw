@@ -12,7 +12,8 @@ import (
 
 // Reader authenticates cluster metadata and decrypts only requested AEA segments.
 // It does not verify unread payloads, archive padding, or an external APFS seal.
-// Concurrent reads are serialized; plaintext caching is bounded to 32 MiB.
+// Concurrent reads are serialized. The plaintext cache holds 32 MiB of
+// segments, and always at least one, so a larger segment exceeds that.
 type Reader struct {
 	mu       sync.Mutex
 	source   io.ReaderAt

@@ -275,3 +275,25 @@ func TestExtractRangedValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractRangedDMGRequiresRanged(t *testing.T) {
+	for key, value := range map[string]any{"json-format": "legacy", "ranged": false, "remote": true, "files": true} {
+		key := "extract." + key
+		previous := viper.Get(key)
+		viper.Set(key, value)
+		t.Cleanup(func() { viper.Set(key, previous) })
+	}
+	flag := extractCmd.Flags().Lookup("ranged-dmg")
+	if err := extractCmd.Flags().Set("ranged-dmg", "sys"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = flag.Value.Set(flag.DefValue)
+		flag.Changed = false
+	})
+	const want = "--ranged-dmg requires --ranged"
+	err := extractCmd.RunE(extractCmd, []string{"https://example.invalid/firmware.ipsw"})
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("got %v; want %s", err, want)
+	}
+}

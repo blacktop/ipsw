@@ -151,9 +151,10 @@ jobs:
           cd apfs-fuse
           git submodule init
           git submodule update
+          sed -i '/#include <memory>/a #include <cstdint>' ApfsLib/PList.h
           mkdir build
           cd build
-          cmake ..
+          cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
           sudo make install
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-latest'

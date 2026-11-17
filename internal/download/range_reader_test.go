@@ -82,6 +82,8 @@ func TestRangeReader(t *testing.T) {
 }
 
 func TestRangeReaderRetries(t *testing.T) {
+	delay := rangeRetryDelay
+	t.Cleanup(func() { rangeRetryDelay = delay })
 	rangeRetryDelay = time.Millisecond
 	payload := bytes.Repeat([]byte("retry"), 1000)
 	for _, tc := range []struct {

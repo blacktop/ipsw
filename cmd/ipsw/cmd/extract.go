@@ -192,6 +192,8 @@ completed artifacts, sets complete to false, includes an error, and exits nonzer
 			if !viper.GetBool("extract.remote") || !viper.GetBool("extract.files") {
 				return fmt.Errorf("--ranged requires --remote and --files")
 			}
+		} else if cmd.Flags().Changed("ranged-dmg") {
+			return fmt.Errorf("--ranged-dmg requires --ranged")
 		}
 
 		if viper.GetString("extract.device") != "" {
