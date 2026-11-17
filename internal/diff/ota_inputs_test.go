@@ -787,6 +787,42 @@ func TestSelectOTAKernelcachePairFollowsSelectedDevice(t *testing.T) {
 	}
 }
 
+func TestOTASystemCryptexTags(t *testing.T) {
+	identity := func(tag string) plist.BuildIdentity {
+		entry := plist.IdentityManifest{Info: map[string]any{"Path": "000-00000-001.dmg.aea"}}
+		if tag != "" {
+			entry.Info["ImagePatchTag"] = tag
+		}
+		return plist.BuildIdentity{Manifest: map[string]plist.IdentityManifest{"Cryptex1,SystemOS": entry}}
+	}
+	recovery := plist.BuildIdentity{Manifest: map[string]plist.IdentityManifest{}}
+	manifest := func(ids ...plist.BuildIdentity) *info.Info {
+		return &info.Info{Plists: &plist.Plists{BuildManifest: &plist.BuildManifest{BuildIdentities: ids}}}
+	}
+	for _, tc := range []struct {
+		name string
+		inf  *info.Info
+		want []string
+	}{
+		{name: "selected device names its variant",
+			inf:  manifest(identity("cryptex-system-arm64e.x1"), recovery),
+			want: []string{"cryptex-system-arm64e.x1"}},
+		{name: "unselected devices disagree",
+			inf: manifest(identity("cryptex-system-arm64e.x1"), identity("cryptex-system-arm64e"),
+				identity("cryptex-system-arm64e")),
+			want: []string{"cryptex-system-arm64e", "cryptex-system-arm64e.x1"}},
+		{name: "manifest without patch tags", inf: manifest(identity(""), recovery)},
+		{name: "no manifest", inf: &info.Info{}},
+		{name: "no info"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := otaSystemCryptexTags(tc.inf); !slices.Equal(got, tc.want) {
+				t.Fatalf("tags = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExtractOTAExclaveOS(t *testing.T) {
 	exclaveManifest := func(path string) *info.Info {
 		manifest := &plist.BuildManifest{BuildIdentities: []plist.BuildIdentity{{

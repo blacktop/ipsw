@@ -27,7 +27,7 @@ require (
 	github.com/blacktop/go-macho v1.1.296
 	github.com/blacktop/go-plist v1.0.2
 	github.com/blacktop/go-termimg v0.1.26
-	github.com/blacktop/lzfse-cgo v1.2.0
+	github.com/blacktop/lzfse-cgo v1.3.0
 	github.com/blacktop/lzss v0.1.8
 	github.com/blacktop/ranger v1.0.3
 	github.com/boombuler/barcode v1.1.0
@@ -66,7 +66,7 @@ require (
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
-	github.com/sergi/go-diff v1.4.0
+	github.com/sergi/go-diff v1.4.4
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
