@@ -21,6 +21,7 @@ import (
 	gplist "github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/pkg/aea"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/blacktop/ipsw/pkg/remote"
 )
 
 // A small synthetic sealed APFS tree with a physical extent tree and a single
@@ -260,34 +261,15 @@ func TestRangedRejectsDeflatedDMG(t *testing.T) {
 	}
 }
 
-func TestAPFSPartition(t *testing.T) {
-	le := binary.LittleEndian
-	image := make([]byte, 64*512)
-	if source, size, err := apfsPartition(bytes.NewReader(image), int64(len(image))); err != nil || size != int64(len(image)) || source == nil {
-		t.Fatalf("naked container: %d %v", size, err)
+// A disk image that is not a ZIP member opens through the same chain.
+func TestOpenAPFSImage(t *testing.T) {
+	image := rangedFixture(t)
+	filesystem, err := remote.OpenAPFS(bytes.NewReader(image), int64(len(image)), nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	copy(image[512:], "EFI PART")
-	le.PutUint64(image[512+72:], 2)   // entries start LBA
-	le.PutUint32(image[512+80:], 4)   // entry count
-	le.PutUint32(image[512+84:], 128) // entry size
-	if _, _, err := apfsPartition(bytes.NewReader(image), int64(len(image))); err == nil || !strings.Contains(err.Error(), "no APFS partition") {
-		t.Fatalf("empty table: %v", err)
-	}
-	entry := image[2*512+128:] // second entry; the first stays unused
-	copy(entry, []byte{0xef, 0x57, 0x34, 0x7c, 0, 0, 0xaa, 0x11, 0xaa, 0x11, 0, 0x30, 0x65, 0x43, 0xec, 0xac})
-	le.PutUint64(entry[32:], 8)
-	le.PutUint64(entry[40:], 15)
-	copy(image[8*512:], "partition")
-	source, size, err := apfsPartition(bytes.NewReader(image), int64(len(image)))
-	if err != nil || size != 8*512 {
-		t.Fatalf("partition: %d %v", size, err)
-	}
-	got := make([]byte, 9)
-	if _, err := source.ReadAt(got, 0); err != nil || string(got) != "partition" {
-		t.Fatalf("partition data: %q %v", got, err)
-	}
-	le.PutUint64(entry[40:], 64) // ends past the image
-	if _, _, err := apfsPartition(bytes.NewReader(image), int64(len(image))); err == nil {
-		t.Fatal("accepted out-of-bounds partition")
+	entry, err := filesystem.Lookup("fixture.loctable")
+	if err != nil || entry.Type != uint16(types.DT_REG) {
+		t.Fatalf("lookup: %+v %v", entry, err)
 	}
 }

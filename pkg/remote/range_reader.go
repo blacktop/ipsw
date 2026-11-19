@@ -1,4 +1,6 @@
-package download
+// Package remote reads the disk images of a remote IPSW through HTTP range
+// requests, without downloading or mounting them.
+package remote
 
 import (
 	"errors"
@@ -8,9 +10,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
+
+// Config selects the HTTP client of a RangeReader.
+type Config struct {
+	Proxy    string
+	Insecure bool
+	// Client overrides Proxy/Insecure when set and is safe to share across
+	// readers for connection reuse.
+	Client *http.Client
+}
 
 // RangeReader is a bounded, immutable HTTP ReaderAt. Unlike the ZIP reader's
 // sequential-download cache, it is intended for sparse filesystem access.
@@ -36,13 +48,15 @@ const (
 	rangeAttempts   = 3
 )
 
-func NewRangeReader(url string, config *RemoteConfig) (*RangeReader, error) {
+// NewRangeReader asks url for its size with a HEAD request. A nil config uses
+// a default client.
+func NewRangeReader(url string, config *Config) (*RangeReader, error) {
 	if config == nil {
-		config = &RemoteConfig{}
+		config = &Config{}
 	}
 	client := config.Client
 	if client == nil {
-		client = NewRemoteHTTPClient(config.Proxy, config.Insecure)
+		client = download.NewRemoteHTTPClient(config.Proxy, config.Insecure)
 	}
 	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
@@ -56,8 +70,8 @@ func NewRangeReader(url string, config *RemoteConfig) (*RangeReader, error) {
 	bounded.Timeout = rangeTimeout
 	resp, err := bounded.Do(req)
 	if err != nil {
-		if errors.Is(err, ErrDevPortalAuthRequired) {
-			return nil, ErrDevPortalAuthRequired
+		if errors.Is(err, download.ErrDevPortalAuthRequired) {
+			return nil, download.ErrDevPortalAuthRequired
 		}
 		return nil, err
 	}
@@ -75,7 +89,11 @@ func NewRangeReader(url string, config *RemoteConfig) (*RangeReader, error) {
 	}
 	return &RangeReader{client: &bounded, url: url, agent: agent, size: resp.ContentLength, etag: etag, cache: cache}, nil
 }
+
+// Size is the length of the remote file.
 func (r *RangeReader) Size() int64 { return r.size }
+
+// Stats reports the range requests made so far and the bytes they returned.
 func (r *RangeReader) Stats() (requests, bytes int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -109,7 +127,7 @@ func (r *RangeReader) fetchOnce(offset int64, dst []byte) (retry bool, err error
 	r.requests++
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return !errors.Is(err, ErrDevPortalAuthRequired), err
+		return !errors.Is(err, download.ErrDevPortalAuthRequired), err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusRequestTimeout {
