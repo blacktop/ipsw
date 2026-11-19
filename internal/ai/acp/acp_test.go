@@ -171,7 +171,7 @@ func TestCollectingClientReadTextFileRestrictsCWD(t *testing.T) {
 	}
 
 	client := &collectingClient{cwd: dir}
-	line, limit := 2, 1
+	line, limit := int64(2), int64(1)
 	resp, err := client.ReadTextFile(context.Background(), acpsdk.ReadTextFileRequest{
 		Path:  inside,
 		Line:  &line,
@@ -204,7 +204,7 @@ func TestCollectingClientPermissionPolicy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			kind := tt.kind
 			resp, err := client.RequestPermission(context.Background(), acpsdk.RequestPermissionRequest{
-				ToolCall: acpsdk.ToolCallUpdate{ToolCallId: acpsdk.ToolCallId(tt.name), Kind: &kind},
+				ToolCall: acpsdk.ToolCallUpdate{ToolCallId: acpsdk.ToolCallId(tt.name), Kind: acpsdk.PatchSet(kind)},
 				Options: []acpsdk.PermissionOption{
 					{Kind: acpsdk.PermissionOptionKindAllowOnce, Name: "Allow", OptionId: acpsdk.PermissionOptionId("allow")},
 					{Kind: acpsdk.PermissionOptionKindRejectOnce, Name: "Reject", OptionId: acpsdk.PermissionOptionId("reject")},
@@ -311,6 +311,10 @@ func (a *testACPAgent) CloseSession(ctx context.Context, _ acpsdk.CloseSessionRe
 	return acpsdk.CloseSessionResponse{}, nil
 }
 
+func (a *testACPAgent) DeleteSession(ctx context.Context, _ acpsdk.DeleteSessionRequest) (acpsdk.DeleteSessionResponse, error) {
+	return acpsdk.DeleteSessionResponse{}, nil
+}
+
 func (a *testACPAgent) ListSessions(ctx context.Context, _ acpsdk.ListSessionsRequest) (acpsdk.ListSessionsResponse, error) {
 	return acpsdk.ListSessionsResponse{}, nil
 }
@@ -348,7 +352,7 @@ func (a *testACPAgent) Prompt(ctx context.Context, req acpsdk.PromptRequest) (ac
 			SessionId: req.SessionId,
 			ToolCall: acpsdk.ToolCallUpdate{
 				ToolCallId: acpsdk.ToolCallId("read-context"),
-				Kind:       &kind,
+				Kind:       acpsdk.PatchSet(kind),
 			},
 			Options: []acpsdk.PermissionOption{
 				{Kind: acpsdk.PermissionOptionKindAllowOnce, Name: "Allow", OptionId: acpsdk.PermissionOptionId("allow")},
@@ -361,7 +365,7 @@ func (a *testACPAgent) Prompt(ctx context.Context, req acpsdk.PromptRequest) (ac
 		if perm.Outcome.Selected == nil {
 			return acpsdk.PromptResponse{}, fmt.Errorf("read permission was not selected")
 		}
-		line, limit := 2, 1
+		line, limit := int64(2), int64(1)
 		file, err := a.conn.ReadTextFile(ctx, acpsdk.ReadTextFileRequest{
 			SessionId: req.SessionId,
 			Path:      a.readPath,

@@ -275,6 +275,14 @@ func (c *collectingClient) WriteTextFile(ctx context.Context, _ acp.WriteTextFil
 	return acp.WriteTextFileResponse{}, fmt.Errorf("acp client: writeTextFile denied")
 }
 
+func (c *collectingClient) CreateElicitation(ctx context.Context, _ acp.CreateElicitationRequest) (acp.CreateElicitationResponse, error) {
+	return acp.CreateElicitationResponse{}, fmt.Errorf("acp client: elicitation not supported")
+}
+
+func (c *collectingClient) CompleteElicitation(ctx context.Context, _ acp.CompleteElicitationNotification) error {
+	return nil
+}
+
 func (c *collectingClient) CreateTerminal(ctx context.Context, _ acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
 	return acp.CreateTerminalResponse{}, fmt.Errorf("acp client: terminal not supported")
 }
@@ -403,10 +411,11 @@ func initializeClient(ctx context.Context, conn *acp.ClientSideConnection) error
 }
 
 func autoApprovedPermissionOption(req acp.RequestPermissionRequest) (acp.PermissionOptionId, bool) {
-	if req.ToolCall.Kind == nil {
+	kind, ok := req.ToolCall.Kind.Value()
+	if !ok {
 		return "", false
 	}
-	switch *req.ToolCall.Kind {
+	switch kind {
 	case acp.ToolKindRead, acp.ToolKindSearch, acp.ToolKindThink:
 	default:
 		return "", false
@@ -450,20 +459,19 @@ func (c *collectingClient) resolveReadPath(path string) (string, error) {
 	return target, nil
 }
 
-func readTextWindow(content string, line, limit *int) string {
+func readTextWindow(content string, line, limit *int64) string {
 	if line == nil && limit == nil {
 		return content
 	}
 	lines := strings.Split(content, "\n")
-	start := 0
+	start, end := int64(0), int64(len(lines))
 	if line != nil && *line > 1 {
-		start = min(*line-1, len(lines))
+		start = min(*line-1, end)
 	}
-	end := len(lines)
 	if limit != nil {
 		if *limit <= 0 {
 			end = start
-		} else if start+*limit < end {
+		} else if *limit < end-start {
 			end = start + *limit
 		}
 	}
