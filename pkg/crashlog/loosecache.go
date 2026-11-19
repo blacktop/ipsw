@@ -80,7 +80,7 @@ func (lc *looseCache) machoFor(img *looseImage) (*macho.File, error) {
 	if err != nil {
 		// Universal/fat dylib: use the last arch, matching how
 		// search.ForEachMacho indexed it in newLooseCache.
-		fat, ferr := macho.OpenFat(img.path)
+		fat, ferr := macho.OpenFatWithConfig(img.path, macho.FatConfig{LargeImages: true})
 		if ferr != nil {
 			return nil, err
 		}

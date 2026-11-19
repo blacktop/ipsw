@@ -61,7 +61,7 @@ func scanFileEntitlements(path string, conf *Config) (output string, ok bool, er
 
 // openSlices returns every Mach-O slice in path (a single slice for thin files).
 func openSlices(path string) ([]*macho.File, func(), error) {
-	fat, err := macho.OpenFat(path)
+	fat, err := macho.OpenFatWithConfig(path, macho.FatConfig{LargeImages: true})
 	if err == nil {
 		files := make([]*macho.File, 0, len(fat.Arches))
 		for _, arch := range fat.Arches {

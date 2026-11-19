@@ -42,3 +42,30 @@ func TestIsHFSPlus(t *testing.T) {
 		})
 	}
 }
+
+func TestMachOMagicRecognizesFat64(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		magic []byte
+		want  bool
+	}{
+		{"thin64", []byte{0xcf, 0xfa, 0xed, 0xfe}, true},
+		{"fat", []byte{0xca, 0xfe, 0xba, 0xbe}, true},
+		{"fat64", []byte{0xca, 0xfe, 0xba, 0xbf}, true},
+		{"other", []byte{0xca, 0xfe, 0xba, 0xb0}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, err := IsMachOData(tc.magic); err != nil || got != tc.want {
+				t.Errorf("IsMachOData = %t, %v; want %t", got, err, tc.want)
+			}
+			path := filepath.Join(t.TempDir(), tc.name)
+			if err := os.WriteFile(path, tc.magic, 0600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := IsMachoOrImg4(path)
+			if got != tc.want || (err == nil) != tc.want {
+				t.Errorf("IsMachoOrImg4 = %t, %v; want %t", got, err, tc.want)
+			}
+		})
+	}
+}

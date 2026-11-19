@@ -26,11 +26,13 @@ const (
 	Magic64    Magic = 0xfeedfacf
 	MagicFatBE Magic = 0xcafebabe
 	MagicFatLE Magic = 0xbebafeca
-	MagicZip   Magic = 0x504b0304
-	MagicYAA1  Magic = 0x31414159 // "YAA1"
-	MagicAA01  Magic = 0x31304141 // "AA01"
-	MagicAEA1  Magic = 0x41454131 // "AEA1"
-	MagicPBZX        = 0x70627a78 // "pbzx"
+	// MagicFat64LE is a fat64 header (on disk CA FE BA BF) read little-endian.
+	MagicFat64LE Magic = 0xbfbafeca
+	MagicZip     Magic = 0x504b0304
+	MagicYAA1    Magic = 0x31414159 // "YAA1"
+	MagicAA01    Magic = 0x31304141 // "AA01"
+	MagicAEA1    Magic = 0x41454131 // "AEA1"
+	MagicPBZX          = 0x70627a78 // "pbzx"
 )
 
 func IsMachO(filePath string) (bool, error) {
@@ -52,7 +54,7 @@ func IsMachOData(dat []byte) (bool, error) {
 		return false, fmt.Errorf("failed to read magic: %w", err)
 	}
 	switch Magic(binary.LittleEndian.Uint32(magic[:])) {
-	case Magic32, Magic64, MagicFatBE, MagicFatLE:
+	case Magic32, Magic64, MagicFatBE, MagicFatLE, MagicFat64LE:
 		return true, nil
 	default:
 		return false, nil
@@ -60,35 +62,20 @@ func IsMachOData(dat []byte) (bool, error) {
 }
 
 func IsMachoOrImg4(filePath string) (bool, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return false, fmt.Errorf("failed to open file %s: %w", filePath, err)
+	if ok, err := IsMachO(filePath); ok || err != nil {
+		return ok, err
 	}
-	defer f.Close()
-
-	var magic [4]byte
-	if _, err = f.Read(magic[:]); err != nil {
-		return false, fmt.Errorf("failed to read magic: %w", err)
+	if isIm4p, err := IsIm4p(filePath); isIm4p && err == nil {
+		if strings.Contains(filePath, "kernelcache") {
+			return false, fmt.Errorf("im4p file detected (run `ipsw kernel dec`)")
+		}
+		return false, fmt.Errorf("im4p file detected (run `ipsw img4 extract`)")
 	}
-
-	switch Magic(binary.LittleEndian.Uint32(magic[:])) {
-	case Magic32, Magic64, MagicFatBE, MagicFatLE:
-		return true, nil
-	default:
-		f.Seek(0, io.SeekStart)
-		if isIm4p, err := IsIm4p(filePath); isIm4p && err == nil {
-			if strings.Contains(filePath, "kernelcache") {
-				return false, fmt.Errorf("im4p file detected (run `ipsw kernel dec`)")
-			}
-			return false, fmt.Errorf("im4p file detected (run `ipsw img4 extract`)")
+	if isImg4, err := IsImg4(filePath); isImg4 && err == nil {
+		if strings.Contains(filePath, "kernelcache") {
+			return false, fmt.Errorf("img4 file detected (run `ipsw kernel dec --km`)")
 		}
-		f.Seek(0, io.SeekStart)
-		if isImg4, err := IsImg4(filePath); isImg4 && err == nil {
-			if strings.Contains(filePath, "kernelcache") {
-				return false, fmt.Errorf("img4 file detected (run `ipsw kernel dec --km`)")
-			}
-			return false, fmt.Errorf("img4 file detected")
-		}
+		return false, fmt.Errorf("img4 file detected")
 	}
 
 	return false, fmt.Errorf("not a macho file")

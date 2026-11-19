@@ -56,7 +56,7 @@ func OpenMachO(machoPath string, arch string) (*MachO, error) {
 // OpenMachONonInteractive opens a MachO file with the specified architecture and interactivity setting
 func OpenMachONonInteractive(machoPath string, arch string, interactive bool) (*MachO, error) {
 	// First try to open as fat file
-	fat, err := macho.OpenFat(machoPath)
+	fat, err := macho.OpenFatWithConfig(machoPath, macho.FatConfig{LargeImages: true})
 	if err != nil && err != macho.ErrNotFat {
 		return nil, err
 	}

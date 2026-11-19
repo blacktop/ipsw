@@ -38,7 +38,7 @@ func machoInfo(c *gin.Context) {
 		return
 	}
 
-	fat, err := macho.OpenFat(params.Path)
+	fat, err := macho.OpenFatWithConfig(params.Path, macho.FatConfig{LargeImages: true})
 	if err != nil {
 		if err == macho.ErrNotFat { // not a fat binary
 			m, err = macho.Open(params.Path)
@@ -75,7 +75,7 @@ func machoStrings(c *gin.Context) {
 		return
 	}
 
-	fat, err := macho.OpenFat(params.Path)
+	fat, err := macho.OpenFatWithConfig(params.Path, macho.FatConfig{LargeImages: true})
 	if err != nil {
 		if err == macho.ErrNotFat { // not a fat binary
 			m, err = macho.Open(params.Path)

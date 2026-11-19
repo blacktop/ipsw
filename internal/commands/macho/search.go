@@ -285,7 +285,7 @@ func RunMTEScanIPSWForDevice(ipswPath, pemDB, device string) error {
 				var result *mteResult
 
 				var m *macho.File
-				if fat, err := macho.OpenFat(filePath); err == nil {
+				if fat, err := macho.OpenFatWithConfig(filePath, macho.FatConfig{LargeImages: true}); err == nil {
 					defer fat.Close()
 					m = fat.Arches[len(fat.Arches)-1].File
 				} else if errors.Is(err, macho.ErrNotFat) {

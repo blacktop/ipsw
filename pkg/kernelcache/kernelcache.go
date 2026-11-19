@@ -251,6 +251,27 @@ func DecompressKernelManagementData(kcache string) ([]byte, error) {
 	return data, nil
 }
 
+// thinSingleSlice returns data itself when it is a thin Mach-O, or the one
+// slice of a universal kernelcache: exactly its declared offset and size, so
+// padding after the slice is dropped. Essentially: lipo -thin arm64e.
+func thinSingleSlice(data []byte) ([]byte, error) {
+	fat, err := macho.NewFatFile(bytes.NewReader(data))
+	if errors.Is(err, macho.ErrNotFat) {
+		return data, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse fat mach-o")
+	}
+	if len(fat.Arches) > 1 {
+		return nil, errors.New("found more than 1 mach-o fat file")
+	}
+	// NewFatFile has checked that the slice lies inside data.
+	arch := fat.Arches[0]
+	utils.Indent(log.Debug, 3)(fmt.Sprintf("Extracting arch '%s, %s' from single slice fat MachO file",
+		arch.CPU, arch.SubCPU.String(arch.CPU)))
+	return data[arch.Offset64 : arch.Offset64+arch.Size64], nil
+}
+
 // DecompressData decompresses compressed kernelcache []byte data
 func DecompressData(cc *CompressedCache) ([]byte, error) {
 	utils.Indent(log.Debug, 2)("Decompressing Kernelcache")
@@ -266,24 +287,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		if len(decompressed) == 0 {
 			return nil, fmt.Errorf("failed to LZFSE decompress kernelcache")
 		}
-		// check if kernelcache is fat/universal
-		fat, err := macho.NewFatFile(bytes.NewReader(decompressed))
-		if errors.Is(err, macho.ErrNotFat) {
-			return decompressed, nil
-		}
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse fat mach-o")
-		}
-		defer fat.Close()
-
-		// Sanity check
-		if len(fat.Arches) > 1 {
-			return nil, errors.New("found more than 1 mach-o fat file")
-		}
-
-		// Essentially: lipo -thin arm64e
-		utils.Indent(log.Debug, 3)(fmt.Sprintf("Extracting arch '%s, %s' from single slice fat MachO file", fat.Arches[0].CPU, fat.Arches[0].SubCPU.String(fat.Arches[0].CPU)))
-		return decompressed[fat.Arches[0].Offset:], nil
+		return thinSingleSlice(decompressed)
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
 		utils.Indent(log.Debug, 3)("kernelcache is LZSS compressed")
 		buffer := bytes.NewBuffer(cc.Data)

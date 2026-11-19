@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -205,6 +206,20 @@ func TestFileEntitlementsSkipsNonMacho(t *testing.T) {
 	}
 	if _, err := fileEntitlements(path, &Config{}); err != errNotMacho {
 		t.Fatalf("got %v, want errNotMacho", err)
+	}
+}
+
+func TestEntitlementScanReadsFat64PastFourGiB(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("NTFS files are not sparse by default; this would write 4 GiB")
+	}
+	path := filepath.Join(t.TempDir(), "tool")
+	testutil.WriteFat64(t, path, 1<<32,
+		testutil.MachoArch{CPU: types.CPUAmd64, SubCPU: types.CPUSubtypeX8664All, Entitlements: "<intel/>"},
+		testutil.MachoArch{CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E, Entitlements: "<arm64e/>"})
+	output, ok, err := scanFileEntitlements(path, &Config{})
+	if err != nil || !ok || output != "<arm64e/>" {
+		t.Fatalf("got (%q, %v, %v), want the arm64e entitlements", output, ok, err)
 	}
 }
 

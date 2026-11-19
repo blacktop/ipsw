@@ -482,7 +482,7 @@ func withMachoSlices(machoPath string, handler func([]*macho.File) error) error 
 	if ok, _ := magic.IsMachOData(header[:]); !ok {
 		return nil
 	}
-	fat, err := macho.NewFatFile(f)
+	fat, err := macho.NewFatFileWithConfig(f, macho.FatConfig{LargeImages: true})
 	if err == nil {
 		var slices []*macho.File
 		for _, arch := range fat.Arches {
@@ -519,7 +519,7 @@ func withMachoSlicesStrict(machoPath string, handler func([]*macho.File) error) 
 	if ok, _ := magic.IsMachOData(header[:]); !ok {
 		return nil
 	}
-	fat, err := macho.NewFatFile(f)
+	fat, err := macho.NewFatFileWithConfig(f, macho.FatConfig{LargeImages: true})
 	if err == nil {
 		slices := make([]*macho.File, 0, len(fat.Arches))
 		for _, arch := range fat.Arches {

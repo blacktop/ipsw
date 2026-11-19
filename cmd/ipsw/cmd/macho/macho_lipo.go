@@ -23,12 +23,13 @@ package macho
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/atomicfile"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -52,9 +53,6 @@ var lipoCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var err error
-		var farch macho.FatArch
-
 		// flags
 		selectedArch := viper.GetString("macho.lipo.arch")
 		extractPath := viper.GetString("macho.lipo.output")
@@ -77,18 +75,7 @@ var lipoCmd = &cobra.Command{
 			return fmt.Errorf("input file is not a universal/fat MachO")
 		}
 
-		farch = *m.FatArch
-
-		f, err := os.Open(machoPath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %v", machoPath, err)
-		}
-		defer f.Close()
-
-		dat := make([]byte, farch.Size)
-		if _, err := f.ReadAt(dat, int64(farch.Offset)); err != nil {
-			return fmt.Errorf("failed to read data in file at %#x: %v", farch.Offset, err)
-		}
+		farch := m.FatArch
 
 		outFile := fmt.Sprintf("%s.%s", machoPath, strings.ToLower(farch.SubCPU.String(farch.CPU)))
 		folder := filepath.Dir(outFile) // default to folder of shared cache
@@ -96,11 +83,36 @@ var lipoCmd = &cobra.Command{
 			folder = extractPath
 		}
 		fname := filepath.Join(folder, filepath.Base(outFile)) // default to NOT full dylib path
-		if err := os.WriteFile(fname, dat, 0660); err != nil {
-			return fmt.Errorf("failed to create file %s: %v", outFile, err)
+		if err := writeSlice(machoPath, fname, farch.Offset64, farch.Size64); err != nil {
+			return err
 		}
 		log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), fname)
 
 		return nil
 	},
+}
+
+// writeSlice copies exactly size bytes at offset in src to dst, streaming so a
+// slice past 4 GiB is never held in memory. dst is replaced only on success.
+func writeSlice(src, dst string, offset, size uint64) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", src, err)
+	}
+	defer in.Close()
+	err = atomicfile.Write(dst, 0660, func(out *os.File) error {
+		// Hiding os.File's ReadFrom makes CopyBuffer use the 1 MiB buffer instead
+		// of ReadFrom's 32 KiB steps.
+		buf := make([]byte, max(1, min(size, 1<<20)))
+		n, err := io.CopyBuffer(struct{ io.Writer }{out},
+			io.NewSectionReader(in, int64(offset), int64(size)), buf)
+		if err == nil && uint64(n) != size {
+			err = io.ErrUnexpectedEOF
+		}
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("failed to write the slice at %#x in %s to %s: %w", offset, src, dst, err)
+	}
+	return nil
 }

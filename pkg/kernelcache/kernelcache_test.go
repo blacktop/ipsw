@@ -2,12 +2,15 @@ package kernelcache
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 )
@@ -101,5 +104,33 @@ func TestParseImg4DataRejectsEncryptedKernelcache(t *testing.T) {
 	_, err = ParseImg4Data(data)
 	if !errors.Is(err, ErrEncryptedKernelCache) {
 		t.Fatalf("ParseImg4Data() error = %v, want %v", err, ErrEncryptedKernelCache)
+	}
+}
+
+func TestThinSingleSliceDropsTrailingPadding(t *testing.T) {
+	thin := make([]byte, types.FileHeaderSize64) // an MH_FILESET with no load commands
+	(&types.FileHeader{
+		Magic: types.Magic64, CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64E, Type: types.MH_FILESET,
+	}).Put(thin, binary.LittleEndian)
+	const offset = 0x1000
+	fat := make([]byte, offset)
+	for idx, word := range []uint32{
+		types.MagicFat.Int(), 1, // fat_header
+		uint32(types.CPUArm64), uint32(types.CPUSubtypeArm64E), offset, uint32(len(thin)), 12, // fat_arch
+	} {
+		binary.BigEndian.PutUint32(fat[idx*4:], word)
+	}
+	fat = append(fat, thin...)
+	fat = append(fat, bytes.Repeat([]byte{0xaa}, 0x4000)...)
+
+	got, err := thinSingleSlice(fat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, thin) {
+		t.Fatalf("got %#x bytes, want the %#x-byte slice without the padding after it", len(got), len(thin))
+	}
+	if got, err := thinSingleSlice(thin); err != nil || !bytes.Equal(got, thin) {
+		t.Fatalf("thin kernelcache: got %#x bytes, %v; want it unchanged", len(got), err)
 	}
 }

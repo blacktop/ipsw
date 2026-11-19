@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"syscall"
@@ -168,6 +169,32 @@ func TestForEachMachoSlicesStrictSelectionAndHandler(t *testing.T) {
 		return wantErr
 	}); !errors.Is(err, wantErr) {
 		t.Fatalf("handler failure suppressed: %v", err)
+	}
+}
+
+func TestMachoSliceReadersOpenFat64PastFourGiB(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("NTFS files are not sparse by default; this would write 4 GiB")
+	}
+	path := filepath.Join(t.TempDir(), "fat64")
+	testutil.WriteFat64(t, path, 1<<32,
+		testutil.MachoArch{CPU: types.CPUArm64, SubCPU: types.CPUSubtypeArm64All},
+		testutil.MachoArch{CPU: types.CPUAmd64, SubCPU: types.CPUSubtypeX8664All})
+	for name, read := range map[string]func(string, func([]*macho.File) error) error{
+		"lenient": withMachoSlices,
+		"strict":  withMachoSlicesStrict,
+	} {
+		calls := 0
+		err := read(path, func(slices []*macho.File) error {
+			calls++
+			if len(slices) != 2 || slices[0].CPU != types.CPUArm64 || slices[1].CPU != types.CPUAmd64 {
+				t.Errorf("%s: got %d slices, want arm64 and x86_64", name, len(slices))
+			}
+			return nil
+		})
+		if err != nil || calls != 1 {
+			t.Errorf("%s: calls=%d err=%v, want one call", name, calls, err)
+		}
 	}
 }
 
