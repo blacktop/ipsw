@@ -48,8 +48,6 @@ const (
 	rangeAttempts   = 3
 )
 
-// NewRangeReader asks url for its size with a HEAD request. A nil config uses
-// a default client.
 func NewRangeReader(url string, config *Config) (*RangeReader, error) {
 	if config == nil {
 		config = &Config{}
@@ -89,11 +87,7 @@ func NewRangeReader(url string, config *Config) (*RangeReader, error) {
 	}
 	return &RangeReader{client: &bounded, url: url, agent: agent, size: resp.ContentLength, etag: etag, cache: cache}, nil
 }
-
-// Size is the length of the remote file.
 func (r *RangeReader) Size() int64 { return r.size }
-
-// Stats reports the range requests made so far and the bytes they returned.
 func (r *RangeReader) Stats() (requests, bytes int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

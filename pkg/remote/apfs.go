@@ -18,17 +18,15 @@ import (
 // AEAConfig says how the key of an AEA encrypted disk image is obtained. The
 // zero value fetches it with the metadata of the image.
 type AEAConfig struct {
-	B64SymKey string // Base64 encoded symmetric encryption key, with or without a "base64:" prefix
-	PemDB     string // Path to PEM database
-	Proxy     string // HTTP/HTTPS proxy
-	Insecure  bool   // Allow insecure connections (skip TLS verification)
+	B64SymKey string // with or without a "base64:" prefix
+	PemDB     string
+	Proxy     string
+	Insecure  bool
 }
 
-// OpenZipAPFS opens the APFS container in a disk image that is a member of a
-// remote ZIP archive. remote reads the archive itself and size is its length.
-// The member must be stored: a compressed member has no random access and is
-// an error, never a download. The image may be AEA encrypted, a UDIF or a raw
-// image, with or without a GPT. A nil config is the zero AEAConfig.
+// OpenZipAPFS opens the APFS container in a disk image that is a stored member
+// of the ZIP archive of size bytes read through remote. The image may be AEA
+// encrypted, a UDIF or a raw image, with or without a GPT.
 func OpenZipAPFS(remote io.ReaderAt, size int64, member *zip.File, config *AEAConfig) (*apfs.Reader, error) {
 	if member.Method != zip.Store || member.CompressedSize64 != member.UncompressedSize64 {
 		return nil, fmt.Errorf("ranged extraction requires a stored ZIP member: %s", member.Name)
@@ -52,8 +50,7 @@ func OpenZipAPFS(remote io.ReaderAt, size int64, member *zip.File, config *AEACo
 	return filesystem, nil
 }
 
-// OpenAPFS opens the APFS container in a disk image of size bytes, as
-// OpenZipAPFS does for one inside a ZIP archive.
+// OpenAPFS is OpenZipAPFS for a disk image that is not a ZIP member.
 func OpenAPFS(image io.ReaderAt, size int64, config *AEAConfig) (*apfs.Reader, error) {
 	source, size, err := apfsSource(image, size, config)
 	if err != nil {
@@ -62,7 +59,6 @@ func OpenAPFS(image io.ReaderAt, size int64, config *AEAConfig) (*apfs.Reader, e
 	return apfs.OpenReader(source, size)
 }
 
-// apfsSource unwraps AEA, UDIF and GPT down to the APFS container.
 func apfsSource(source io.ReaderAt, size int64, config *AEAConfig) (io.ReaderAt, int64, error) {
 	if config == nil {
 		config = &AEAConfig{}

@@ -261,7 +261,6 @@ func TestRangedRejectsDeflatedDMG(t *testing.T) {
 	}
 }
 
-// A disk image that is not a ZIP member opens through the same chain.
 func TestOpenAPFSImage(t *testing.T) {
 	image := rangedFixture(t)
 	filesystem, err := remote.OpenAPFS(bytes.NewReader(image), int64(len(image)), nil)
