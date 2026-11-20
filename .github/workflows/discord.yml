@@ -27,7 +27,7 @@ jobs:
         run: |
           cat hack/.watch_cache || echo "No cache found"
       - name: Set up Go
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Run ipsw watch WebKit/WebKit (Security Features)
