@@ -66,7 +66,14 @@ func init() {
 	viper.BindPFlag("download.ipa.password", downloadIpaCmd.Flags().Lookup("password"))
 	viper.BindPFlag("download.ipa.vault-password", downloadIpaCmd.Flags().Lookup("vault-password"))
 	// viper.BindPFlag("download.ipa.keybag-plist", downloadIpaCmd.Flags().Lookup("keybag-plist"))
+	if ipaExtension != nil {
+		ipaExtension(downloadIpaCmd)
+	}
 }
+
+// ipaExtension is set by an optional build-tagged file. It is called once the
+// flags above exist, because an extension may share them.
+var ipaExtension func(*cobra.Command)
 
 // downloadIpaCmd represents the dev command
 var downloadIpaCmd = &cobra.Command{
