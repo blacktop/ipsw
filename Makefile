@@ -67,6 +67,14 @@ snapshot: _require-sandbox _require-engine ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
 	@GOROOT=$(shell go env GOROOT) $(GORELEASER) --clean --timeout 60m --snapshot
 
+# A checkout that holds pkg/ext/release/release.sh is released with that script.
+# This stops make before any prerequisite or recipe of the two targets runs.
+ifneq ($(wildcard pkg/ext/release/release.sh),)
+ifneq ($(filter release release-minor,$(MAKECMDGOALS)),)
+$(error this checkout releases with pkg/ext/release/release.sh; make release and release-minor are disabled here)
+endif
+endif
+
 .PHONY: release
 release: _require-sandbox _require-engine test-engine ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
