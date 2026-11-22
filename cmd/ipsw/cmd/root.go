@@ -234,7 +234,27 @@ func expandConfigPaths(config *viper.Viper) error {
 // sensitiveConfigKeys are credentials, not paths: they are never expanded and
 // their values are never logged.
 var sensitiveConfigKeys = map[string]bool{
-	"symbolicate.api-token": true,
+	"appstore.jwt":                 true,
+	"database.password":            true,
+	"dmg.password":                 true,
+	"download.appledb.api-token":   true,
+	"download.dev.password":        true,
+	"download.dev.vault-password":  true,
+	"download.git.api":             true,
+	"download.ipa.password":        true,
+	"download.ipa.vault-password":  true,
+	"dyld.disass.dec-api-key":      true,
+	"dyld.webkit.api":              true,
+	"ent.pg-password":              true,
+	"macho.disass.dec-api-key":     true,
+	"macho.sign.pw":                true,
+	"ssh.password":                 true,
+	"symbolicate.api-token":        true,
+	"update.api":                   true,
+	"watch.api":                    true,
+	"watch.discord-token":          true,
+	"watch.mastodon-access-token":  true,
+	"watch.mastodon-client-secret": true,
 }
 
 // expandSettings recursively processes all configuration values and expands relative paths

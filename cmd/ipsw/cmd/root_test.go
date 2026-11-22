@@ -3,8 +3,11 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/apex/log"
+	"github.com/apex/log/handlers/memory"
 	"github.com/fatih/color"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -92,5 +95,88 @@ func TestExpandExtensionlessYAMLConfig(t *testing.T) {
 	}
 	if !filepath.IsAbs(v.GetString("output")) {
 		t.Fatalf("path was not expanded: %q", v.GetString("output"))
+	}
+}
+
+// A credential that happens to look like a path is neither rewritten nor
+// logged, while an ordinary path beside it is still expanded and reported.
+func TestExpandSettingsLeavesCredentialsAlone(t *testing.T) {
+	// The list is repeated here on purpose: removing an exemption from the
+	// map, or adding one, must be a deliberate change in both places.
+	credentials := []string{
+		"appstore.jwt",
+		"database.password",
+		"dmg.password",
+		"download.appledb.api-token",
+		"download.dev.password",
+		"download.dev.vault-password",
+		"download.git.api",
+		"download.ipa.password",
+		"download.ipa.vault-password",
+		"dyld.disass.dec-api-key",
+		"dyld.webkit.api",
+		"ent.pg-password",
+		"macho.disass.dec-api-key",
+		"macho.sign.pw",
+		"ssh.password",
+		"symbolicate.api-token",
+		"update.api",
+		"watch.api",
+		"watch.discord-token",
+		"watch.mastodon-access-token",
+		"watch.mastodon-client-secret",
+	}
+	if len(sensitiveConfigKeys) != len(credentials) {
+		t.Fatalf("sensitiveConfigKeys has %d entries, this test expects %d", len(sensitiveConfigKeys), len(credentials))
+	}
+	for _, key := range credentials {
+		if !sensitiveConfigKeys[key] {
+			t.Errorf("%s is not exempt from path expansion", key)
+		}
+	}
+	for _, key := range credentials {
+		t.Run(key, func(t *testing.T) {
+			const secret = "~/looks-like-a-path-Qm4r8Tz1Wd"
+			handler := memory.New()
+			logger, ok := log.Log.(*log.Logger)
+			if !ok {
+				t.Fatal("apex logger has an unexpected implementation")
+			}
+			previous := logger.Handler
+			log.SetHandler(handler)
+			t.Cleanup(func() { log.SetHandler(previous) })
+
+			// Build the nested map a YAML file with this dotted key produces.
+			parts := strings.Split(key, ".")
+			settings := map[string]any{"control-path": "~/control-Hn3x"}
+			level := settings
+			for _, part := range parts[:len(parts)-1] {
+				next := map[string]any{}
+				level[part] = next
+				level = next
+			}
+			level[parts[len(parts)-1]] = secret
+
+			expandSettings(settings, "", false)
+
+			if level[parts[len(parts)-1]] != secret {
+				t.Errorf("credential was rewritten: %q", level[parts[len(parts)-1]])
+			}
+			if settings["control-path"] == "~/control-Hn3x" {
+				t.Error("the ordinary path was not expanded")
+			}
+			warned := false
+			for _, entry := range handler.Entries {
+				if strings.Contains(entry.Message, "Qm4r8Tz1Wd") {
+					t.Errorf("credential value was logged: %q", entry.Message)
+				}
+				if strings.Contains(entry.Message, "control-path") {
+					warned = true
+				}
+			}
+			if !warned {
+				t.Error("the ordinary path produced no warning; the leak check would be vacuous")
+			}
+		})
 	}
 }
