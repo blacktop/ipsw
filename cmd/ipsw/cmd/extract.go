@@ -153,6 +153,9 @@ completed artifacts, sets complete to false, includes an error, and exits nonzer
 		# Extract files from filesystem DMG matching pattern
 		$ ipsw extract --files --pattern '.*LaunchDaemons.*\.plist$' iPhone.ipsw
 
+		# Extract filesystem files from a remote IPSW with HTTP ranges (no DMG download)
+		$ ipsw extract --remote --files --ranged --pattern '^/System/Library/CoreServices/SystemVersion\.plist$' https://updates.cdn-apple.com/iPhone.ipsw
+
 		# Extract DriverKit dyld_shared_cache
 		$ ipsw extract --dyld --driverkit macOS.ipsw
 	`),
