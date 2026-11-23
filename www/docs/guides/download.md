@@ -595,6 +595,46 @@ Download App Packages from the iOS App Store
    • Created com.zhiliaoapp.musically_835599320.v27.4.0.ipa
 ```
 
+### Online route
+
+:::info
+The online route is in the release builds for Apple Silicon Macs and works for free apps only. `ipsw download ipa setup --check` prints `available` when your build supports it.
+:::
+
+Prepare the local state once. Setup downloads six files (about 300 MB) from Apple; pass `--images DIR` to use local copies instead.
+
+```bash
+❯ ipsw download ipa setup
+```
+
+Sign in. The prompts ask for your Apple ID, your password and, if Apple requests one, a verification code. The session is saved in the Keychain item `ipsw fairplay session`.
+
+```bash
+❯ ipsw download ipa signin
+```
+
+Download a licensed IPA
+
+```bash
+❯ ipsw download ipa --online --output ./apps com.zhiliaoapp.musically
+```
+
+Get the free license for an app the account does not own yet. If the saved sign-in is older than three minutes, `ipsw` signs in again before it sends the purchase request.
+
+```bash
+❯ ipsw download ipa --online --purchase com.zhiliaoapp.musically
+```
+
+Also decrypt the licensed IPA. This needs the authorization file described in the [offline IPA guide](/docs/guides/offline-ipa). The `--output` folder receives the licensed IPA only; `ipsw` prints the directory that holds the decrypted `repacked.ipa`.
+
+```bash
+❯ ipsw download ipa --online --decrypt com.zhiliaoapp.musically
+```
+
+:::note
+The online route refuses to run while `APPSTORE_GUID`, `APPSTORE_PROXY`, `APPSTORE_REDOWNLOAD`, `APPSTORE_UA` or `IPSW_ANISETTE_URL` is set.
+:::
+
 ## **download git**
 
 > Download [apple-oss-distributions](https://github.com/apple-oss-distributions) tarballs

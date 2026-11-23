@@ -25,6 +25,15 @@ require_sandbox() {
     fi
 }
 
+require_ext() {
+    if [[ ! -d pkg/ext ]]; then
+        echo "ERROR: pkg/ext/ is closed-source and not present in public clones." >&2
+        echo "       CLI doc generation requires the online IPA command sources." >&2
+        echo "       Public users should use the committed docs instead of regenerating them." >&2
+        exit 1
+    fi
+}
+
 move_swagger() {
     if [[ -f api/swagger.json ]]; then
         cp api/swagger.json www/static/api/swagger.json
@@ -33,6 +42,7 @@ move_swagger() {
 
 main() {
     require_sandbox
+    require_ext
     move_swagger
 
     SED="sed"
@@ -41,7 +51,7 @@ main() {
     fi
 
     rm -rf www/docs/cli/**/*.md
-    go run -tags 'sandbox' ./cmd/ipsw/main.go docs
+    go run -tags 'sandbox,ipsw_ext' ./cmd/ipsw/main.go docs
     # go run . schema -o ./www/docs/static/schema.json
     fd .md www/docs/cli/ | xargs $SED -i'' \
         -e ':a' -e 'N' -e '$!ba' -e 's/### Examples\n\n```/### Examples\n\n```bash/g'
