@@ -28,6 +28,15 @@ var (
 	ErrOfflinePermission  = errors.New("authorization access or file permissions were rejected")
 	ErrOfflineIO          = errors.New("offline operation could not read or write its files")
 	ErrOfflineProcessing  = errors.New("offline processing failed")
+	// ErrOfflineOutputRejected reports ABI status 19: the directory that will
+	// contain the output is a symbolic link, is not a directory, belongs to
+	// another user, or is writable by group or others.
+	ErrOfflineOutputRejected = errors.New("output location was rejected: " +
+		"its parent must be a real directory that you own and that others cannot write to")
+	// ErrOfflineInputRejected reports ABI status 20: the IPA is a symbolic link,
+	// is not a regular file, or is larger than the engine accepts.
+	ErrOfflineInputRejected = errors.New("input IPA was rejected: " +
+		"it must be a regular file, not a symbolic link, and no larger than 4 GiB")
 	// ErrOfflinePanic reports ABI status 7. The caller must retire the process
 	// without retrying; an opaque panic payload is quarantined until exit.
 	ErrOfflinePanic  = errors.New("offline engine encountered an internal failure")
@@ -90,6 +99,11 @@ func offlineStatus(status int32) error {
 		return ErrOfflinePanic
 	case 8:
 		return ErrOfflineBuffer
+	// 9 to 18 belong to the online entries and never come from these calls.
+	case 19:
+		return ErrOfflineOutputRejected
+	case 20:
+		return ErrOfflineInputRejected
 	default:
 		return fmt.Errorf("offline engine returned an unknown status (%d)", status)
 	}

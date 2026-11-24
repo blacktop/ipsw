@@ -21,6 +21,12 @@ extern "C" {
 #define IPSW_FP_PROCESSING INT32_C(6)
 #define IPSW_FP_PANIC INT32_C(7)
 #define IPSW_FP_BUFFER_TOO_SMALL INT32_C(8)
+/* 9 to 18 belong to ipsw_fp_ext.h. The two below name no path: the result's
+ * parent is a symbolic link, not a directory, another user's, or writable by
+ * group or others; the selected IPA is a symbolic link, not a regular file, or
+ * over the size bound. */
+#define IPSW_FP_OUTPUT_REJECTED INT32_C(19)
+#define IPSW_FP_INPUT_REJECTED INT32_C(20)
 
 /* No function retains a pointer or transfers ownership of an allocation.
  * All nonempty spans must lie within one live allocation for the whole call.

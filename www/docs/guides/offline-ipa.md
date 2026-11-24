@@ -54,8 +54,9 @@ with mode `0700`, and the authorization file has mode `0600`. An existing
 authorization file is never overwritten, so move the old one away before you
 export again.
 
-An export keeps working for later downloads made with the same Apple ID. If
-decryption reports that no matching license record was found, export again.
+An export keeps working for later downloads made with the same Apple ID. If a
+newer download fails with `matching license record was not found` although the
+Apple ID is right, export again.
 
 Keep this file private. Together with a licensed IPA it is all that decryption
 needs, on any machine.
@@ -170,12 +171,43 @@ Then decrypt as above:
 ipsw macho decrypt-ipa ./LicensedApp.ipa --output ./decrypted
 ```
 
-## Errors
+## Troubleshooting
+
+The decryption errors are short on purpose: they name no path and no account.
+`offline processing failed` is the catch-all. When a decryption fails, work
+through these in order.
+
+1. Check the version with `ipsw version`. Version 3.1.746 failed with
+   `offline processing failed` when started through Homebrew's
+   `/opt/homebrew/bin/ipsw` link, and on Linux. Both were fixed in 3.1.747.
+   Versions before 3.1.751 report a rejected output location or IPA as
+   `offline processing failed` or
+   `offline operation could not read or write its files`.
+2. Check the Apple ID. The export must come from a Mac signed in to the App
+   Store with the Apple ID that owns the app. A wrong Apple ID reports
+   `matching license record was not found`. So does an export that lacks the
+   key this download needs, so if the Apple ID is right, export again.
+3. Check the output path. The directory that will contain the output must be a
+   real directory, owned by you and not writable by your group or by others.
+   Otherwise the decryption is refused before any work starts, with
+   `output location was rejected`. On macOS `/tmp` and `/var` are symbolic
+   links, so `--output /tmp/result` is refused. Only the immediate parent is
+   checked, so a directory you created inside `/tmp` works as the parent, and
+   so does your home folder.
+4. Check the inputs. The IPA must be a regular file, not a symbolic link, and
+   no larger than 4 GiB; otherwise the error is `input IPA was rejected`. The
+   authorization file must be a regular file with mode `0600` exactly, and its
+   directory needs mode `0700` exactly and must not be a symbolic link.
 
 | Message | Cause |
 | --- | --- |
-| `matching license record was not found` | The exported authorization does not contain the license record this IPA needs. Export on a Mac signed in to the App Store with the Apple ID that owns the app. |
-| `offline processing failed` | One known cause is an export and an IPA that belong to different Apple IDs. |
+| `matching license record was not found` | The exported authorization has no record for the IPA's Apple ID, or has the record without the key this IPA needs. Export on a Mac signed in to the App Store with the Apple ID that owns the app. If the Apple ID is right, export again. |
+| `output location was rejected` | The directory that will contain the output is a symbolic link (as `/tmp` and `/var` are on macOS), is not a directory, belongs to another user, or is writable by group or others. |
+| `input IPA was rejected` | The IPA is a symbolic link, is not a regular file, or is larger than 4 GiB. |
+| `offline processing failed` | The catch-all for a failure that has no message of its own. `ipsw` 3.1.746 reported it for every decryption started through Homebrew's link or on Linux. |
+| `offline operation could not read or write its files` | The IPA, the authorization file or the directory that will contain the output is missing, or a file could not be created in the output directory. |
+| `authorization access or file permissions were rejected` | The authorization file or its directory is a symbolic link, or the modes are not exactly `0600` for the file and `0700` for its directory. Also reported when the system denies writing the output. |
+| `platform or input format is not supported` | `export-auth` was run on Linux; it runs on macOS only. From `decrypt-ipa`: the authorization file is damaged or is not an authorization file, or the IPA uses a license version that is not supported. |
 | `authorization.fpauth already exists; existing files are never overwritten` | Move the old file away, or export to another directory with `--output`. |
 | `authorization export requires an interactive terminal for sudo approval` | Run `export-auth` in a terminal, not from a script or a job runner. |
 | `authorization directory must be owned by the current user with mode 0700` | Fix the directory's owner and mode. |

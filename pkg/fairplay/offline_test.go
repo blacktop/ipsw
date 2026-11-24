@@ -51,7 +51,15 @@ func TestOfflineStatusUsesNeutralErrors(t *testing.T) {
 			t.Fatalf("status %d: got %v, want %v", status, got, want)
 		}
 	}
-	if err := offlineStatus(99); err == nil {
-		t.Fatal("unknown status must fail")
+	rejected := map[int32]error{19: ErrOfflineOutputRejected, 20: ErrOfflineInputRejected}
+	for status, want := range rejected {
+		if got := offlineStatus(status); !errors.Is(got, want) {
+			t.Fatalf("status %d: got %v, want %v", status, got, want)
+		}
+	}
+	for _, status := range []int32{-1, 9, 18, 21, 99} {
+		if err := offlineStatus(status); err == nil || !strings.Contains(err.Error(), "unknown status") {
+			t.Fatalf("status %d: got %v, want an unknown status", status, err)
+		}
 	}
 }
