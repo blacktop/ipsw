@@ -101,7 +101,7 @@ To download an IPSW when the SHA-1 reported by ipsw.me is known to be incorrect
 :::warning
 Only skip SHA-1 verification after independently validating the download. Downloads made with `--ignore-sha1` are not added to `checksums.txt.sha1`.
 
-Interrupted downloads now stage bytes in a `.part` file (with a `.part.json` resume sidecar) and resume automatically on the next run — no flag needed. `--skip-all` skips only files actively locked by another downloader; an inactive `.part` resumes normally. Partial `.download` files from older ipsw versions cannot be resumed by the new engine and are left in place with a warning; if such a file is actually complete, rename it into place (`mv file.ipsw.download file.ipsw`) — otherwise delete it.
+Interrupted downloads stage bytes in a `.part` file (with a `.part.json` resume sidecar) and resume automatically on the next run, with no flag needed. `--skip-all` skips only files actively locked by another downloader; an inactive `.part` resumes normally. Partial `.download` files from older ipsw versions cannot be resumed and are left in place with a warning. If such a file is actually complete, rename it into place (`mv file.ipsw.download file.ipsw`); otherwise delete it.
 :::
 
 ### download concurrency
@@ -625,7 +625,7 @@ Get the free license for an app the account does not own yet. If the saved sign-
 ❯ ipsw download ipa --online --purchase com.zhiliaoapp.musically
 ```
 
-Also decrypt the licensed IPA. This needs the authorization file described in the [offline IPA guide](/docs/guides/offline-ipa). The `--output` folder receives the licensed IPA only; `ipsw` prints the directory that holds the decrypted `repacked.ipa`.
+Also decrypt the licensed IPA. This needs the authorization file described in the [IPA decryption guide](/docs/guides/offline-ipa). The `--output` folder receives the licensed IPA only; `ipsw` prints the directory that holds the decrypted `repacked.ipa`.
 
 ```bash
 ❯ ipsw download ipa --online --decrypt com.zhiliaoapp.musically
