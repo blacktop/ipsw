@@ -22,7 +22,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.4.2
 	github.com/blacktop/arm64-cgo v1.0.76
-	github.com/blacktop/go-apfs v1.0.32
+	github.com/blacktop/go-apfs v1.0.33
 	github.com/blacktop/go-download v0.2.8
 	github.com/blacktop/go-dwarf v1.1.0
 	github.com/blacktop/go-macho v1.1.298
@@ -31,7 +31,7 @@ require (
 	github.com/blacktop/lzfse-cgo v1.3.0
 	github.com/blacktop/lzss v0.1.8
 	github.com/blacktop/ranger v1.0.3
-	github.com/boombuler/barcode v1.1.0
+	github.com/boombuler/barcode v1.1.1
 	github.com/briandowns/spinner v1.23.2
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
@@ -53,7 +53,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/gomarkdown/markdown v0.0.0-20261117205700-e8c6d33a8b6c
+	github.com/gomarkdown/markdown v0.0.0-20261123200727-167101872811
 	github.com/google/gousb v1.1.3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
@@ -64,7 +64,7 @@ require (
 	github.com/mattn/go-mastodon v0.0.13
 	github.com/mattn/go-runewidth v0.0.31
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/ollama/ollama v0.40.17
+	github.com/ollama/ollama v0.40.18
 	github.com/openai/openai-go v1.12.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
@@ -80,7 +80,7 @@ require (
 	github.com/vbauerster/mpb/v8 v8.16.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.59.0
-	golang.org/x/exp v0.0.0-20261121134650-e1094eeca1b5
+	golang.org/x/exp v0.0.0-20261124000051-d6646c509b6d
 	golang.org/x/image v0.48.0
 	golang.org/x/net v0.63.0
 	golang.org/x/oauth2 v0.38.0
