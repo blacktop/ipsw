@@ -67,27 +67,25 @@ snapshot: _require-sandbox _require-engine ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
 	@GOROOT=$(shell go env GOROOT) $(GORELEASER) --clean --timeout 60m --snapshot
 
-# A checkout that holds pkg/ext/release/release.sh is released with that script.
-# This stops make before any prerequisite or recipe of the two targets runs.
-ifneq ($(wildcard pkg/ext/release/release.sh),)
-ifneq ($(filter release release-minor,$(MAKECMDGOALS)),)
-$(error this checkout releases with pkg/ext/release/release.sh; make release and release-minor are disabled here)
-endif
-endif
+# pkg/ext/release/release.sh drives GoReleaser: build holds the binaries and publish ships them.
+RELEASE := env -u IPSW_FP_MANIFEST pkg/ext/release/release.sh
+RELEASE_MANIFEST = $(dir $(IPSW_FP_MANIFEST))release-manifest.json
+BUMP ?= patch
+# A tag already at HEAD is a release that stopped before its push.
+RELEASE_TAG = $(or $(shell git tag --list 'v3.1.*' --points-at HEAD --sort=v:refname | tail -n 1),$(shell go tool svu --tag.pattern 'v3.1.*' $(BUMP)))
 
 .PHONY: release
-release: _require-sandbox _require-engine test-engine ## Create a new release from the NEXT_VERSION
-	@echo " > Creating Release ${NEXT_VERSION}"
-	@hack/make/release ${NEXT_VERSION}
-	@GOROOT=$(shell go env GOROOT) GITHUB_TOKEN=$(shell gh auth token) $(GORELEASER) --clean --timeout 60m --skip=validate
-	@echo " > Update Portfile ${NEXT_VERSION}"
+release: _require-sandbox _require-engine ## Build, test and publish the NEXT_VERSION release
+	@hack/goreleaser/test-engine check
+	@tag=$(RELEASE_TAG); echo " > Creating Release $$tag"; \
+	$(RELEASE) build $$tag "$(RELEASE_MANIFEST)" && \
+	hack/goreleaser/test-engine host dist && \
+	$(RELEASE) publish $$tag "$(RELEASE_MANIFEST)"
 	@hack/make/portfile ../ports
 
 .PHONY: release-minor
-release-minor: _require-sandbox _require-engine test-engine ## Create a new minor semver release
-	@echo " > Creating Release $(shell go tool svu --tag.pattern 'v3.1.*' minor)"
-	@hack/make/release $(shell go tool svu --tag.pattern 'v3.1.*' minor)
-	@GOROOT=$(shell go env GOROOT) $(GORELEASER) --clean --timeout 60m --skip=validate
+release-minor: BUMP=minor
+release-minor: release ## Build, test and publish a new minor semver release
 
 .PHONY: destroy
 destroy: ## Remove release from the CUR_VERSION

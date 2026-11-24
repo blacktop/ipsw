@@ -3,12 +3,14 @@
 
 usage: test-engine check
        test-engine run DIST
+       test-engine host DIST
 
 run reads DIST/artifacts.json from a GoReleaser build and tests each binary
 that must carry the engine. Every binary is invoked through a symbolic link,
 as Homebrew installs it: a decrypt of missing input must report the engine's
 file error, and a decrypt of the replay IPA must produce the expected
-repacked IPA. Linux binaries run in Docker. check validates the replay
+repacked IPA. Linux binaries run in Docker. host tests only the binaries
+that run on this machine, so it needs no Docker. check validates the replay
 fixture alone, so a release fails before its long build.
 
 IPSW_FP_REPLAY names the fixture: {"ipa": "...", "authorization": "...",
@@ -189,11 +191,13 @@ def exercise(session, expected):
         raise EngineTestError(f"repacked.ipa is {digest}, expected {expected}")
 
 
-def run(dist):
+def run(dist, linux=True):
     ipa, authorization, expected = replay_fixture(os.environ)
     failures = 0
     for build, binary in sorted(engine_binaries(dist).items()):
         label = "/".join(build)
+        if build[1] == "linux" and not linux:
+            continue
         if build[1] == "linux":
             session = linux_session(binary, ipa, authorization, build[2])
         else:
@@ -214,8 +218,8 @@ def main(arguments):
     try:
         if arguments == ["check"]:
             replay_fixture(os.environ)
-        elif len(arguments) == 2 and arguments[0] == "run":
-            run(Path(arguments[1]))
+        elif len(arguments) == 2 and arguments[0] in ("run", "host"):
+            run(Path(arguments[1]), linux=arguments[0] == "run")
         else:
             sys.exit(__doc__.strip())
     except (EngineTestError, OSError, ValueError) as error:
