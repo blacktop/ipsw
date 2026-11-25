@@ -588,7 +588,7 @@ Output downloadable items as JSON
 Download App Packages from the iOS App Store
 
 :::info
-Release builds for Apple Silicon Macs download with their own FairPlay support. It works for free apps only, and the first download fetches Apple's support files (about 300 MB) and asks you to sign in.
+Release builds for Apple Silicon Macs download apps directly from the App Store. This works for free apps only, and the first download fetches Apple's support files (about 300 MB) and asks you to sign in.
 :::
 
 Download an app by bundle ID
