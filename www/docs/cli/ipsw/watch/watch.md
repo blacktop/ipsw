@@ -76,4 +76,5 @@ ipsw watch <ORG/REPO> [flags]
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw watch pcc](/docs/cli/ipsw/watch/pcc)	 - Watch for new PCC vphone600 firmware
+* [ipsw watch security](/docs/cli/ipsw/watch/security)	 - Watch Apple security advisories for new and changed CVEs
 

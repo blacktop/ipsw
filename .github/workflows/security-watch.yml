@@ -1,0 +1,39 @@
+name: "Apple Security Watch"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 */6 * * *" # every 6 hours
+
+permissions:
+  contents: write
+
+concurrency:
+  group: security-watch # overlapping runs would double-post and race the state commit
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked] git-auto-commit-action pushes with the persisted token
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - name: Run ipsw watch security
+        env:
+          IPSW_WATCH_DISCORD_ID: ${{ secrets.DISCORD_ID }}
+          IPSW_WATCH_DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+        run: |
+          go run ./cmd/ipsw/main.go watch security \
+          --interval 0 \
+          --state hack/.security_watch_state \
+          --credit "Calif.io" \
+          --discord
+      - uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v5
+        if: ${{ !cancelled() }}
+        with:
+          commit_message: Update security watch state
+          file_pattern: hack/.security_watch_state
