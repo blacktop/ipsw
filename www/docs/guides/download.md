@@ -597,7 +597,7 @@ Download an app by bundle ID
 ❯ ipsw download ipa --output ./apps com.zhiliaoapp.musically
 ```
 
-An IPA that is already in the output folder is not replaced; pass `--force` to overwrite it.
+An IPA that is already in the output folder is not downloaded again. For one app, including a `--search` that picks only one, `ipsw` exits with an error. When you pick several apps with `--search`, it skips the ones already there with a warning and downloads the rest. With `--decrypt`, an IPA already there is decrypted if it has no decrypted copy yet. Pass `--force` to download the app again and replace it.
 
 Search for apps and pick which to download
 
