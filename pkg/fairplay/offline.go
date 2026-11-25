@@ -21,7 +21,7 @@ var authorizationMagic = []byte{'F', 'P', 'A', 'U', 'T', 'H', 0, 0}
 
 var (
 	ErrOfflineUnavailable = errors.New("offline decryption is unavailable in this build")
-	ErrOfflineABI         = errors.New("offline engine ABI is incompatible")
+	ErrOfflineABI         = errors.New("offline decryption is incompatible with this build")
 	ErrOfflineArgument    = errors.New("invalid offline operation argument")
 	ErrLicenseAbsent      = errors.New("matching license record was not found")
 	ErrOfflineUnsupported = errors.New("platform or input format is not supported")
@@ -39,7 +39,7 @@ var (
 		"it must be a regular file, not a symbolic link, and no larger than 4 GiB")
 	// ErrOfflinePanic reports ABI status 7. The caller must retire the process
 	// without retrying; an opaque panic payload is quarantined until exit.
-	ErrOfflinePanic  = errors.New("offline engine encountered an internal failure")
+	ErrOfflinePanic  = errors.New("offline decryption encountered an internal failure")
 	ErrOfflineBuffer = errors.New("authorization capture buffer is too small")
 )
 
@@ -105,6 +105,6 @@ func offlineStatus(status int32) error {
 	case 20:
 		return ErrOfflineInputRejected
 	default:
-		return fmt.Errorf("offline engine returned an unknown status (%d)", status)
+		return fmt.Errorf("offline decryption returned an unknown status (%d)", status)
 	}
 }
