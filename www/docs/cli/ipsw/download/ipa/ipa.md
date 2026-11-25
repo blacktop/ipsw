@@ -42,6 +42,7 @@ ipsw download ipa [flags]
 
 ```
       --decrypt[=true|false]          Also decrypt the IPA (needs 'ipsw macho export-auth' once)
+      --force[=true|false]            Overwrite an IPA that already exists
   -h, --help[=true|false]             help for ipa
       --insecure[=true|false]         do not verify ssl certs (legacy downloader)
   -o, --output string                 Folder to download files to

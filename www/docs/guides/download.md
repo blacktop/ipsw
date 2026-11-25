@@ -597,6 +597,8 @@ Download an app by bundle ID
 ❯ ipsw download ipa --output ./apps com.zhiliaoapp.musically
 ```
 
+An IPA that is already in the output folder is not replaced; pass `--force` to overwrite it.
+
 Search for apps and pick which to download
 
 ```bash
