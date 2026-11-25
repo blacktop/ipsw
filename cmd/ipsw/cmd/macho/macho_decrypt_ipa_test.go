@@ -52,7 +52,7 @@ func TestDecryptIPACommand(t *testing.T) {
 	}
 }
 
-func TestDecryptIPACommandRequiresExplicitInputs(t *testing.T) {
+func TestDecryptIPACommandRejectsEmptyInputs(t *testing.T) {
 	command := newMachoDecryptIPACmd(func(_, _, _ string) (fairplay.Result, error) {
 		t.Fatal("backend must not run")
 		return fairplay.Result{}, nil
@@ -60,12 +60,12 @@ func TestDecryptIPACommandRequiresExplicitInputs(t *testing.T) {
 	command.SetOut(&bytes.Buffer{})
 	command.SetErr(&bytes.Buffer{})
 	for _, args := range [][]string{
-		{"fixture.ipa", "--auth", "fixture.fpauth"},
+		{"fixture.ipa", "--auth", "fixture.fpauth", "--output", ""},
 		{"fixture.ipa", "--auth", "", "--output", "new-output"},
 	} {
 		command.SetArgs(args)
 		if err := command.Execute(); err == nil {
-			t.Fatalf("missing output or empty auth must fail: %q", args)
+			t.Fatalf("empty output or empty auth must fail: %q", args)
 		}
 	}
 }
@@ -133,6 +133,20 @@ func TestDecryptIPACommandRerunReplacesEarlierResult(t *testing.T) {
 	}
 	if names := outputNames(t, output); names != "notes.txt,repacked.ipa" {
 		t.Fatalf("output holds %q; want the result beside the untouched file", names)
+	}
+}
+
+func TestDecryptIPACommandDefaultsToCurrentDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+	command := newMachoDecryptIPACmd(newDirectoryEngine("decrypted"))
+	command.SetOut(&bytes.Buffer{})
+	command.SetErr(&bytes.Buffer{})
+	command.SetArgs([]string{"fixture.ipa", "--auth", "fixture.fpauth"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if names := outputNames(t, "."); names != "repacked.ipa" {
+		t.Fatalf("current directory holds %q; want only the result", names)
 	}
 }
 

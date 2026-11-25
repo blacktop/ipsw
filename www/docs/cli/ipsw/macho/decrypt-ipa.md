@@ -12,7 +12,7 @@ Decrypt an IPA using an exported local authorization file
 
 ### Synopsis
 
-Decrypt a licensed IPA into an output directory; decrypting into the same directory again replaces the earlier result. The authorization exported by 'ipsw macho export-auth' is read from ~/.config/ipsw/fairplay/authorization.fpauth unless --auth names another file.
+Decrypt a licensed IPA to repacked.ipa in the output directory, replacing an earlier result there. The authorization exported by 'ipsw macho export-auth' is read from ~/.config/ipsw/fairplay/authorization.fpauth unless --auth names another file.
 
 ```
 ipsw macho decrypt-ipa <IPA> [flags]
@@ -33,7 +33,7 @@ ipsw macho decrypt-ipa <IPA> [flags]
 ```
       --auth string         Exported local authorization file (default ~/.config/ipsw/fairplay/authorization.fpauth)
   -h, --help[=true|false]   help for decrypt-ipa
-  -o, --output string       Output directory (created if missing)
+  -o, --output string       Output directory (created if missing) (default ".")
 ```
 
 ### Options inherited from parent commands

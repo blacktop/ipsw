@@ -24,6 +24,7 @@ THE SOFTWARE.
 package download
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -107,6 +108,14 @@ var downloadIpaCmd = &cobra.Command{
 		username := viper.GetString("download.ipa.username")
 		password := viper.GetString("download.ipa.password")
 
+		bundles := args
+		if viper.GetBool("download.ipa.search") {
+			var err error
+			if bundles, err = pickApps(cmd.Context(), args[0]); err != nil || len(bundles) == 0 {
+				return err
+			}
+		}
+
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("failed to get user home directory: %v", err)
@@ -133,40 +142,54 @@ var downloadIpaCmd = &cobra.Command{
 			return fmt.Errorf("failed to login to App Store: %v", err)
 		}
 
-		if viper.GetBool("download.ipa.search") {
-			apps, err := as.Search(args[0], download.AppStoreSearchLimit)
-			if err != nil {
-				return fmt.Errorf("failed to search App Store: %v", err)
+		for _, bundleID := range bundles {
+			if err := as.Download(bundleID, output); err != nil {
+				return fmt.Errorf("failed to download app %s: %v", bundleID, err)
 			}
-
-			var choices []string
-			for _, app := range apps {
-				choices = append(choices, app.Name)
-			}
-
-			dfiles := []int{}
-			prompt := &survey.MultiSelect{
-				Message:  "Select what app(s) to download:",
-				Options:  choices,
-				PageSize: 20,
-			}
-			if err := survey.AskOne(prompt, &dfiles); err != nil {
-				if err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					return nil
-				}
-				return err
-			}
-
-			for _, df := range dfiles {
-				if err := as.Download(apps[df].BundleID, output); err != nil {
-					return fmt.Errorf("failed to download app %s: %v", apps[df].Name, err)
-				}
-			}
-
-			return nil
 		}
 
-		return as.Download(args[0], output)
+		return nil
 	},
+}
+
+// pickApps searches the App Store, which needs no sign-in, and returns the
+// bundle IDs of the apps the user selects.
+func pickApps(ctx context.Context, term string) ([]string, error) {
+	as := download.NewAppStore(&download.AppStoreConfig{
+		Context:    ctx,
+		Proxy:      viper.GetString("download.ipa.proxy"),
+		Insecure:   viper.GetBool("download.ipa.insecure"),
+		StoreFront: viper.GetString("download.ipa.store-front"),
+	})
+	defer as.Close()
+
+	apps, err := as.Search(term, download.AppStoreSearchLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search App Store: %v", err)
+	}
+
+	var choices []string
+	for _, app := range apps {
+		choices = append(choices, app.Name)
+	}
+
+	picked := []int{}
+	prompt := &survey.MultiSelect{
+		Message:  "Select what app(s) to download:",
+		Options:  choices,
+		PageSize: 20,
+	}
+	if err := survey.AskOne(prompt, &picked); err != nil {
+		if err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var bundles []string
+	for _, index := range picked {
+		bundles = append(bundles, apps[index].BundleID)
+	}
+	return bundles, nil
 }

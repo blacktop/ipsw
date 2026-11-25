@@ -587,52 +587,43 @@ Output downloadable items as JSON
 
 Download App Packages from the iOS App Store
 
+:::info
+Release builds for Apple Silicon Macs download with their own FairPlay support. It works for free apps only, and the first download fetches Apple's support files (about 300 MB) and asks you to sign in.
+:::
+
+Download an app by bundle ID
+
+```bash
+❯ ipsw download ipa --output ./apps com.zhiliaoapp.musically
+```
+
+Search for apps and pick which to download
+
 ```bash
 ❯ ipsw download ipa --search TikTok
 ? Select what app(s) to download: ✅
-   • Downloading               file=/var/folders/5q/g6x_p_yn113dpvwd1tm2kjzc0000gn/T/appstore.ipa2930715700
-	197.74 MiB / 197.74 MiB [==========================================================| ✅  ] 11.68 MiB/s
-   • Created com.zhiliaoapp.musically_835599320.v27.4.0.ipa
 ```
 
-### Online route
-
-:::info
-The online route is in the release builds for Apple Silicon Macs and works for free apps only. `ipsw download ipa setup --check` prints `available` when your build supports it.
-:::
-
-Prepare the local state once. Setup downloads six files (about 300 MB) from Apple; pass `--images DIR` to use local copies instead.
+Get the free license for an app the account does not own yet
 
 ```bash
-❯ ipsw download ipa setup
+❯ ipsw download ipa --purchase com.zhiliaoapp.musically
 ```
 
-Sign in. The prompts ask for your Apple ID, your password and, if Apple requests one, a verification code. The session is saved in the Keychain item `ipsw fairplay session`.
+Download and decrypt. This needs the authorization file described in the [IPA decryption guide](/docs/guides/offline-ipa).
 
 ```bash
-❯ ipsw download ipa signin
+❯ ipsw download ipa --decrypt --output ./apps com.zhiliaoapp.musically
 ```
 
-Download a licensed IPA
+Sign in ahead of time, for example from a script. The session is saved in the Keychain item `ipsw fairplay session`.
 
 ```bash
-❯ ipsw download ipa --online --output ./apps com.zhiliaoapp.musically
-```
-
-Get the free license for an app the account does not own yet. If the saved sign-in is older than three minutes, `ipsw` signs in again before it sends the purchase request.
-
-```bash
-❯ ipsw download ipa --online --purchase com.zhiliaoapp.musically
-```
-
-Also decrypt the licensed IPA. This needs the authorization file described in the [IPA decryption guide](/docs/guides/offline-ipa). The `--output` folder receives the licensed IPA only; `ipsw` prints the directory that holds the decrypted `repacked.ipa`.
-
-```bash
-❯ ipsw download ipa --online --decrypt com.zhiliaoapp.musically
+❯ security find-generic-password -s appleid -w | ipsw download ipa signin --username user@example.com --password-stdin
 ```
 
 :::note
-The online route refuses to run while `APPSTORE_GUID`, `APPSTORE_PROXY`, `APPSTORE_REDOWNLOAD`, `APPSTORE_UA` or `IPSW_ANISETTE_URL` is set.
+Other builds use the legacy downloader, and so do `--proxy`, `--insecure`, `--sms`, `--store-front`, `--password` and `--vault-password`. It has its own sign-in and keeps its state in `~/.ipsw`.
 :::
 
 ## **download git**

@@ -83,8 +83,8 @@ func newMachoDecryptIPACmd(decrypt decryptIPAFunc) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "decrypt-ipa <IPA>",
 		Short: "Decrypt an IPA using an exported local authorization file",
-		Long: "Decrypt a licensed IPA into an output directory; decrypting into the same directory " +
-			"again replaces the earlier result. The authorization exported by " +
+		Long: "Decrypt a licensed IPA to repacked.ipa in the output directory, replacing an earlier " +
+			"result there. The authorization exported by " +
 			"'ipsw macho export-auth' is read from ~/.config/ipsw/fairplay/authorization.fpauth " +
 			"unless --auth names another file.",
 		Example: heredoc.Doc(`
@@ -130,8 +130,7 @@ func newMachoDecryptIPACmd(decrypt decryptIPAFunc) *cobra.Command {
 	}
 	command.Flags().String("auth", "",
 		"Exported local authorization file (default ~/.config/ipsw/fairplay/authorization.fpauth)")
-	command.Flags().StringP("output", "o", "", "Output directory (created if missing)")
-	_ = command.MarkFlagRequired("output")
+	command.Flags().StringP("output", "o", ".", "Output directory (created if missing)")
 	_ = command.MarkFlagFilename("auth")
 	return command
 }

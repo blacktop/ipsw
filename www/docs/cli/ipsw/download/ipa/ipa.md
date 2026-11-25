@@ -12,9 +12,11 @@ Download App Packages from the iOS App Store
 
 ### Synopsis
 
-Download App Packages from the iOS App Store
+Download an app from the App Store by bundle ID. Free apps only.
 
-With --purchase, if the saved sign-in is older than three minutes or its age is unknown, ipsw signs in again before doing any other download work or sending a purchase request. It asks for the Apple ID unless one was supplied, then asks for the password at a hidden prompt or reads it from standard input with --password-stdin. If Apple refuses a recent saved sign-in as too old, ipsw names the saved Apple ID and asks you to sign in again. After sign-in succeeds, ipsw asks Apple again and sends the purchase request once more only if the app still needs a license.
+The first download fetches Apple's support files (about 300 MB) and asks you to sign in.
+
+--password, --proxy, --insecure, --sms, --store-front and --vault-password select the legacy downloader, which has its own sign-in.
 
 ```
 ipsw download ipa [flags]
@@ -23,49 +25,35 @@ ipsw download ipa [flags]
 ### Examples
 
 ```bash
-# Download specific app by bundle ID
+# Download an app by bundle ID (the first run sets up and signs in)
 ❯ ipsw download ipa com.zhiliaoapp.musically
 
-# Search for apps and download interactively
+# Search for apps and pick which to download
 ❯ ipsw download ipa --search twitter
 
-# Download from different store front
-❯ ipsw download ipa --store-front UK com.zhiliaoapp.musically
-
-# Download to specific directory
-❯ ipsw download ipa --output ./apps com.zhiliaoapp.musically
-
-# Online route: prepare the state once, sign in, then download a licensed IPA
-❯ ipsw download ipa setup
-❯ ipsw download ipa signin
-❯ ipsw download ipa --online com.zhiliaoapp.musically
-
 # Get the free license for an app the account does not own yet
-❯ ipsw download ipa --online --purchase com.zhiliaoapp.musically
+❯ ipsw download ipa --purchase com.zhiliaoapp.musically
 
-# Also decrypt the licensed archive; ipsw prints where the decrypted copy is
-❯ ipsw download ipa --online --decrypt com.zhiliaoapp.musically
-
+# Download and decrypt into ./apps (needs 'ipsw macho export-auth' once)
+❯ ipsw download ipa --decrypt --output ./apps com.zhiliaoapp.musically
 ```
 
 ### Options
 
 ```
-      --decrypt[=true|false]          Decrypt the licensed archive after --online download
+      --decrypt[=true|false]          Also decrypt the IPA (needs 'ipsw macho export-auth' once)
   -h, --help[=true|false]             help for ipa
-      --images string                 Use the six Apple files in DIR instead of fetching them (absolute path without symbolic links)
-      --insecure[=true|false]         do not verify ssl certs
-      --online[=true|false]           Use the optional online FairPlay engine. Before using the online route, unset APPSTORE_GUID, APPSTORE_PROXY, APPSTORE_REDOWNLOAD, APPSTORE_UA, IPSW_ANISETTE_URL.
+      --insecure[=true|false]         do not verify ssl certs (legacy downloader)
   -o, --output string                 Folder to download files to
-      --password string               Password for authentication
-      --password-stdin[=true|false]   Read the online sign-in password from standard input
-      --proxy string                  HTTP/HTTPS proxy
-      --purchase[=true|false]         Allow one free license purchase with --online
+      --password string               Password for authentication (legacy downloader)
+      --password-stdin[=true|false]   Read the Apple ID password from standard input
+      --proxy string                  HTTP/HTTPS proxy (legacy downloader)
+      --purchase[=true|false]         Get the free license if the account does not own the app
       --search[=true|false]           Search for app to download
-      --sms[=true|false]              Prefer SMS Two-factor authentication
-  -s, --store-front string            The country code for the App Store to download from (default "US")
+      --sms[=true|false]              Prefer SMS Two-factor authentication (legacy downloader)
+  -s, --store-front string            The country code for the App Store to download from (legacy downloader) (default "US")
       --username string               Username for authentication
-  -k, --vault-password string         Password to unlock credential vault (only for file vaults)
+  -k, --vault-password string         Password to unlock credential vault (only for file vaults) (legacy downloader)
 ```
 
 ### Options inherited from parent commands
@@ -84,6 +72,6 @@ ipsw download ipa [flags]
 ### SEE ALSO
 
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
-* [ipsw download ipa setup](/docs/cli/ipsw/download/ipa/setup)	 - Fetch the Apple files and prepare private online FairPlay state
-* [ipsw download ipa signin](/docs/cli/ipsw/download/ipa/signin)	 - Sign in using the optional online FairPlay engine
+* [ipsw download ipa setup](/docs/cli/ipsw/download/ipa/setup)	 - Prepare this Mac for IPA downloads
+* [ipsw download ipa signin](/docs/cli/ipsw/download/ipa/signin)	 - Sign in to the App Store for IPA downloads
 
