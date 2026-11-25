@@ -1330,17 +1330,6 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 	}
 }
 
-func waitForContext(ctx context.Context, duration time.Duration) error {
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
 func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 	batch := &downloadBatch{ctx: dp.config.Context}
