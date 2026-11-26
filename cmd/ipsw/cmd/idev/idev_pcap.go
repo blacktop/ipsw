@@ -86,7 +86,7 @@ var PcapCmd = &cobra.Command{
 		}
 		defer cli.Close()
 
-		pcapName := fmt.Sprintf("%s.pcap", time.Now())
+		pcapName := fmt.Sprintf("%s.pcap", time.Now().Format("02Jan2006_150405"))
 		pcapName = filepath.Join(output, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion), pcapName)
 		if err := os.MkdirAll(filepath.Dir(pcapName), 0755); err != nil {
 			return fmt.Errorf("failed to create pcap directory %s: %w", filepath.Dir(pcapName), err)

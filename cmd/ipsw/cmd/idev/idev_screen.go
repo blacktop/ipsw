@@ -55,7 +55,7 @@ func saveScreenshot(dev *lockdownd.DeviceValues, destPath string) error {
 		return fmt.Errorf("failed to get screenshot: %w", err)
 	}
 
-	fname := fmt.Sprintf("screenshot_%s.png", time.Now().Format("02Jan2006_15:04:05MST"))
+	fname := fmt.Sprintf("screenshot_%s.png", time.Now().Format("02Jan2006_150405MST"))
 	fname = filepath.Join(destPath, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion), fname)
 	if err := os.MkdirAll(filepath.Dir(fname), 0755); err != nil {
 		return fmt.Errorf("failed to create screenshot directory %s: %w", filepath.Dir(fname), err)
