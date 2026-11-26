@@ -2086,8 +2086,8 @@
     },
     "149035": {
       "name": "macOS Golden Gate 27",
-      "etag": "\"731b7-65ec469ecee00\"",
-      "last_modified": "Mon, 26 Oct 2026 20:45:44 GMT",
+      "etag": "\"731b7-65ec469ce6980\"",
+      "last_modified": "Mon, 26 Oct 2026 20:45:42 GMT",
       "vulnerabilities": {
         "CVE-2019-5598": {
           "component": "Kernel",
@@ -6523,8 +6523,8 @@
     },
     "149037": {
       "name": "watchOS 27",
-      "etag": "\"26442-65ec469545780\"",
-      "last_modified": "Mon, 26 Oct 2026 20:45:34 GMT",
+      "etag": "\"26442-65ec46972dc00\"",
+      "last_modified": "Mon, 26 Oct 2026 20:45:36 GMT",
       "vulnerabilities": {
         "CVE-2026-112608": {
           "component": "Core Bluetooth",
