@@ -31,3 +31,12 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+  # Static docs site: Dependabot drops the lockfile's pnpm overrides block,
+  # so /www dependencies are bumped by hand through pnpm.overrides.
+  - package-ecosystem: "npm"
+    directory: "/www"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
