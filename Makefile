@@ -77,9 +77,13 @@ RELEASE_TAG = $(or $(shell git tag --list 'v3.1.*' --points-at HEAD --sort=v:ref
 .PHONY: release
 release: _require-sandbox _require-engine ## Build, test and publish the NEXT_VERSION release
 	@hack/goreleaser/test-engine check
+	@docker info >/dev/null 2>&1 || { \
+	  echo "ERROR: start Docker; the release tests the Linux builds in a container."; \
+	  exit 1; \
+	}
 	@tag=$(RELEASE_TAG); echo " > Creating Release $$tag"; \
 	$(RELEASE) build $$tag "$(RELEASE_MANIFEST)" && \
-	hack/goreleaser/test-engine host dist && \
+	hack/goreleaser/test-engine run dist && \
 	$(RELEASE) publish $$tag "$(RELEASE_MANIFEST)"
 	@hack/make/portfile ../ports
 
