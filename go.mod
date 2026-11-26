@@ -10,7 +10,7 @@ tool (
 
 require (
 	charm.land/bubbles/v2 v2.2.2
-	charm.land/bubbletea/v2 v2.1.2
+	charm.land/bubbletea/v2 v2.1.3
 	charm.land/lipgloss/v2 v2.1.1
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4
 	github.com/99designs/keyring v1.2.2
@@ -35,7 +35,7 @@ require (
 	github.com/briandowns/spinner v1.23.2
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/charmbracelet/x/ansi v0.11.10
+	github.com/charmbracelet/x/ansi v0.12.0
 	github.com/coder/acp-go-sdk v0.20.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/docker/docker v28.5.2+incompatible
