@@ -47,6 +47,7 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/macho"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ota"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/sb"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/skill"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ssh"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/fatih/color"
@@ -180,6 +181,7 @@ func init() {
 	rootCmd.AddCommand(macho.MachoCmd)
 	rootCmd.AddCommand(ota.OtaCmd)
 	rootCmd.AddCommand(sb.SbCmd)
+	rootCmd.AddCommand(skill.SkillCmd)
 	rootCmd.AddCommand(ssh.SSHCmd)
 	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true

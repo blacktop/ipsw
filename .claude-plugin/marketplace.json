@@ -1,0 +1,16 @@
+{
+  "name": "ipsw",
+  "owner": {
+    "name": "blacktop"
+  },
+  "metadata": {
+    "description": "Apple firmware and binary reverse engineering skill for the ipsw CLI"
+  },
+  "plugins": [
+    {
+      "name": "ipsw",
+      "description": "Apple firmware and binary reverse engineering with the ipsw CLI",
+      "source": "./skills"
+    }
+  ]
+}

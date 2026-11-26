@@ -86,3 +86,7 @@ cmd/ipsw/cmd/sb/sb_*.go
 internal/commands/sb/
 pkg/sandbox/
 pkg/ext/
+
+# Agent skill: the shipped files that blanket rules above would drop
+!/skills/ipsw/LICENSE.txt
+!/internal/skills/ipsw.zip

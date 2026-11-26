@@ -16,17 +16,38 @@
 
 **ipsw** is a command-line toolkit for Apple firmware research and reverse engineering. Download and unpack IPSWs and OTAs, inspect Mach-O binaries and dyld shared caches, analyze kernelcaches, and work with connected iOS devices.
 
-[Agent skill](https://github.com/blacktop/ipsw-skill) · [Install](#install) · [CLI examples](#cli-examples) · [Documentation](https://blacktop.github.io/ipsw)
+[Agent skill](#use-ipsw-with-an-ai-agent) · [Install](#install) · [CLI examples](#cli-examples) · [Documentation](https://blacktop.github.io/ipsw)
 
 ## Use ipsw with an AI agent
 
-Start with **[ipsw-skill](https://github.com/blacktop/ipsw-skill)** if you're working in Claude Code, Codex, Gemini CLI, or another agent that supports skills. It gives the agent command references and workflows for firmware extraction, binary analysis, and Apple platform research.
+ipsw ships with an agent skill for Claude Code, Codex, and other agents that support skills. It gives the agent command references and workflows for firmware extraction, binary analysis, and Apple platform research. The skill lives in [`skills/ipsw`](skills/ipsw) and is built into the `ipsw` binary.
 
-[Install the ipsw CLI](#install), then add the skill:
+[Install the ipsw CLI](#install), then install the skill bundled with it:
 
 ```sh
-npx skills add https://github.com/blacktop/ipsw-skill --skill ipsw
+ipsw skill install                 # ~/.agents/skills (Codex and other agents)
+ipsw skill install --agent claude  # Claude Code
+ipsw skill install --local         # only the current project
 ```
+
+Re-run it after upgrading ipsw so the skill matches your binary.
+
+The same skill also installs through the usual agent tools:
+
+```sh
+# skills.sh
+npx skills add blacktop/ipsw --skill ipsw
+
+# Claude Code plugin
+claude plugin marketplace add blacktop/ipsw --sparse .claude-plugin skills
+claude plugin install ipsw@ipsw
+
+# Codex plugin
+codex plugin marketplace add blacktop/ipsw --sparse .claude-plugin --sparse skills
+codex plugin add ipsw@ipsw
+```
+
+The `--sparse` paths fetch only the skill instead of the whole repository. Pick one install method per agent: installing the skill twice, say as a plugin and with `ipsw skill install`, makes the agent load it twice.
 
 You can then ask for a task in plain language. For example:
 
@@ -35,8 +56,6 @@ You can then ask for a task in plain language. For example:
 > Dump the Objective-C headers for SpringBoardServices from this dyld shared cache.
 
 > Compare the KEXTs in these two kernelcaches.
-
-The [skill README](https://github.com/blacktop/ipsw-skill#installation) has setup instructions for individual agents, including the Claude Code plugin and Gemini CLI extension.
 
 ## Install
 
@@ -148,7 +167,7 @@ The separate `ipswd` daemon exposes a REST API for automation. See the [API refe
 
 ## Documentation and community
 
-- [Agent skill and setup](https://github.com/blacktop/ipsw-skill)
+- [Agent skill](skills/ipsw) and [setup](#use-ipsw-with-an-ai-agent)
 - [Guides and command reference](https://blacktop.github.io/ipsw)
 - [Precomputed firmware diffs](https://github.com/blacktop/ipsw-diffs)
 - [GitHub Discussions](https://github.com/blacktop/ipsw/discussions)

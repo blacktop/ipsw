@@ -51,6 +51,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw pkg](/docs/cli/ipsw/pkg)	 - 🚧 List contents of a DMG/PKG file
 * [ipsw plist](/docs/cli/ipsw/plist)	 - Dump plist as JSON
 * [ipsw sb](/docs/cli/ipsw/sb)	 - Sandbox commands
+* [ipsw skill](/docs/cli/ipsw/skill)	 - Manage the ipsw agent skill bundled with this binary
 * [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device
 * [ipsw swift-dump](/docs/cli/ipsw/swift-dump)	 - 🚧 Swift class-dump a dylib from a DSC or MachO
 * [ipsw symbolicate](/docs/cli/ipsw/symbolicate)	 - Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
