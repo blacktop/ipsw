@@ -95,3 +95,91 @@ func TestDecodeMatchedLiterals(t *testing.T) {
 func TestDecodeExecutableFilters(t *testing.T) {
 	testDecode(t, "bcj_arm64.rav", "bcj_x86.rav", "macho_header_like.rav")
 }
+
+// TestDecodeRejectsEveryStrictPrefix rejects incomplete stored and compressed
+// frames.
+func TestDecodeRejectsEveryStrictPrefix(t *testing.T) {
+	for _, fixture := range []struct {
+		name string
+		size int
+	}{{"one_byte.rav", 1}, {"random_1k.rav", 1024}, {"zeros_4k.rav", 4096}} {
+		t.Run(fixture.name, func(t *testing.T) {
+			compressed, err := os.ReadFile(
+				filepath.Join("testdata", "apple", fixture.name),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for end := 0; end < len(compressed); end++ {
+				if err := Decode(
+					make([]byte, fixture.size),
+					compressed[:end],
+				); err == nil {
+					t.Fatalf("Decode accepted strict prefix of length %d", end)
+				}
+			}
+		})
+	}
+}
+
+// TestDecodeRejectsWrongDestinationSize enforces the exact output-size
+// contract.
+func TestDecodeRejectsWrongDestinationSize(t *testing.T) {
+	for _, fixture := range []struct {
+		name string
+		size int
+	}{
+		{"one_byte.rav", 1},
+		{"zeros_4k.rav", 4096},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			compressed, err := os.ReadFile(
+				filepath.Join("testdata", "apple", fixture.name),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, size := range []int{fixture.size - 1, fixture.size + 1} {
+				if err := Decode(make([]byte, size), compressed); err == nil {
+					t.Errorf(
+						"Decode accepted destination size %d, want %d",
+						size,
+						fixture.size,
+					)
+				}
+			}
+		})
+	}
+
+	empty, err := os.ReadFile(filepath.Join("testdata", "apple", "empty.rav"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Decode(make([]byte, 1), empty); err == nil {
+		t.Error("Decode accepted a one-byte destination for the empty fixture")
+	}
+}
+
+// TestDecodeRejectsInvalidHeader rejects bad magic and reserved header bits.
+func TestDecodeRejectsInvalidHeader(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("testdata", "apple", "one_byte.rav"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mutation := range []struct {
+		name string
+		byte int
+		mask byte
+	}{
+		{"magic", 0, 1},
+		{"reserved bit", 4, 1},
+	} {
+		t.Run(mutation.name, func(t *testing.T) {
+			corrupt := append([]byte(nil), fixture...)
+			corrupt[mutation.byte] ^= mutation.mask
+			if err := Decode(make([]byte, 1), corrupt); err == nil {
+				t.Error("Decode accepted invalid header")
+			}
+		})
+	}
+}
