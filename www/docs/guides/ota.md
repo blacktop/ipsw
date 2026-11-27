@@ -284,3 +284,76 @@ Now you have the RSR patched files ready to start diffing :smirk: :tada:
 :::caution NOTE
 For now the `ipsw ota patch rsr` command will only work on **macOS Ventura** as it calls into a private API to apply the patch.  We plan on adding cross-platform support in the future.
 :::
+
+## Testing PBZM extraction with an external corpus
+
+The optional `TestExtractExternalPBZM` test accepts a file containing a
+raw or version 0 BXDIFF50 patch enclosing a PBZM stream. These were first
+observed in OTAs published in macOS 27 (Golden Gate). Supply the file through
+`PBZM_TEST_FILE`, there are two methods of obtaining test corpora.
+
+### (Recommended) Recovery image validation
+
+Extract `AssetData/payloadv2/basesystem_patches/arm64eBaseSystem.dmg` from a
+full OTA and supply that file to `TestExtractExternalPBZM`. Using a OTA that
+requires a base image will be rejected.
+
+The test checks that it needs no base image, then decodes every PBZM chunk into
+a hash. The result must match the SHA-1 recorded in Apple's patch header in
+order for the test to pass. The decoded image is not written to disk.
+
+Extract the replacement patch from the downloaded archive
+
+```bash
+unzip -p ./OTA.zip \
+  AssetData/payloadv2/basesystem_patches/arm64eBaseSystem.dmg \
+  > ./arm64eBaseSystem.dmg
+```
+
+Run the test from the repository root, passing the extracted file
+
+```bash
+CGO_ENABLED=1 \
+PBZM_TEST_FILE="${PWD}/arm64eBaseSystem.dmg" \
+  go test -count=1 -v -run '^TestExtractExternalPBZM$' ./pkg/ota/pbzx
+```
+
+### (Lightweight) Payload validation with ranged retrieval
+
+:::caution
+This method while bandwidth efficient is brittle as it depends on the exact
+layout of a specific OTA. The following guidance may require improvisation if
+using a different build or archive.
+:::
+
+The OTA archive for macOS 27.2 build 26B123 has a PBZM member located at
+`AssetData/payloadv2/payload.003.ecc`. For non-ECC data, `payload.000` is a
+viable candidate.
+
+Start by retrieving a link to the OTA
+
+```bash
+OTA_URL="$(curl -fsSL \
+  'https://raw.githubusercontent.com/littlebyteorg/appledb/2d592267/osFiles/macOS/26x%20-%2027.x/26B123.json' \
+  | jq -er 'first(
+      .sources[] | select(.type == "ota" and .prerequisiteBuild == null)
+      | .links[] | select(.active == true) | .url
+    )')"
+```
+
+then extract the payload slice from the OTA using a ranged request
+
+```bash
+ipsw extract --remote --flat \
+  --pattern '^AssetData/payloadv2/payload\.003\.ecc$' \
+  --output ./pbzm-corpus "${OTA_URL}"
+```
+
+The command writes `payload.003.ecc` under `pbzm-corpus/26B123__MacOS/`.
+Run the test against that file from the repository root
+
+```bash
+CGO_ENABLED=1 \
+PBZM_TEST_FILE="${PWD}/pbzm-corpus/26B123__MacOS/payload.003.ecc" \
+  go test -count=1 -v -run '^TestExtractExternalPBZM$' ./pkg/ota/pbzx
+```
