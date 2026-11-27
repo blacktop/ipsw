@@ -18,9 +18,12 @@ func (h *_Heap) Push(x any) {
 	*h = append(*h, x.(_Chunk))
 }
 
+// Pop removes the last heap element and clears its backing-array slot so
+// the decoded chunk buffer can be reclaimed.
 func (h *_Heap) Pop() (x any) {
 	last := len(*h) - 1
 	x = (*h)[last]
+	(*h)[last] = _Chunk{}
 	*h = (*h)[:last]
 	return
 }
