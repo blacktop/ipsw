@@ -17,11 +17,7 @@ func write(
 ) error {
 	next := 0
 	write := func(c _Chunk) error {
-		n, err := dst.Write(c.data)
-		if err == nil && n != len(c.data) {
-			err = io.ErrShortWrite
-		}
-		if err != nil {
+		if err := writeBlock(dst, c.data); err != nil {
 			return fmt.Errorf("write error: %w", err)
 		}
 		next += 1
@@ -60,4 +56,14 @@ func write(
 			heap.Push(&h, chunk)
 		}
 	}
+}
+
+// writeBlock converts an incomplete write with no reported error into
+// io.ErrShortWrite so callers cannot silently lose encoded or decoded bytes.
+func writeBlock(dst io.Writer, data []byte) error {
+	n, err := dst.Write(data)
+	if err == nil && n != len(data) {
+		return io.ErrShortWrite
+	}
+	return err
 }
