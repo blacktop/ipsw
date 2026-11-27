@@ -1,0 +1,33 @@
+Zero-Clause BSD (0BSD)
+
+Copyright (c) 2026 anat0m1a
+
+Permission to use, copy, modify, and/or distribute this software for any purpose
+with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+THIS SOFTWARE.
+
+---
+
+Scope
+-----
+
+0BSD asks nothing of you: no attribution, no notice retention, no conditions.
+Use it, ship it, relicense it, embed it in anything.
+
+Two limits are worth stating rather than leaving to inference:
+
+This covers the original work in this repository — the C library, the test and
+fuzzing harnesses, the tooling, and the documentation. It does not and cannot
+grant rights in the LZRAVEN format itself, which is Apple's. The format is
+documented here for interoperability, derived by black-box testing and analysis
+of Apple's shipping implementation. No Apple code is included or redistributed.
+
+Nothing here is a patent licence. This grants copyright permissions only and
+makes no representation about patents held by any third party.
