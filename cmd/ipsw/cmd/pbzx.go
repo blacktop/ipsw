@@ -29,7 +29,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/atomicfile"
-	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/ota/pbzx"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -41,8 +40,8 @@ func init() {
 
 // pbzxCmd represents the pbzx command
 var pbzxCmd = &cobra.Command{
-	Use:           "pbzx <PBZX>",
-	Short:         "Decompress pbzx files",
+	Use:           "pbzx <file>",
+	Short:         "Decompress PBZX and PBZM files",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,12 +51,6 @@ var pbzxCmd = &cobra.Command{
 		}
 
 		infile := filepath.Clean(args[0])
-
-		if isPBZX, err := magic.IsPBZX(infile); err != nil {
-			return err
-		} else if !isPBZX {
-			return fmt.Errorf("file is not a pbzx file")
-		}
 
 		f, err := os.Open(infile)
 		if err != nil {
@@ -94,7 +87,7 @@ var pbzxCmd = &cobra.Command{
 			"compressed":   fmt.Sprintf("%d bytes (%s)", finfo.Size(), humanize.IBytes(uint64(finfo.Size()))),
 			"decompressed": fmt.Sprintf("%d bytes (%s)", oinfo.Size(), humanize.IBytes(uint64(oinfo.Size()))),
 			"output":       fname,
-		}).Info("Extracted PBZX file")
+		}).Info("Extracted file")
 		return nil
 	},
 }

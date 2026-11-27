@@ -12,7 +12,7 @@ List contents of a payloadv2 file
 
 ### Synopsis
 
-List contents of a raw, PBZX, or PBZM payloadv2 file. PBZM requires Apple's aa tool with PBZM support.
+List contents of a raw, PBZX, or PBZM payloadv2 file. Compressed PBZM requires CGO.
 
 ```
 ipsw ota payload <PAYLOAD> | <OTA> <PAYLOAD> [flags]
