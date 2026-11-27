@@ -9660,8 +9660,8 @@
     },
     "149041": {
       "name": "iOS 26.7 and iPadOS 26.7",
-      "etag": "\"2870a-65ec468cb0340\"",
-      "last_modified": "Mon, 26 Oct 2026 20:45:25 GMT",
+      "etag": "\"2870a-65ec468ac7ec0\"",
+      "last_modified": "Mon, 26 Oct 2026 20:45:23 GMT",
       "vulnerabilities": {
         "CVE-2026-112565": {
           "component": "Model I/O",
@@ -10882,8 +10882,8 @@
     },
     "149042": {
       "name": "macOS Tahoe 26.7",
-      "etag": "\"3fe1a-65ec46935d300\"",
-      "last_modified": "Mon, 26 Oct 2026 20:45:32 GMT",
+      "etag": "\"3fe1a-65ec469174e80\"",
+      "last_modified": "Mon, 26 Oct 2026 20:45:30 GMT",
       "vulnerabilities": {
         "CVE-2019-5598": {
           "component": "Kernel",
@@ -13004,8 +13004,8 @@
     },
     "149043": {
       "name": "macOS Sequoia 15.8",
-      "etag": "\"40f1d-65ec468e987c0\"",
-      "last_modified": "Mon, 26 Oct 2026 20:45:27 GMT",
+      "etag": "\"40f1d-65ec468f8ca00\"",
+      "last_modified": "Mon, 26 Oct 2026 20:45:28 GMT",
       "vulnerabilities": {
         "CVE-2019-5598": {
           "component": "Kernel",
