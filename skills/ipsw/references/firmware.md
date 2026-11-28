@@ -143,8 +143,7 @@ ipsw ota extract "$OTA" --cryptex system -o ./ota/     # a cryptex as a DMG (ful
   `--range '<regex>'` limits which payload chunks are searched.
 - `ota ls --payload --json` prints one JSON array per matching payload chunk (a stream, so
   `jq -s 'add'` merges them); no match prints nothing.
-- `ota payload <OTA> <payload>` lists a raw, PBZX, or PBZM payloadv2 file; PBZM needs Apple's
-  `aa` tool with PBZM support.
+- `ota payload <OTA> <payload>` lists a raw, PBZX, or PBZM payloadv2 file. Compressed PBZM requires CGO.
 - `ota patch rsr` applies Rapid Security Response patches; `ota patch bxdiff` handles BXDIFF50
   updates.
 

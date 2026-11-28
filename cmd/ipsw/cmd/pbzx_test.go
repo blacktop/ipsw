@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// pbzxTestSource wraps a string in a single stored PBZX chunk for CLI tests.
 func pbzxTestSource(payload string) []byte {
 	valid := []byte("pbzx")
 	valid = binary.BigEndian.AppendUint64(valid, 0x1000000)
@@ -22,6 +23,8 @@ func pbzxTestSource(payload string) []byte {
 	return append(valid, payload...)
 }
 
+// TestPBZXOutput checks output creation and replacement, symlink handling,
+// and preservation of existing files when extraction fails or is canceled.
 func TestPBZXOutput(t *testing.T) {
 	const payload = "synthetic decompressed payload"
 	valid := pbzxTestSource(payload)
@@ -153,6 +156,8 @@ func TestPBZXOutput(t *testing.T) {
 	}
 }
 
+// TestPBZXWriteFailure checks that a destination write error preserves the
+// previous output and removes the temporary replacement file.
 func TestPBZXWriteFailure(t *testing.T) {
 	dir := t.TempDir()
 	output := filepath.Join(dir, "output")
@@ -177,5 +182,34 @@ func TestPBZXWriteFailure(t *testing.T) {
 	}
 	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 1 {
 		t.Fatalf("failed extraction left unexpected files: %v, %v", entries, err)
+	}
+}
+
+// TestPBZMOutput checks that the pbzx command also extracts a PBZM stream
+// containing an independently supplied compressed fixture.
+func TestPBZMOutput(t *testing.T) {
+	const size = 4096
+	chunk, err := os.ReadFile("../../../pkg/ota/lzraven/codec/testdata/apple/zeros_4k.rav")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := binary.BigEndian.AppendUint64([]byte(pbzx.MagicPBZM), size)
+	stream = binary.BigEndian.AppendUint64(stream, size)
+	stream = binary.BigEndian.AppendUint64(stream, uint64(len(chunk)))
+	input := filepath.Join(t.TempDir(), "zeros.pbzm")
+	if err := os.WriteFile(input, append(stream, chunk...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
+	if err := pbzxCmd.RunE(cmd, []string{input}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(input + ".extracted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, make([]byte, size)) {
+		t.Fatalf("decoded data differs from %d zero bytes", size)
 	}
 }

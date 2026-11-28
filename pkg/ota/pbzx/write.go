@@ -7,13 +7,21 @@ import (
 	"io"
 )
 
-func write(ctx context.Context, writeCh <-chan _Chunk, dst io.Writer) error {
+// write restores chunk order and releases an in-flight slot only after the
+// chunk is written. Missing chunks at the end are reported as truncation.
+func write(
+	ctx context.Context,
+	writeCh <-chan _Chunk,
+	dst io.Writer,
+	pending <-chan struct{},
+) error {
 	next := 0
 	write := func(c _Chunk) error {
-		if _, err := dst.Write(c.data); err != nil {
+		if err := writeBlock(dst, c.data); err != nil {
 			return fmt.Errorf("write error: %w", err)
 		}
 		next += 1
+		<-pending
 		return nil
 	}
 
@@ -48,4 +56,14 @@ func write(ctx context.Context, writeCh <-chan _Chunk, dst io.Writer) error {
 			heap.Push(&h, chunk)
 		}
 	}
+}
+
+// writeBlock converts an incomplete write with no reported error into
+// io.ErrShortWrite so callers cannot silently lose encoded or decoded bytes.
+func writeBlock(dst io.Writer, data []byte) error {
+	n, err := dst.Write(data)
+	if err == nil && n != len(data) {
+		return io.ErrShortWrite
+	}
+	return err
 }

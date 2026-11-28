@@ -2,10 +2,9 @@
 // Archive compression ("pbzm" streams) that macOS 27 OTAs use for payloadv2
 // members and RIDIFF cryptex patches.
 //
-// ipsw has no LZRaven decoder of its own: it relies on the system aa tool and
-// libParallelCompression, which only gained LZRaven in macOS 27. Older hosts
-// reject pbzm streams in aa and can crash inside libParallelCompression, so
-// callers check before handing them one.
+// LZRaven can be decoded by `pbzx` if CGO is enabled, libParallelCompression
+// decodes RIDIFF patches.
+
 package lzraven
 
 import (

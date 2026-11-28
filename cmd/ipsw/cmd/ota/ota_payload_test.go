@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blacktop/ipsw/pkg/ota/lzraven"
 	"github.com/blacktop/ipsw/pkg/ota/yaa"
 )
 
+// payloadFixture builds a minimal YAA entry named file.txt for listing tests.
 func payloadFixture() []byte {
 	header := append([]byte("TYP1FPATP"), 8, 0)
 	header = append(header, []byte("file.txtMOD1")...)
@@ -26,6 +26,7 @@ func payloadFixture() []byte {
 	return out.Bytes()
 }
 
+// zipPayloadFixture places named payloads in a temporary OTA-like ZIP.
 func zipPayloadFixture(t *testing.T, members map[string][]byte) string {
 	t.Helper()
 	var data bytes.Buffer
@@ -49,6 +50,8 @@ func zipPayloadFixture(t *testing.T, members map[string][]byte) string {
 	return name
 }
 
+// captureOTAOutput captures a command's stdout while preserving its error
+// and restoring stdout before returning.
 func captureOTAOutput(t *testing.T, run func() error) (string, error) {
 	t.Helper()
 	out, err := os.CreateTemp(t.TempDir(), "stdout")
@@ -66,7 +69,9 @@ func captureOTAOutput(t *testing.T, run func() error) (string, error) {
 	return string(data), runErr
 }
 
-func TestOTAPayloadRawAndPBZXInputs(t *testing.T) {
+// TestOTAPayloadInputs checks raw YAA, PBZX and PBZM listings from standalone
+// files and ZIP members, including PBZM operation without a system aa tool.
+func TestOTAPayloadInputs(t *testing.T) {
 	previousContext := otaPayloadCmd.Context()
 	otaPayloadCmd.SetContext(t.Context())
 	t.Cleanup(func() { otaPayloadCmd.SetContext(previousContext) })
@@ -77,60 +82,45 @@ func TestOTAPayloadRawAndPBZXInputs(t *testing.T) {
 		binary.Write(&compressed, binary.BigEndian, uint64(len(raw)))
 	}
 	compressed.Write(raw)
+	pbzm, err := os.ReadFile("../../../../pkg/ota/lzraven/probe.aar")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name string
 		data []byte
-	}{{"raw", raw}, {"pbzx", compressed.Bytes()}} {
+		want string
+	}{
+		{"raw", raw, "file.txt"},
+		{"pbzx", compressed.Bytes(), "file.txt"},
+		{"pbzm", pbzm, " a\n"},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.name == "pbzm" {
+				t.Setenv("PATH", t.TempDir())
+			}
 			standalone := filepath.Join(t.TempDir(), "payload.000")
 			if err := os.WriteFile(standalone, tc.data, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			archive := zipPayloadFixture(t, map[string][]byte{"AssetData/payloadv2/payload.000": tc.data})
 			for _, args := range [][]string{{standalone}, {archive, "AssetData/payloadv2/payload.000"}} {
-				out, err := captureOTAOutput(t, func() error { return otaPayloadCmd.RunE(otaPayloadCmd, args) })
+				out, err := captureOTAOutput(t, func() error {
+					return otaPayloadCmd.RunE(otaPayloadCmd, args)
+				})
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !strings.Contains(out, "file.txt") {
-					t.Fatalf("listing missing synthetic file: %q", out)
+				if !strings.Contains(out, tc.want) {
+					t.Fatalf("listing missing %q: %q", tc.want, out)
 				}
 			}
 		})
 	}
 }
 
-func TestOTAPayloadPBZMConversion(t *testing.T) {
-	bin := t.TempDir()
-	t.Setenv("PATH", bin)
-	input := append([]byte("pbzm"), payloadFixture()...)
-	_, err := parseOTAPayload(context.Background(), bytes.NewReader(input), "payload.000")
-	if !errors.Is(err, lzraven.ErrUnsupported) {
-		t.Fatalf("missing converter error = %v", err)
-	}
-	tool := filepath.Join(bin, "aa")
-	// `aa list` is the LZRaven capability probe; `aa convert` decodes.
-	script := "#!/bin/sh\n[ \"$1\" = list ] && { /bin/cat >/dev/null; exit 0; }\n" +
-		"[ \"$*\" = 'convert -a raw' ] || exit 42\n/bin/dd bs=1 skip=4 2>/dev/null\n"
-	if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	aa, err := parseOTAPayload(context.Background(), bytes.NewReader(input), "payload.000")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(aa.Entries) != 1 || aa.Entries[0].Path != "file.txt" {
-		t.Fatalf("entries = %+v", aa.Entries)
-	}
-	if err := os.WriteFile(tool, []byte("#!/bin/sh\necho unsupported-codec >&2\nexit 1\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	_, err = parseOTAPayload(context.Background(), bytes.NewReader(input), "payload.000")
-	if err == nil || !strings.Contains(err.Error(), "payload.000") || !strings.Contains(err.Error(), "unsupported-codec") {
-		t.Fatalf("conversion error = %v", err)
-	}
-}
-
+// TestOTAPayloadUnknownHeaderNamesMember checks that an invalid payload header
+// reports the affected member and offset while preserving the parsing error.
 func TestOTAPayloadUnknownHeaderNamesMember(t *testing.T) {
 	_, err := parseOTAPayload(context.Background(), strings.NewReader("nope"), "AssetData/payloadv2/payload.001")
 	if !errors.Is(err, yaa.ErrInvalidMagic) || !strings.Contains(err.Error(), "AssetData/payloadv2/payload.001") || !strings.Contains(err.Error(), "offset 0x0") {
