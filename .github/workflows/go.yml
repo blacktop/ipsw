@@ -519,6 +519,8 @@ jobs:
   test:
     permissions:
       contents: read
+    env:
+      CGO_ENABLED: "1"
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest]
@@ -536,3 +538,11 @@ jobs:
         run: go vet ./pkg/dyld ./pkg/disass ./pkg/img3 ./pkg/devicetree ./internal/magic ./internal/utils ./internal/commands/macho ./internal/commands/dsc ./internal/commands/mount ./internal/commands/extract ./internal/diff ./internal/syms ./internal/skills/... ./cmd/ipsw/cmd/skill
       - name: Test
         run: go test -count=1 ./pkg/dyld ./pkg/disass ./pkg/img3 ./pkg/devicetree ./internal/magic ./internal/utils ./internal/commands/macho ./internal/commands/dsc ./internal/commands/mount ./internal/commands/extract ./internal/diff ./internal/syms ./internal/skills/... ./cmd/ipsw/cmd/skill
+      - name: Vet OTA packages
+        run: go vet ./pkg/ota/lzraven/codec ./pkg/ota/pbzx ./cmd/ipsw/cmd ./cmd/ipsw/cmd/ota
+      - name: Test OTA packages
+        run: go test -count=1 ./pkg/ota/lzraven/codec ./pkg/ota/pbzx
+      - name: Test OTA commands
+        run: >-
+          go test -count=1 -run '^(TestPBZ|TestOTAPayload)'
+          ./cmd/ipsw/cmd ./cmd/ipsw/cmd/ota
